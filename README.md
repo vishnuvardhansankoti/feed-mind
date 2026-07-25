@@ -11,13 +11,18 @@ Ingests 11 RSS feeds (AI/ML research, industry news, cloud computing), summarize
 ```
 feed-mind/
 ├── main.py             # Cloud Function entry point (HTTP trigger)
-├── config.py           # Feed URLs, constants, system prompt
-├── secrets.py          # GCP Secret Manager loader
-├── ingestion.py        # RSS feed fetching & parsing (feedparser)
-├── deduplication.py    # Firestore dedup check & write
-├── summarization.py    # Gemini 2.0 Flash API integration
-├── notification.py     # Telegram Bot API message delivery
-├── requirements.txt    # Python dependencies
+├── feedmind/           # Core application package
+│   ├── __init__.py
+│   ├── config.py       # Feed URLs, constants, system prompt
+│   ├── secrets.py      # GCP Secret Manager loader
+│   ├── ingestion.py    # RSS feed fetching & parsing (feedparser)
+│   ├── deduplication.py # Firestore dedup check & write
+│   ├── summarization.py # Gemini 2.0 Flash API integration
+│   └── notification.py # Telegram Bot API message delivery
+├── tests/              # Unit tests
+│   ├── __init__.py
+│   └── test_config.py
+├── pyproject.toml      # Python dependencies & config
 └── deploy.sh           # One-shot GCP deployment script
 ```
 
@@ -46,7 +51,18 @@ Edit `config.py`:
 - Set `GCP_PROJECT_ID` to your GCP project ID
 - Validate and update the RSS feed URLs in `RSS_FEEDS` (some may need real RSS paths)
 
-### 2. Create secrets in Secret Manager
+### 2. Set up Firestore Database
+
+This project uses Firestore to keep track of articles it has already seen (deduplication).
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Select your project.
+3. In the navigation menu, go to **Firestore**.
+4. Click **Create Database**.
+5. Select **Native mode** (required for this project).
+6. Choose a location (e.g., `nam5` for multi-region US or a specific region) and click **Create Database**.
+
+### 3. Create secrets in Secret Manager
 
 ```bash
 PROJECT_ID="your-gcp-project-id"
@@ -67,7 +83,7 @@ echo -n "YOUR_GEMINI_API_KEY" | \
 > **Tip:** To find your Telegram Chat ID, send a message to your bot and call:
 > `https://api.telegram.org/bot<TOKEN>/getUpdates`
 
-### 3. Deploy
+### 4. Deploy
 
 ```bash
 # Update PROJECT_ID and SCHEDULER_TIMEZONE in deploy.sh first
@@ -81,7 +97,7 @@ The script will:
 - Deploy the Cloud Function (Gen 2, authenticated only)
 - Set up a Cloud Scheduler job (daily at 8 AM)
 
-### 4. Test manually
+### 5. Test manually
 
 ```bash
 gcloud scheduler jobs run feedmind-daily-trigger \

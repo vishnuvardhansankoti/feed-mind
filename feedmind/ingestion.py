@@ -12,7 +12,7 @@ from typing import List, Optional
 
 import feedparser
 
-import config
+from feedmind import config
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,15 @@ def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> List[Arti
         raw_text: str = getattr(entry, "summary", "") or getattr(entry, "description", "") or ""
         snippet: str = _strip_html(raw_text)[: config.MAX_SNIPPET_CHARS]
 
+        published_at_str = _parse_published_at(entry)
+        
+        try:
+            pub_dt = datetime.fromisoformat(published_at_str)
+            if (datetime.now(timezone.utc) - pub_dt).days > config.MAX_ARTICLE_AGE_DAYS:
+                continue
+        except Exception:
+            pass
+
         articles.append(
             Article(
                 article_id    = _compute_article_id(url),
@@ -105,7 +114,7 @@ def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> List[Arti
                 snippet       = snippet,
                 feed_source   = feed_source,
                 feed_category = feed_category,
-                published_at  = _parse_published_at(entry),
+                published_at  = published_at_str,
             )
         )
 

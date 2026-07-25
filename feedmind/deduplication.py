@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 
 from google.cloud import firestore
 
-import config
-from ingestion import Article
+from feedmind import config
+from feedmind.ingestion import Article
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,14 @@
+
+curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+  -H "Content-Type: application/json" \
+  -d "{\"chat_id\": \"${chat_id}\", \"text\": \"✅ FeedMind bot is working!\"}"
+
+###
+
+  POST {{telegram-send-message-api}} HTTP/1.1
+  Content-Type: application/json
+
+  {
+    "chat_id": {{chat_id}},
+    "text": "✅ FeedMind bot is working!"
+  }

@@ -16,7 +16,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuration — update these before running
 # ---------------------------------------------------------------------------
-PROJECT_ID="your-gcp-project-id"           # TODO: replace
+PROJECT_ID="feed-mind"           # TODO: replace
 REGION="us-central1"                       # TODO: update to your preferred region
 FUNCTION_NAME="feedmind"
 RUNTIME="python312"

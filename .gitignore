@@ -20,3 +20,17 @@ service-account*.json
 # Ignore OS files
 .DS_Store
 Thumbs.db
+
+
+.vscode/settings.json
+
+secrets.txt
+
+# uv specific
+.uv/
+uv.lock
+
+# Test and lint caches
+.pytest_cache/
+.ruff_cache/
+.coverage

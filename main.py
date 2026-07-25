@@ -14,12 +14,12 @@ from datetime import datetime, timezone
 import functions_framework
 from google.cloud import firestore
 
-import config
-from deduplication import is_duplicate, mark_as_delivered
-from ingestion import fetch_feed
-from notification import send_message
-from secrets import load_all_secrets
-from summarization import init_gemini, summarize
+from feedmind import config
+from feedmind.deduplication import is_duplicate, mark_as_delivered
+from feedmind.ingestion import fetch_feed
+from feedmind.notification import send_message
+from feedmind.secrets import load_all_secrets
+from feedmind.summarization import init_gemini, summarize
 
 # ---------------------------------------------------------------------------
 # Logging — structured JSON for Cloud Logging
@@ -77,7 +77,10 @@ def feedmind(request):
     # Step 2: Initialise Gemini model and Firestore client
     # ------------------------------------------------------------------
     gemini_model = init_gemini(gemini_api_key)
-    db           = firestore.Client(project=config.GCP_PROJECT_ID)
+    db           = firestore.Client(
+        project=config.GCP_PROJECT_ID,
+        database=config.FIRESTORE_DATABASE
+    )
 
     # ------------------------------------------------------------------
     # Step 3: Process feeds sequentially
@@ -166,3 +169,8 @@ def feedmind(request):
     logger.info(json.dumps(summary_log))
 
     return (json.dumps(summary_log), 200, {"Content-Type": "application/json"})
+
+if __name__ == "__main__":
+    # Allow running the script directly without functions-framework
+    print("Running FeedMind locally...")
+    feedmind(None)

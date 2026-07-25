@@ -7,8 +7,8 @@ from typing import Optional
 
 import google.generativeai as genai
 
-import config
-from ingestion import Article
+from feedmind import config
+from feedmind.ingestion import Article
 
 logger = logging.getLogger(__name__)
 

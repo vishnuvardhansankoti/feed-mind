@@ -17,8 +17,8 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuration — update before running
 # ---------------------------------------------------------------------------
-PROJECT_ID="your-gcp-project-id"         # TODO: replace
-GITHUB_ORG="your-github-username"        # TODO: replace (username or org name)
+PROJECT_ID="feed-mind"         # TODO: replace
+GITHUB_ORG="vishnuvardhansankoti"        # TODO: replace (username or org name)
 GITHUB_REPO="feed-mind"                  # TODO: replace if repo name differs
 
 # ---------------------------------------------------------------------------
