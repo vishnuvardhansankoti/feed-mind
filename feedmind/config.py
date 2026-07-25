@@ -16,7 +16,7 @@ RSS_FEEDS = [
     # --- Academic / Research ---
     ("arXiv ML",           "https://rss.arxiv.org/rss/cs.LG",                                      "academic"),
     ("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic"),
-    ("Hugging Face Papers","https://huggingface.co/blog/feed.xml",                                  "academic"),  
+    ("Hugging Face Papers","https://huggingface.co/blog/feed.xml",                                  "academic"),
     ("MIT Tech Review",    "https://www.technologyreview.com/feed/",                               "academic"),
 
     # --- Industry News ---

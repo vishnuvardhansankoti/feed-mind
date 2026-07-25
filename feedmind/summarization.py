@@ -3,7 +3,6 @@ summarization.py — Gemini 2.0 Flash API integration for article summarization.
 """
 
 import logging
-from typing import Optional
 
 import google.generativeai as genai
 
@@ -28,7 +27,7 @@ def init_gemini(api_key: str) -> genai.GenerativeModel:
     return model
 
 
-def summarize(model: genai.GenerativeModel, article: Article) -> Optional[str]:
+def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
     """
     Call the Gemini API to produce a 3-bullet summary of the article.
 

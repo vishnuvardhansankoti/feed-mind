@@ -9,7 +9,7 @@ import json
 import logging
 import socket
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import functions_framework
 from google.cloud import firestore
@@ -47,7 +47,7 @@ def feedmind(request):
     The Cloud Function platform validates the token before invoking this handler.
     """
     run_start = time.monotonic()
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
 
     logger.info(json.dumps({"message": "FeedMind run started", "timestamp": started_at}))
 

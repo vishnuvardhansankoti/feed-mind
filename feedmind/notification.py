@@ -8,7 +8,6 @@ Messages are formatted in MarkdownV2 with proper escaping.
 import logging
 import re
 import time
-from typing import Optional
 
 import httpx
 

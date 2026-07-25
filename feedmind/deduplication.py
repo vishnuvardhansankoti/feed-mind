@@ -3,7 +3,7 @@ deduplication.py — Firestore-backed deduplication check.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from google.cloud import firestore
 
@@ -41,7 +41,7 @@ def mark_as_delivered(db: firestore.Client, article: Article) -> None:
             "feed_source":  article.feed_source,
             "feed_category": article.feed_category,
             "published_at": article.published_at,
-            "processed_at": datetime.now(timezone.utc).isoformat(),
+            "processed_at": datetime.now(UTC).isoformat(),
             "status":       "delivered",
         }
     )

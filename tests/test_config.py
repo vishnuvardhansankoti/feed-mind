@@ -1,5 +1,6 @@
 from feedmind import config
 
+
 def test_rss_feeds_structure():
     assert isinstance(config.RSS_FEEDS, list)
     assert len(config.RSS_FEEDS) > 0

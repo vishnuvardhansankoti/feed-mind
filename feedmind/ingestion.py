@@ -6,9 +6,8 @@ import hashlib
 import html
 import logging
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import List, Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import feedparser
 
@@ -38,12 +37,12 @@ def _parse_published_at(entry) -> str:
     """
     try:
         if hasattr(entry, "published_parsed") and entry.published_parsed:
-            dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+            dt = datetime(*entry.published_parsed[:6], tzinfo=UTC)
             return dt.isoformat()
     except Exception:
         pass
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -57,7 +56,7 @@ class Article:
     published_at:  str
 
 
-def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> List[Article]:
+def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> list[Article]:
     """
     Fetch and parse a single RSS feed.
 
@@ -85,9 +84,9 @@ def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> List[Arti
         )
         return []
 
-    articles: List[Article] = []
+    articles: list[Article] = []
     for entry in parsed.entries:
-        url: Optional[str] = getattr(entry, "link", None)
+        url: str | None = getattr(entry, "link", None)
         if not url:
             continue
 
@@ -98,10 +97,10 @@ def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> List[Arti
         snippet: str = _strip_html(raw_text)[: config.MAX_SNIPPET_CHARS]
 
         published_at_str = _parse_published_at(entry)
-        
+
         try:
             pub_dt = datetime.fromisoformat(published_at_str)
-            if (datetime.now(timezone.utc) - pub_dt).days > config.MAX_ARTICLE_AGE_DAYS:
+            if (datetime.now(UTC) - pub_dt).days > config.MAX_ARTICLE_AGE_DAYS:
                 continue
         except Exception:
             pass

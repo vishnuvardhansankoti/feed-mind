@@ -3,6 +3,7 @@ secrets.py — Load secrets from GCP Secret Manager at function startup.
 """
 
 import logging
+
 from google.cloud import secretmanager
 
 from feedmind import config
