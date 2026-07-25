@@ -1,0 +1,168 @@
+"""
+main.py — FeedMind Cloud Function entry point.
+
+Triggered by Cloud Scheduler via authenticated HTTPS POST.
+Orchestrates: secret loading → RSS ingestion → deduplication → summarization → Telegram delivery.
+"""
+
+import json
+import logging
+import socket
+import time
+from datetime import datetime, timezone
+
+import functions_framework
+from google.cloud import firestore
+
+import config
+from deduplication import is_duplicate, mark_as_delivered
+from ingestion import fetch_feed
+from notification import send_message
+from secrets import load_all_secrets
+from summarization import init_gemini, summarize
+
+# ---------------------------------------------------------------------------
+# Logging — structured JSON for Cloud Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("feedmind")
+
+# ---------------------------------------------------------------------------
+# Set global socket timeout so feedparser respects FEED_FETCH_TIMEOUT_SECONDS
+# ---------------------------------------------------------------------------
+socket.setdefaulttimeout(config.FEED_FETCH_TIMEOUT_SECONDS)
+
+
+# ---------------------------------------------------------------------------
+# Cloud Function entry point
+# ---------------------------------------------------------------------------
+@functions_framework.http
+def feedmind(request):
+    """
+    HTTP-triggered Cloud Function.
+    Cloud Scheduler calls this endpoint once daily with an OIDC token.
+    The Cloud Function platform validates the token before invoking this handler.
+    """
+    run_start = time.monotonic()
+    started_at = datetime.now(timezone.utc).isoformat()
+
+    logger.info(json.dumps({"message": "FeedMind run started", "timestamp": started_at}))
+
+    # --- Counters ---
+    feeds_checked          = 0
+    feeds_failed           = 0
+    new_articles_found     = 0
+    articles_summarized    = 0
+    articles_delivered     = 0
+    gemini_failures        = 0
+    telegram_failures      = 0
+
+    # ------------------------------------------------------------------
+    # Step 1: Load secrets
+    # ------------------------------------------------------------------
+    try:
+        secrets = load_all_secrets()
+    except RuntimeError as exc:
+        logger.critical("Secret loading failed — aborting run: %s", exc)
+        return ("Secret loading failed. See Cloud Logging for details.", 500)
+
+    telegram_token   = secrets["telegram_token"]
+    telegram_chat_id = secrets["telegram_chat_id"]
+    gemini_api_key   = secrets["gemini_api_key"]
+
+    # ------------------------------------------------------------------
+    # Step 2: Initialise Gemini model and Firestore client
+    # ------------------------------------------------------------------
+    gemini_model = init_gemini(gemini_api_key)
+    db           = firestore.Client(project=config.GCP_PROJECT_ID)
+
+    # ------------------------------------------------------------------
+    # Step 3: Process feeds sequentially
+    # ------------------------------------------------------------------
+    for feed_source, feed_url, feed_category in config.RSS_FEEDS:
+
+        # Soft timeout guard — exit gracefully before the 5-minute hard limit
+        elapsed = time.monotonic() - run_start
+        if elapsed >= config.FUNCTION_SOFT_TIMEOUT_S:
+            logger.warning(
+                json.dumps({
+                    "message": "Soft timeout reached — stopping early",
+                    "elapsed_seconds": round(elapsed, 1),
+                    "feeds_remaining": config.RSS_FEEDS.index(
+                        (feed_source, feed_url, feed_category)
+                    ),
+                })
+            )
+            break
+
+        # --- Fetch feed ---
+        articles = fetch_feed(feed_source, feed_url, feed_category)
+        feeds_checked += 1
+
+        if not articles:
+            feeds_failed += 1
+            continue
+
+        feed_new        = 0
+        feed_duplicates = 0
+
+        for article in articles:
+
+            # --- Deduplication ---
+            if is_duplicate(db, article):
+                feed_duplicates += 1
+                logger.debug("SKIP duplicate: article_id=%s", article.article_id)
+                continue
+
+            feed_new          += 1
+            new_articles_found += 1
+
+            # --- Summarization ---
+            summary = summarize(gemini_model, article)
+            if summary is None:
+                gemini_failures += 1
+                continue   # do NOT write to Firestore; allow retry on next run
+            articles_summarized += 1
+
+            # --- Telegram delivery ---
+            delivered = send_message(telegram_token, telegram_chat_id, article, summary)
+            if not delivered:
+                telegram_failures += 1
+                continue   # do NOT write to Firestore; allow retry on next run
+            articles_delivered += 1
+
+            # --- Mark as processed in Firestore (only after successful delivery) ---
+            mark_as_delivered(db, article)
+
+        logger.info(
+            json.dumps({
+                "message":           "Feed processed",
+                "feed_source":       feed_source,
+                "feed_category":     feed_category,
+                "entries_found":     len(articles),
+                "new_articles":      feed_new,
+                "skipped_duplicates": feed_duplicates,
+            })
+        )
+
+    # ------------------------------------------------------------------
+    # Step 4: Emit run summary
+    # ------------------------------------------------------------------
+    duration = round(time.monotonic() - run_start, 2)
+    summary_log = {
+        "message":               "FeedMind run complete",
+        "feeds_checked":         feeds_checked,
+        "feeds_failed":          feeds_failed,
+        "new_articles_found":    new_articles_found,
+        "articles_summarized":   articles_summarized,
+        "articles_delivered":    articles_delivered,
+        "gemini_failures":       gemini_failures,
+        "telegram_failures":     telegram_failures,
+        "duration_seconds":      duration,
+    }
+    logger.info(json.dumps(summary_log))
+
+    return (json.dumps(summary_log), 200, {"Content-Type": "application/json"})
