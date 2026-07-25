@@ -34,7 +34,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Run Ruff linter
-        run: uv run ruff check .
+        run: uvx ruff check .
 
   # ---------------------------------------------------------------------------
   # Job 2: Deploy to GCP Cloud Functions
