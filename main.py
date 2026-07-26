@@ -17,7 +17,7 @@ from google.cloud import firestore
 from feedmind import config
 from feedmind.deduplication import is_duplicate, mark_as_delivered
 from feedmind.ingestion import fetch_feed
-from feedmind.notification import send_message
+from feedmind.notification import build_category_messages, send_message
 from feedmind.secrets import load_all_secrets
 from feedmind.summarization import init_gemini, summarize
 
@@ -76,11 +76,17 @@ def feedmind(request):
     # ------------------------------------------------------------------
     # Step 2: Initialise Gemini model and Firestore client
     # ------------------------------------------------------------------
-    gemini_model = init_gemini(gemini_api_key)
-    db           = firestore.Client(
+    if config.ENABLE_GEMINI_SUMMARIES:
+        gemini_model = init_gemini(gemini_api_key)
+    else:
+        gemini_model = None
+
+    db = firestore.Client(
         project=config.GCP_PROJECT_ID,
         database=config.FIRESTORE_DATABASE
     )
+
+    category_items = {"academic": [], "industry": [], "cloud": []}
 
     # ------------------------------------------------------------------
     # Step 3: Process feeds sequentially
@@ -124,21 +130,19 @@ def feedmind(request):
             new_articles_found += 1
 
             # --- Summarization ---
-            summary = summarize(gemini_model, article)
-            if summary is None:
-                gemini_failures += 1
-                continue   # do NOT write to Firestore; allow retry on next run
-            articles_summarized += 1
+            if config.ENABLE_GEMINI_SUMMARIES:
+                summary = summarize(gemini_model, article)
+                if summary is None:
+                    gemini_failures += 1
+                    continue   # do NOT write to Firestore; allow retry on next run
+                articles_summarized += 1
+            else:
+                summary = article.title
 
-            # --- Telegram delivery ---
-            delivered = send_message(telegram_token, telegram_chat_id, article, summary)
-            if not delivered:
-                telegram_failures += 1
-                continue   # do NOT write to Firestore; allow retry on next run
-            articles_delivered += 1
-
-            # --- Mark as processed in Firestore (only after successful delivery) ---
-            mark_as_delivered(db, article)
+            # Collect for batching
+            if article.feed_category not in category_items:
+                category_items[article.feed_category] = []
+            category_items[article.feed_category].append((article, summary))
 
         logger.info(
             json.dumps({
@@ -152,7 +156,29 @@ def feedmind(request):
         )
 
     # ------------------------------------------------------------------
-    # Step 4: Emit run summary
+    # Step 4: Batch and Send Messages per Category
+    # ------------------------------------------------------------------
+    for category, items in category_items.items():
+        if not items:
+            continue
+
+        messages = build_category_messages(category, items)
+
+        all_chunks_delivered = True
+        for msg_text in messages:
+            delivered = send_message(telegram_token, telegram_chat_id, msg_text)
+            if not delivered:
+                telegram_failures += 1
+                all_chunks_delivered = False
+
+        if all_chunks_delivered:
+            # Mark all as delivered only if all message chunks for this category succeeded
+            for article, _ in items:
+                mark_as_delivered(db, article)
+                articles_delivered += 1
+
+    # ------------------------------------------------------------------
+    # Step 5: Emit run summary
     # ------------------------------------------------------------------
     duration = round(time.monotonic() - run_start, 2)
     summary_log = {

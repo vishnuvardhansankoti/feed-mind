@@ -45,6 +45,7 @@ SECRET_NAME_GEMINI_API_KEY   = "GEMINI_API_KEY"
 # ---------------------------------------------------------------------------
 # Gemini
 # ---------------------------------------------------------------------------
+ENABLE_GEMINI_SUMMARIES = True
 GEMINI_MODEL            = "gemini-3.5-flash"
 GEMINI_TIMEOUT_SECONDS  = 30
 MAX_SNIPPET_CHARS       = 2_000   # truncate article text before sending to Gemini
@@ -52,12 +53,11 @@ MAX_SNIPPET_CHARS       = 2_000   # truncate article text before sending to Gemi
 GEMINI_SYSTEM_PROMPT = (
     "You are a highly technical AI research assistant summarizing content "
     "for a senior ML engineer.\n"
-    "Your task is to summarize the following article in exactly 3 concise bullet points.\n"
+    "Your task is to summarize the following article in exactly one concise sentence.\n"
     "Rules:\n"
-    "- Each bullet must be ≤20 words.\n"
-    "- Total summary must be ≤60 words.\n"
+    "- The summary must be ≤20 words.\n"
     "- Use technical language. Do not oversimplify.\n"
-    "- Output ONLY the 3 bullet points in Markdown format (using • or -).\n"
+    "- Output ONLY the one sentence.\n"
     "- Do NOT include a preamble, title, or closing statement."
 )
 
@@ -70,8 +70,9 @@ MAX_ARTICLE_AGE_DAYS       = 1    # skip articles older than this
 # ---------------------------------------------------------------------------
 # Telegram
 # ---------------------------------------------------------------------------
-TELEGRAM_API_BASE        = "https://api.telegram.org"
-TELEGRAM_MESSAGE_DELAY_S = 1      # sleep between messages to respect rate limits
+TELEGRAM_API_BASE           = "https://api.telegram.org"
+TELEGRAM_MESSAGE_DELAY_S    = 1      # sleep between messages to respect rate limits
+TELEGRAM_MAX_MESSAGE_LENGTH = 4000   # maximum characters per Telegram message chunk
 
 # ---------------------------------------------------------------------------
 # Firestore
