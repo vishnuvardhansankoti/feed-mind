@@ -1,8 +1,15 @@
 """
-summarization.py — Gemini 2.0 Flash API integration for article summarization.
+summarization.py — Article summarization backends.
+
+Two interchangeable implementations, selected at runtime by
+config.ENABLE_GEMINI_SUMMARIES:
+  - summarize_with_sumy(): offline extractive summarization (sumy LSA + NLTK).
+    The default. No API key, no network call, deterministic, cannot hallucinate.
+  - summarize(): abstractive summarization via the Gemini API. Opt-in.
 """
 
 import logging
+import time
 
 import google.generativeai as genai
 from sumy.nlp.stemmers import Stemmer
@@ -34,14 +41,15 @@ def init_gemini(api_key: str) -> genai.GenerativeModel:
 
 def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
     """
-    Call the Gemini API to produce a 3-bullet summary of the article.
+    Call the Gemini API to produce a one-sentence summary of the article.
 
     Args:
         model: Initialised GenerativeModel.
         article: Article to summarize.
 
     Returns:
-        Markdown-formatted summary string, or None on failure.
+        Summary string, or None on failure (caller skips the article and
+        retries it on the next run).
     """
     if not article.snippet:
         logger.warning(
@@ -77,7 +85,6 @@ def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
 
     finally:
         # Respect free-tier rate limits (e.g. 15 RPM)
-        import time
         time.sleep(config.GEMINI_REQUEST_DELAY_S)
 
 

@@ -48,6 +48,7 @@ SECRET_NAME_GEMINI_API_KEY   = "GEMINI_API_KEY"
 ENABLE_GEMINI_SUMMARIES = False
 GEMINI_MODEL            = "gemini-3.5-flash-lite"
 GEMINI_TIMEOUT_SECONDS  = 30
+GEMINI_REQUEST_DELAY_S  = 4       # sleep between Gemini calls to respect free-tier RPM (~15/min)
 MAX_SNIPPET_CHARS       = 2_000   # truncate article text before sending to Gemini
 
 GEMINI_SYSTEM_PROMPT = (
