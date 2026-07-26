@@ -25,3 +25,8 @@ def test_gemini_config():
 def test_telegram_config():
     assert config.TELEGRAM_API_BASE.startswith("http")
     assert isinstance(config.TELEGRAM_MESSAGE_DELAY_S, (int, float))
+    assert isinstance(config.TELEGRAM_MAX_MESSAGE_LENGTH, int)
+
+def test_gemini_toggles():
+    assert isinstance(config.ENABLE_GEMINI_SUMMARIES, bool)
+    assert isinstance(config.GEMINI_REQUEST_DELAY_S, (int, float))

@@ -45,8 +45,8 @@ SECRET_NAME_GEMINI_API_KEY   = "GEMINI_API_KEY"
 # ---------------------------------------------------------------------------
 # Gemini
 # ---------------------------------------------------------------------------
-ENABLE_GEMINI_SUMMARIES = True
-GEMINI_MODEL            = "gemini-3.5-flash"
+ENABLE_GEMINI_SUMMARIES = False
+GEMINI_MODEL            = "gemini-3.5-flash-lite"
 GEMINI_TIMEOUT_SECONDS  = 30
 MAX_SNIPPET_CHARS       = 2_000   # truncate article text before sending to Gemini
 

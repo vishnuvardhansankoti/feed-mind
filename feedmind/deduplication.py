@@ -3,7 +3,7 @@ deduplication.py — Firestore-backed deduplication check.
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from google.cloud import firestore
 
@@ -32,6 +32,7 @@ def mark_as_delivered(db: firestore.Client, article: Article) -> None:
 
     Fields written match the schema defined in the PRD (Section 6).
     """
+    now = datetime.now(UTC)
     doc_ref = db.collection(config.FIRESTORE_COLLECTION).document(article.article_id)
     doc_ref.set(
         {
@@ -41,7 +42,9 @@ def mark_as_delivered(db: firestore.Client, article: Article) -> None:
             "feed_source":  article.feed_source,
             "feed_category": article.feed_category,
             "published_at": article.published_at,
-            "processed_at": datetime.now(UTC).isoformat(),
+            "processed_at": now.isoformat(),
+            # Firestore TTL requires a native datetime object, not a string
+            "expires_at":   now + timedelta(days=90),
             "status":       "delivered",
         }
     )

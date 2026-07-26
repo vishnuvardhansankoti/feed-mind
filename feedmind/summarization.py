@@ -5,6 +5,11 @@ summarization.py — Gemini 2.0 Flash API integration for article summarization.
 import logging
 
 import google.generativeai as genai
+from sumy.nlp.stemmers import Stemmer
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.summarizers.lsa import LsaSummarizer
+from sumy.utils import get_stop_words
 
 from feedmind import config
 from feedmind.ingestion import Article
@@ -69,3 +74,30 @@ def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
             exc,
         )
         return None
+
+    finally:
+        # Respect free-tier rate limits (e.g. 15 RPM)
+        import time
+        time.sleep(config.GEMINI_REQUEST_DELAY_S)
+
+
+def summarize_with_sumy(article: Article) -> str:
+    """Extract a 1-sentence summary using the Sumy extractive NLP library."""
+    if not article.snippet:
+        return article.title
+
+    try:
+        parser = PlaintextParser.from_string(article.snippet, Tokenizer("english"))
+        stemmer = Stemmer("english")
+        summarizer = LsaSummarizer(stemmer)
+        summarizer.stop_words = get_stop_words("english")
+
+        # Request exactly 1 sentence
+        summary_sentences = summarizer(parser.document, 1)
+        if summary_sentences:
+            return str(summary_sentences[0])
+        else:
+            return article.title
+    except Exception as exc:
+        logger.error("Sumy summarization failed for article_id=%s: %s", article.article_id, exc)
+        return article.title

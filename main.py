@@ -19,7 +19,7 @@ from feedmind.deduplication import is_duplicate, mark_as_delivered
 from feedmind.ingestion import fetch_feed
 from feedmind.notification import build_category_messages, send_message
 from feedmind.secrets import load_all_secrets
-from feedmind.summarization import init_gemini, summarize
+from feedmind.summarization import init_gemini, summarize, summarize_with_sumy
 
 # ---------------------------------------------------------------------------
 # Logging — structured JSON for Cloud Logging
@@ -81,6 +81,17 @@ def feedmind(request):
     else:
         gemini_model = None
 
+        # Download required NLTK datasets for Sumy to a writable temp dir
+        import os
+
+        import nltk
+        nltk_data_dir = "/tmp/nltk_data"
+        os.makedirs(nltk_data_dir, exist_ok=True)
+        if nltk_data_dir not in nltk.data.path:
+            nltk.data.path.append(nltk_data_dir)
+        nltk.download("punkt", download_dir=nltk_data_dir, quiet=True)
+        nltk.download("punkt_tab", download_dir=nltk_data_dir, quiet=True)
+
     db = firestore.Client(
         project=config.GCP_PROJECT_ID,
         database=config.FIRESTORE_DATABASE
@@ -126,6 +137,11 @@ def feedmind(request):
                 logger.debug("SKIP duplicate: article_id=%s", article.article_id)
                 continue
 
+            # Check soft timeout inside the loop to avoid crashing on huge backlogs
+            if time.monotonic() - run_start >= config.FUNCTION_SOFT_TIMEOUT_S:
+                logger.warning("Soft timeout reached inside feed loop — stopping early")
+                break
+
             feed_new          += 1
             new_articles_found += 1
 
@@ -137,7 +153,8 @@ def feedmind(request):
                     continue   # do NOT write to Firestore; allow retry on next run
                 articles_summarized += 1
             else:
-                summary = article.title
+                summary = summarize_with_sumy(article)
+                articles_summarized += 1
 
             # Collect for batching
             if article.feed_category not in category_items:

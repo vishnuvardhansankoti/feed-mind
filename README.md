@@ -2,7 +2,7 @@
 
 A self-hosted, serverless RSS ingestion and AI-summarization pipeline running on GCP.
 
-Ingests 11 RSS feeds (AI/ML research, industry news, cloud computing), summarizes new articles using **Gemini 2.0 Flash**, and pushes individual notifications to a private **Telegram bot** — once daily, at $0/month.
+Ingests 11 RSS feeds (AI/ML research, industry news, cloud computing), summarizes new articles using **Gemini 3.5 Flash Lite** (or the offline **Sumy NLP** library), and pushes batched notifications to a private **Telegram bot** — once daily, at $0/month.
 
 ---
 
@@ -17,8 +17,8 @@ feed-mind/
 │   ├── secrets.py      # GCP Secret Manager loader
 │   ├── ingestion.py    # RSS feed fetching & parsing (feedparser)
 │   ├── deduplication.py # Firestore dedup check & write
-│   ├── summarization.py # Gemini 2.0 Flash API integration
-│   └── notification.py # Telegram Bot API message delivery
+│   ├── summarization.py # Gemini AI & Sumy offline NLP summarization
+│   └── notification.py # Telegram batched message delivery
 ├── tests/              # Unit tests
 │   ├── __init__.py
 │   └── test_config.py
@@ -148,24 +148,24 @@ curl -X POST http://localhost:8080
 | Firestore reads | ~6,600 | 1.5M/month | $0.00 |
 | Firestore writes | ~450 | 600K/month | $0.00 |
 | Secret Manager | 90 accesses | 10K/month | $0.00 |
-| Gemini 2.0 Flash | ~450 req | 45K/month | $0.00 |
+| Gemini 3.5 Lite (Optional) | ~450 req | 45K/month | $0.00 |
 | **Total** | | | **$0.00** |
 
 ---
 
 ## Telegram Message Format
 
-Each new article generates one Telegram message:
+Articles are now **batched by category** to reduce notification spam. Each daily run yields up to 3 messages (Academic, Industry, Cloud). 
+Example:
 
-```
-*Attention Is All You Need — A New Transformer Architecture*
+```text
+*🎓 Academic News*
 
-• Introduces multi-head self-attention replacing recurrence in seq2seq models.
-• Achieves SOTA on WMT translation benchmarks with 3x faster training.
-• Positional encodings enable order-awareness without sequential computation.
+• *Attention Is All You Need* — Introduces multi-head self-attention replacing recurrence in seq2seq models.
+  🔗 Read More | 📰 arXiv ML
 
-🔗 Read More
-📰 Source: arXiv ML  🎓 Academic
+• *LoRA: Low-Rank Adaptation* — A new technique that freezes pre-trained model weights.
+  🔗 Read More | 📰 Hugging Face Papers
 ```
 
 ---

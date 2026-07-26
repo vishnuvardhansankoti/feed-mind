@@ -10,6 +10,8 @@ dependencies = [
     "google-generativeai==0.8.3",
     "httpx==0.27.2",
     "functions-framework==3.8.1",
+    "sumy>=0.11.0",
+    "nltk>=3.9.1",
 ]
 
 [project.optional-dependencies]
