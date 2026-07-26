@@ -12,6 +12,7 @@ dependencies = [
     "functions-framework==3.8.1",
     "sumy>=0.11.0",
     "nltk>=3.9.1",
+    "numpy>=2.5.1",
 ]
 
 [project.optional-dependencies]

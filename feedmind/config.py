@@ -16,6 +16,7 @@ RSS_FEEDS = [
     # --- Academic / Research ---
     ("arXiv ML",           "https://rss.arxiv.org/rss/cs.LG",                                      "academic"),
     ("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic"),
+    ("arXiv NLP", "https://rss.arxiv.org/rss/cs.CL",                                      "academic"),
     ("Hugging Face Papers","https://huggingface.co/blog/feed.xml",                                  "academic"),
     ("MIT Tech Review",    "https://www.technologyreview.com/feed/",                               "academic"),
 
@@ -25,12 +26,22 @@ RSS_FEEDS = [
     ("Google Research Blog", "https://research.google/blog/rss/",                        "industry"),
     ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/",                        "industry"),
     ("TechCrunch AI",      "https://techcrunch.com/category/artificial-intelligence/feed/",         "industry"),
+   
 
     # --- Cloud Computing ---
     ("CNCF Blog",          "https://www.cncf.io/blog/feed/",                                        "cloud"),
     ("AWS News Blog",      "https://aws.amazon.com/blogs/aws/feed/",                                "cloud"),
     ("Google Cloud Blog",  "https://cloudblog.withgoogle.com/rss",                                     "cloud"),
     ("Azure Updates",      "https://azure.microsoft.com/en-us/blog/feed/",                      "cloud"),
+]
+
+# ---------------------------------------------------------------------------
+# Static Links
+# ---------------------------------------------------------------------------
+# Direct links appended daily without RSS fetching.
+# Each entry: (title, url, category, message)
+STATIC_LINKS = [
+    ("GitHub Trending", "https://github.com/trending", "open-source", "Check out today's trending open-source repositories!"),
 ]
 
 # ---------------------------------------------------------------------------

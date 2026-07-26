@@ -49,8 +49,9 @@ def build_category_messages(category: str, items: list[tuple[Article, str]]) -> 
         escaped_title = _escape_md(article.title)
 
         if summary and summary != article.title:
+            escaped_summary = _escape_md(summary)
             item_text = (
-                f"• *{escaped_title}* — {summary}\n"
+                f"• *{escaped_title}* — {escaped_summary}\n"
                 f"  🔗 [Read More]({article.url}) \\| 📰 {_escape_md(article.feed_source)}\n\n"
             )
         else:

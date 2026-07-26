@@ -175,6 +175,23 @@ def feedmind(request):
     # ------------------------------------------------------------------
     # Step 4: Batch and Send Messages per Category
     # ------------------------------------------------------------------
+    # --- Append static daily reminders ---
+    from feedmind.ingestion import Article
+    for title, url, category, msg in getattr(config, "STATIC_LINKS", []):
+        dummy_id = f"static_{title.replace(' ', '_').lower()}"
+        dummy_article = Article(
+            article_id=dummy_id,
+            url=url,
+            title=title,
+            snippet="",
+            feed_source="Daily Reminder",
+            feed_category=category,
+            published_at=datetime.now(UTC).isoformat()
+        )
+        if category not in category_items:
+            category_items[category] = []
+        category_items[category].append((dummy_article, msg))
+
     for category, items in category_items.items():
         if not items:
             continue
@@ -191,8 +208,9 @@ def feedmind(request):
         if all_chunks_delivered:
             # Mark all as delivered only if all message chunks for this category succeeded
             for article, _ in items:
-                mark_as_delivered(db, article)
-                articles_delivered += 1
+                if not article.article_id.startswith("static_"):
+                    mark_as_delivered(db, article)
+                    articles_delivered += 1
 
     # ------------------------------------------------------------------
     # Step 5: Emit run summary

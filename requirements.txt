@@ -6,6 +6,8 @@ anyio==4.14.2
     # via httpx
 blinker==1.9.0
     # via flask
+breadability==0.1.20
+    # via sumy
 certifi==2026.7.22
     # via
     #   httpcore
@@ -13,18 +15,27 @@ certifi==2026.7.22
     #   requests
 cffi==2.1.0
     # via cryptography
+chardet==7.4.3
+    # via breadability
 charset-normalizer==3.4.9
     # via requests
 click==8.4.2
     # via
     #   flask
     #   functions-framework
+    #   nltk
 cloudevents==1.13.0
     # via functions-framework
 cryptography==49.0.0
     # via google-auth
+defusedxml==0.7.1
+    # via nltk
 deprecation==2.1.0
     # via cloudevents
+docopt==0.6.2
+    # via breadability
+docopt-ng==0.9.0
+    # via sumy
 feedparser==6.0.11
     # via feedmind (pyproject.toml)
 flask==3.1.3
@@ -99,11 +110,25 @@ itsdangerous==2.2.0
     # via flask
 jinja2==3.1.6
     # via flask
+joblib==1.5.3
+    # via nltk
+lxml==6.1.1
+    # via
+    #   breadability
+    #   lxml-html-clean
+lxml-html-clean==0.4.5
+    # via sumy
 markupsafe==3.0.3
     # via
     #   flask
     #   jinja2
     #   werkzeug
+nltk==3.10.0
+    # via
+    #   feedmind (pyproject.toml)
+    #   sumy
+numpy==2.5.1
+    # via feedmind (pyproject.toml)
 packaging==26.2
     # via
     #   deprecation
@@ -129,6 +154,8 @@ pyasn1==0.6.4
     # via pyasn1-modules
 pyasn1-modules==0.4.2
     # via google-auth
+pycountry==26.2.16
+    # via sumy
 pycparser==3.0
     # via cffi
 pydantic==2.13.4
@@ -137,14 +164,24 @@ pydantic-core==2.46.4
     # via pydantic
 pyparsing==3.3.2
     # via httplib2
+regex==2026.7.19
+    # via nltk
 requests==2.34.2
-    # via google-api-core
+    # via
+    #   google-api-core
+    #   sumy
+setuptools==83.0.0
+    # via sumy
 sgmllib3k==1.0.0
     # via feedparser
 sniffio==1.3.1
     # via httpx
+sumy==0.12.0
+    # via feedmind (pyproject.toml)
 tqdm==4.69.1
-    # via google-generativeai
+    # via
+    #   google-generativeai
+    #   nltk
 typing-extensions==4.16.0
     # via
     #   anyio
