@@ -46,6 +46,8 @@ def feedmind(request):
     Cloud Scheduler calls this endpoint once daily with an OIDC token.
     The Cloud Function platform validates the token before invoking this handler.
     """
+    is_local_run = (request is None)
+
     run_start = time.monotonic()
     started_at = datetime.now(UTC).isoformat()
 
@@ -200,7 +202,12 @@ def feedmind(request):
 
         all_chunks_delivered = True
         for msg_text in messages:
-            delivered = send_message(telegram_token, telegram_chat_id, msg_text)
+            if is_local_run:
+                print(f"--- WOULD SEND TO TELEGRAM ({category}) ---\n{msg_text}\n-----------------------------")
+                delivered = True
+            else:
+                delivered = send_message(telegram_token, telegram_chat_id, msg_text)
+            
             if not delivered:
                 telegram_failures += 1
                 all_chunks_delivered = False
@@ -209,7 +216,10 @@ def feedmind(request):
             # Mark all as delivered only if all message chunks for this category succeeded
             for article, _ in items:
                 if not article.article_id.startswith("static_"):
-                    mark_as_delivered(db, article)
+                    if is_local_run:
+                        print(f"--- WOULD MARK AS DELIVERED IN FIRESTORE: {article.article_id} ---")
+                    else:
+                        mark_as_delivered(db, article)
                     articles_delivered += 1
 
     # ------------------------------------------------------------------

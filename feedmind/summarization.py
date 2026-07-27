@@ -11,17 +11,49 @@ config.ENABLE_GEMINI_SUMMARIES:
 import logging
 import time
 
+import re as _re
+
 import google.generativeai as genai
 from sumy.nlp.stemmers import Stemmer
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.parsers.plaintext import PlaintextParser
-from sumy.summarizers.lsa import LsaSummarizer
+from sumy.summarizers.lex_rank import LexRankSummarizer
 from sumy.utils import get_stop_words
 
 from feedmind import config
 from feedmind.ingestion import Article
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Sumy helpers
+# ---------------------------------------------------------------------------
+_MAX_SUMMARY_WORDS = 15
+
+# Patterns stripped from RSS snippets before summarization
+_BOILERPLATE_PATTERNS = [
+    _re.compile(r"(?i)\bRead\s+more\.?\.?\.?\s*$"),
+    _re.compile(r"(?i)\bContinue\s+reading\.?\.?\.?\s*$"),
+    _re.compile(r"(?i)The\s+post\s+.{0,120}\s+appeared\s+first\s+on\s+.{0,80}\.?\s*$"),
+    _re.compile(r"(?i)\[…\]"),
+    _re.compile(r"(?i)\[\.\.\.\]"),
+    _re.compile(r"\s{2,}"),  # collapse multiple spaces
+]
+
+
+def _clean_snippet(text: str) -> str:
+    """Strip common RSS boilerplate and collapse whitespace."""
+    for pattern in _BOILERPLATE_PATTERNS:
+        text = pattern.sub(" ", text)
+    return text.strip()
+
+
+def _truncate_to_words(text: str, max_words: int = _MAX_SUMMARY_WORDS) -> str:
+    """Truncate text to at most *max_words* words, appending '...' if trimmed."""
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    return " ".join(words[:max_words]) + "..."
 
 
 def init_gemini(api_key: str) -> genai.GenerativeModel:
@@ -89,22 +121,30 @@ def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
 
 
 def summarize_with_sumy(article: Article) -> str:
-    """Extract a 1-sentence summary using the Sumy extractive NLP library."""
+    """
+    Extract a single concise sentence using the LexRank algorithm.
+
+    Pipeline: clean snippet → LexRank (1 sentence) → truncate to ≤15 words.
+    Falls back to a truncated title when the snippet is empty or extraction fails.
+    """
     if not article.snippet:
-        return article.title
+        return _truncate_to_words(article.title)
+
+    cleaned = _clean_snippet(article.snippet)
+    if not cleaned:
+        return _truncate_to_words(article.title)
 
     try:
-        parser = PlaintextParser.from_string(article.snippet, Tokenizer("english"))
+        parser = PlaintextParser.from_string(cleaned, Tokenizer("english"))
         stemmer = Stemmer("english")
-        summarizer = LsaSummarizer(stemmer)
+        summarizer = LexRankSummarizer(stemmer)
         summarizer.stop_words = get_stop_words("english")
 
-        # Request exactly 1 sentence
+        # Request exactly 1 sentence — the most "central" one
         summary_sentences = summarizer(parser.document, 1)
         if summary_sentences:
-            return str(summary_sentences[0])
-        else:
-            return article.title
+            return _truncate_to_words(str(summary_sentences[0]))
+        return _truncate_to_words(article.title)
     except Exception as exc:
         logger.error("Sumy summarization failed for article_id=%s: %s", article.article_id, exc)
-        return article.title
+        return _truncate_to_words(article.title)

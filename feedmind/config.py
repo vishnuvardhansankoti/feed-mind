@@ -14,18 +14,26 @@ against each source's actual RSS endpoint before first run.
 
 RSS_FEEDS = [
     # --- Academic / Research ---
-    ("arXiv ML",           "https://rss.arxiv.org/rss/cs.LG",                                      "academic"),
-    ("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic"),
-    ("arXiv NLP", "https://rss.arxiv.org/rss/cs.CL",                                      "academic"),
+    #("arXiv ML",           "https://rss.arxiv.org/rss/cs.LG",                                      "academic"),
+    #("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic"),
+    #("arXiv NLP", "https://rss.arxiv.org/rss/cs.CL",                                      "academic"),
     ("Hugging Face Papers","https://huggingface.co/blog/feed.xml",                                  "academic"),
     ("MIT Tech Review",    "https://www.technologyreview.com/feed/",                               "academic"),
+    ("Google Research Blog", "https://research.google/blog/rss/",                        "academic"),
+    ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/",                        "academic"),
+    ("Google Developers Blog", "https://developers.googleblog.com/feeds/posts/default/", "academic"),
+    ("NVIDIA Developer Blog", "https://developer.nvidia.com/blog/feed/", "industry"),
 
     # --- Industry News ---
     ("OpenAI News",        "https://openai.com/news/rss.xml",                                       "industry"),
     ("Google DeepMind",    "https://deepmind.google/blog/rss.xml",                                  "industry"),
-    ("Google Research Blog", "https://research.google/blog/rss/",                        "industry"),
-    ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/",                        "industry"),
-    ("TechCrunch AI",      "https://techcrunch.com/category/artificial-intelligence/feed/",         "industry"),
+    ("TechCrunch AI",      "https://techcrunch.com/category/artificial-intelligence/feed/",         "industry"),  
+    ("ByteByteGo", "https://blog.bytebytego.com/feed", "industry"),
+    ("Daily AI", "https://dailyai.com/feed/", "industry"),
+    ("Meta Engineering", "https://engineering.fb.com/feed/", "industry"),
+    ("Netflix Tech Blog", "https://netflixtechblog.com/feed", "industry"),
+
+    
 
 
     # --- Cloud Computing ---
@@ -33,6 +41,7 @@ RSS_FEEDS = [
     ("AWS News Blog",      "https://aws.amazon.com/blogs/aws/feed/",                                "cloud"),
     ("Google Cloud Blog",  "https://cloudblog.withgoogle.com/rss",                                     "cloud"),
     ("Azure Updates",      "https://azure.microsoft.com/en-us/blog/feed/",                      "cloud"),
+      ("Amazon ML Research", "https://aws.amazon.com/blogs/machine-learning/feed/", "cloud"),
 ]
 
 # ---------------------------------------------------------------------------
