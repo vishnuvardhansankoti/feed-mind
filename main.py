@@ -207,7 +207,7 @@ def feedmind(request):
                 delivered = True
             else:
                 delivered = send_message(telegram_token, telegram_chat_id, msg_text)
-            
+
             if not delivered:
                 telegram_failures += 1
                 all_chunks_delivered = False

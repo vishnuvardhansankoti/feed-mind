@@ -137,6 +137,16 @@ curl -X POST http://localhost:8080
 > For local runs, Application Default Credentials (ADC) are used automatically.
 > Ensure your local ADC has access to Secret Manager and Firestore in your GCP project.
 
+### Linting
+
+```bash
+# Check for lint errors
+uv run ruff check .
+
+# Auto-fix fixable lint errors
+uv run ruff check --fix .
+```
+
 ---
 
 ## Cost Analysis

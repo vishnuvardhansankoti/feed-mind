@@ -9,9 +9,8 @@ config.ENABLE_GEMINI_SUMMARIES:
 """
 
 import logging
+import re
 import time
-
-import re as _re
 
 import google.generativeai as genai
 from sumy.nlp.stemmers import Stemmer
@@ -32,12 +31,12 @@ _MAX_SUMMARY_WORDS = 15
 
 # Patterns stripped from RSS snippets before summarization
 _BOILERPLATE_PATTERNS = [
-    _re.compile(r"(?i)\bRead\s+more\.?\.?\.?\s*$"),
-    _re.compile(r"(?i)\bContinue\s+reading\.?\.?\.?\s*$"),
-    _re.compile(r"(?i)The\s+post\s+.{0,120}\s+appeared\s+first\s+on\s+.{0,80}\.?\s*$"),
-    _re.compile(r"(?i)\[…\]"),
-    _re.compile(r"(?i)\[\.\.\.\]"),
-    _re.compile(r"\s{2,}"),  # collapse multiple spaces
+    re.compile(r"(?i)\bRead\s+more\.?\.?\.?\s*$"),
+    re.compile(r"(?i)\bContinue\s+reading\.?\.?\.?\s*$"),
+    re.compile(r"(?i)The\s+post\s+.{0,120}\s+appeared\s+first\s+on\s+.{0,80}\.?\s*$"),
+    re.compile(r"(?i)\[…\]"),
+    re.compile(r"(?i)\[\.\.\.\]"),
+    re.compile(r"\s{2,}"),  # collapse multiple spaces
 ]
 
 

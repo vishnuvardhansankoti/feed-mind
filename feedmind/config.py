@@ -27,13 +27,13 @@ RSS_FEEDS = [
     # --- Industry News ---
     ("OpenAI News",        "https://openai.com/news/rss.xml",                                       "industry"),
     ("Google DeepMind",    "https://deepmind.google/blog/rss.xml",                                  "industry"),
-    ("TechCrunch AI",      "https://techcrunch.com/category/artificial-intelligence/feed/",         "industry"),  
+    ("TechCrunch AI",      "https://techcrunch.com/category/artificial-intelligence/feed/",         "industry"),
     ("ByteByteGo", "https://blog.bytebytego.com/feed", "industry"),
     ("Daily AI", "https://dailyai.com/feed/", "industry"),
     ("Meta Engineering", "https://engineering.fb.com/feed/", "industry"),
     ("Netflix Tech Blog", "https://netflixtechblog.com/feed", "industry"),
 
-    
+
 
 
     # --- Cloud Computing ---
