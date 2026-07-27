@@ -21,7 +21,7 @@ REGION="us-central1"                       # TODO: update to your preferred regi
 FUNCTION_NAME="feedmind"
 RUNTIME="python312"
 ENTRY_POINT="feedmind"
-MEMORY="256Mi"
+MEMORY="512Mi"
 TIMEOUT="300s"
 SERVICE_ACCOUNT="feedmind-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 

@@ -12,7 +12,7 @@ env:
   FUNCTION_NAME:   feedmind
   RUNTIME:         python312
   ENTRY_POINT:     feedmind
-  MEMORY:          256Mi
+  MEMORY:          512Mi
   TIMEOUT:         300s
 
 jobs:
