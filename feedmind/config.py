@@ -26,7 +26,7 @@ RSS_FEEDS = [
     ("Google Research Blog", "https://research.google/blog/rss/",                        "industry"),
     ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/",                        "industry"),
     ("TechCrunch AI",      "https://techcrunch.com/category/artificial-intelligence/feed/",         "industry"),
-   
+
 
     # --- Cloud Computing ---
     ("CNCF Blog",          "https://www.cncf.io/blog/feed/",                                        "cloud"),
