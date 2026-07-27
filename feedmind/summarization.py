@@ -125,6 +125,8 @@ def summarize_with_sumy(article: Article) -> str:
 
     Pipeline: clean snippet → LexRank (1 sentence) → truncate to ≤15 words.
     Falls back to a truncated title when the snippet is empty or extraction fails.
+    Skips LexRank for very short inputs (< 2 sentences) to avoid numpy
+    RuntimeWarning from zero-norm vectors in the power method.
     """
     if not article.snippet:
         return _truncate_to_words(article.title)
@@ -135,6 +137,13 @@ def summarize_with_sumy(article: Article) -> str:
 
     try:
         parser = PlaintextParser.from_string(cleaned, Tokenizer("english"))
+
+        # LexRank needs ≥ 2 sentences to build a meaningful similarity matrix.
+        # With only 1 sentence the cosine-similarity matrix is degenerate and
+        # numpy raises: "RuntimeWarning: invalid value encountered in divide".
+        if len(parser.document.sentences) < 2:
+            return _truncate_to_words(str(parser.document.sentences[0]))
+
         stemmer = Stemmer("english")
         summarizer = LexRankSummarizer(stemmer)
         summarizer.stop_words = get_stop_words("english")
@@ -147,3 +156,4 @@ def summarize_with_sumy(article: Article) -> str:
     except Exception as exc:
         logger.error("Sumy summarization failed for article_id=%s: %s", article.article_id, exc)
         return _truncate_to_words(article.title)
+

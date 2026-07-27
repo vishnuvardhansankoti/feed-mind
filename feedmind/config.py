@@ -18,7 +18,6 @@ RSS_FEEDS = [
     #("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic"),
     #("arXiv NLP", "https://rss.arxiv.org/rss/cs.CL",                                      "academic"),
     ("Hugging Face Papers","https://huggingface.co/blog/feed.xml",                                  "academic"),
-    ("MIT Tech Review",    "https://www.technologyreview.com/feed/",                               "academic"),
     ("Google Research Blog", "https://research.google/blog/rss/",                        "academic"),
     ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/",                        "academic"),
     ("Google Developers Blog", "https://developers.googleblog.com/feeds/posts/default/", "academic"),
