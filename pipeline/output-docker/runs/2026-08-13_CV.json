@@ -1,0 +1,31 @@
+{
+  "id": "2026-08-13_CV",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "CV",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "In-Loop Model Adaptation with Coupled Latent-Noise Guidance for High-Fidelity Subject-Driven Text-to-Image Generation",
+      "arxiv_id": "2608.09244",
+      "url": "http://arxiv.org/abs/2608.09244v1",
+      "score": 0.5976,
+      "summary": null
+    },
+    {
+      "rank": 2,
+      "title": "HRDiT: Training-Free High-Resolution Image Generation with Off-the-Shelf Diffusion Transformer Models",
+      "arxiv_id": "2608.07003",
+      "url": "http://arxiv.org/abs/2608.07003v1",
+      "score": 0.5695,
+      "summary": null
+    },
+    {
+      "rank": 3,
+      "title": "KVAE: Family of Tokenizers for Multimodal Generative Models",
+      "arxiv_id": "2608.05798",
+      "url": "http://arxiv.org/abs/2608.05798v1",
+      "score": 0.5531,
+      "summary": null
+    }
+  ]
+}

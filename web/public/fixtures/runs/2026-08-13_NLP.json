@@ -1,0 +1,31 @@
+{
+  "id": "2026-08-13_NLP",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "NLP",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "Mitigating Context Interference for Reliable and Efficient Search Agents",
+      "arxiv_id": "2608.10743",
+      "url": "http://arxiv.org/abs/2608.10743v1",
+      "score": 0.6255,
+      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks."
+    },
+    {
+      "rank": 2,
+      "title": "UNSPECIFIC: General Constraint Synthesis for Breaking Copy-and-Paste Shortcut in LLM Instruction Following",
+      "arxiv_id": "2608.09154",
+      "url": "http://arxiv.org/abs/2608.09154v1",
+      "score": 0.5692,
+      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings."
+    },
+    {
+      "rank": 3,
+      "title": "TELLME: Test-Enhanced Learning for Language Model Enrichment",
+      "arxiv_id": "2608.11788",
+      "url": "http://arxiv.org/abs/2608.11788v1",
+      "score": 0.5525,
+      "summary": null
+    }
+  ]
+}

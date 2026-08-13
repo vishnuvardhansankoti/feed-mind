@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Public read-only digest (PRD §4.5). The pipeline writes server-side under a
+// service account via the Admin SDK, which bypasses these rules; the browser
+// never writes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /runs/{doc}       { allow read: if true; allow write: if false; }
+    match /run_status/{doc} { allow read: if true; allow write: if false; }
+  }
+}

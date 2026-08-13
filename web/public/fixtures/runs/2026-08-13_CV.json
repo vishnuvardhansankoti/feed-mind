@@ -1,0 +1,31 @@
+{
+  "id": "2026-08-13_CV",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "CV",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "XYZFlow:Scaling Multi dimensional Shortcut Flows for Efficient Generative Modeling",
+      "arxiv_id": "2608.12276",
+      "url": "http://arxiv.org/abs/2608.12276v1",
+      "score": 0.5918,
+      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks."
+    },
+    {
+      "rank": 2,
+      "title": "In-Loop Model Adaptation with Coupled Latent-Noise Guidance for High-Fidelity Subject-Driven Text-to-Image Generation",
+      "arxiv_id": "2608.09244",
+      "url": "http://arxiv.org/abs/2608.09244v1",
+      "score": 0.5914,
+      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings."
+    },
+    {
+      "rank": 3,
+      "title": "TGRHuman: Text-Guided Realistic 3D Human Generation via Diffusion Renderer",
+      "arxiv_id": "2608.12175",
+      "url": "http://arxiv.org/abs/2608.12175v1",
+      "score": 0.5732,
+      "summary": null
+    }
+  ]
+}

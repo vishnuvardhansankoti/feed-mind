@@ -1,0 +1,31 @@
+{
+  "id": "2026-08-13_AIML",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "AIML",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "Small-Scale Experiments: Are We There Yet?",
+      "arxiv_id": "2608.11859",
+      "url": "http://arxiv.org/abs/2608.11859v1",
+      "score": 0.5248,
+      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks."
+    },
+    {
+      "rank": 2,
+      "title": "DistillCache: KL-Guided Adaptive KV-Cache Eviction for Memory-Efficient LLM Inference",
+      "arxiv_id": "2608.08878",
+      "url": "http://arxiv.org/abs/2608.08878v1",
+      "score": 0.5154,
+      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings."
+    },
+    {
+      "rank": 3,
+      "title": "Derivative Computation in PINNs: Automatic Differentiation, Finite Differences and Beyond",
+      "arxiv_id": "2608.11020",
+      "url": "http://arxiv.org/abs/2608.11020v1",
+      "score": 0.4949,
+      "summary": null
+    }
+  ]
+}

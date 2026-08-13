@@ -1,0 +1,38 @@
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- secrets / local config (never commit) ---
+.env
+.env.local
+*.tfvars
+!*.tfvars.example
+env.yaml
+*-service-account*.json
+service-account*.json
+
+# --- Python (pipeline) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+pipeline/output/
+
+# --- Node / Vite (web) ---
+node_modules/
+dist/
+.vite/
+
+# --- Terraform (infra) ---
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+
+# --- Firebase ---
+.firebase/
+firebase-debug.log

@@ -1,0 +1,18 @@
+project_id  = "your-project-id"
+region      = "us-central1"
+
+# Image must be pushed before `apply` (or at least before the first execution).
+image       = "us-central1-docker.pkg.dev/your-project-id/paper-prism/paper-prism:latest"
+
+# Secrets / contacts
+gemini_api_key = "your-ai-studio-key"   # keep out of VCS; prefer TF_VAR_gemini_api_key
+alert_email    = "you@example.com"
+
+# Interest profiles — the product. Author these carefully.
+profile_aiml = "Efficient training and inference for large models: KV-cache tricks, quantization, sparsity/MoE, distillation, small models that match big ones, optimization and scaling laws, and reinforcement learning that actually ships."
+profile_nlp  = "Practical large language models: retrieval-augmented generation, long-context, agents and tool use, evaluation and hallucination, instruction tuning and preference optimization, and generative text systems that are reproducible."
+profile_cv   = "Generative vision: diffusion and flow models, text-to-image and text-to-video, controllable and 3D-aware generation, efficient samplers, and multimodal models bridging vision and language."
+
+# Firebase Hosting via Terraform is optional (default off).
+# enable_firebase_hosting = true
+# hosting_site_id         = "your-hosting-site-id"

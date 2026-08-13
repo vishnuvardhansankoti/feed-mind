@@ -1,0 +1,3 @@
+# Image dependencies = core pipeline + Firestore client (SINK=firestore in prod).
+-r requirements.txt
+google-cloud-firestore>=2.13
