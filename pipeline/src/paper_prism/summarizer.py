@@ -27,7 +27,7 @@ _PROMPT = (
 
 
 class Summarizer:
-    def __init__(self, api_key: str | None, model: str = "gemini-2.5-flash") -> None:
+    def __init__(self, api_key: str | None, model: str = "gemini-3.6-flash") -> None:
         self.api_key = api_key
         self.model = model
 

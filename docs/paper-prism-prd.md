@@ -78,7 +78,7 @@ flowchart LR
 
     subgraph External
         ARX[(arXiv Atom XML API)]
-        GEM[Gemini API<br/>gemini-2.5-flash]
+        GEM[Gemini API<br/>gemini-3.6-flash]
     end
 
     subgraph Storage
@@ -144,7 +144,7 @@ For each lens, independently (**best-effort per category**):
    take the **top 3** (fewer if the window yielded < 3). Cosine is the
    authoritative `score`. *(There is no 15-candidate intermediate and no LLM
    re-ranking.)*
-4. **Summarize.** For each of the top-3, call **gemini-2.5-flash** with a grounded
+4. **Summarize.** For each of the top-3, call **gemini-3.6-flash** with a grounded
    prompt (see 3.4) to produce a 2-sentence key-innovation summary.
 5. **Persist.** Write one Firestore document per (run, category) with deterministic
    ID `YYYY-MM-DD_<CATEGORY>`, overwriting any existing doc for that key.

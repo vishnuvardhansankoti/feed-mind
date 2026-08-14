@@ -63,7 +63,7 @@ def load_config() -> Config:
     return Config(
         profiles=profiles,
         gemini_api_key=key,
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
         sink=os.getenv("SINK", "local").strip().lower(),
         window_days=int(os.getenv("WINDOW_DAYS", "7")),
         top_k=int(os.getenv("TOP_K", "3")),

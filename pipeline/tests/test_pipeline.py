@@ -16,7 +16,7 @@ def _config(retention_days=45, top_k=2):
     return Config(
         profiles={"AIML": "a", "NLP": "n", "CV": "c"},
         gemini_api_key=None,
-        gemini_model="gemini-2.5-flash",
+        gemini_model="gemini-3.6-flash",
         sink="local",
         window_days=7,
         top_k=top_k,

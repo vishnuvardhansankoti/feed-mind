@@ -44,7 +44,7 @@ variable "profile_cv" {
 # --- Tunables ---
 variable "gemini_model" {
   type    = string
-  default = "gemini-2.5-flash"
+  default = "gemini-3.6-flash"
 }
 
 variable "schedule" {
