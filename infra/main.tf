@@ -9,8 +9,12 @@ resource "google_artifact_registry_repository" "repo" {
 }
 
 # --- Firestore (native mode) + the one composite index the UI needs ---
+# NOTE: var.firestore_database defaults to a named (non-default) database. If it
+# already exists (e.g. created manually or by pipeline/deploy/01b-setup-firestore-db.sh),
+# import it before apply so Terraform manages rather than recreates it:
+#   terraform import google_firestore_database.db projects/PROJECT/databases/feed-mind-db
 resource "google_firestore_database" "db" {
-  name        = "(default)"
+  name        = var.firestore_database
   location_id = var.region
   type        = "FIRESTORE_NATIVE"
 

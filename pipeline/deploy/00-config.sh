@@ -3,8 +3,12 @@
 # Override any value by exporting it before running (e.g. `PROJECT_ID=foo ./01-setup.sh`).
 set -euo pipefail
 
-export PROJECT_ID="${PROJECT_ID:?set PROJECT_ID (your GCP project id)}"
+export PROJECT_ID="${PROJECT_ID:?set PROJECT_ID feed-mind)}"
 export REGION="${REGION:-us-central1}"
+
+# Firestore database id. The pipeline writes runs/run_status here. Use a named
+# (non-default) database; "(default)" is reserved for the auto-created one.
+export FIRESTORE_DATABASE="${FIRESTORE_DATABASE:-feed-mind-db}"
 
 # Artifact Registry + image
 export REPO="${REPO:-paper-prism}"

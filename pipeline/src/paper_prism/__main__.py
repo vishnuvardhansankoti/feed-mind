@@ -42,7 +42,12 @@ def main() -> int:
         ),
         embedder=Embedder(),
         summarizer=Summarizer(config.gemini_api_key, config.gemini_model),
-        sink=build_sink(config.sink, config.output_dir, config.firestore_project),
+        sink=build_sink(
+            config.sink,
+            config.output_dir,
+            config.firestore_project,
+            config.firestore_database,
+        ),
     )
 
     status = pipeline.run()

@@ -35,6 +35,7 @@ class Config:
     arxiv_max_pages: int
     output_dir: str
     firestore_project: str | None = field(default=None)
+    firestore_database: str | None = field(default=None)
 
     @property
     def summaries_enabled(self) -> bool:
@@ -73,4 +74,7 @@ def load_config() -> Config:
         arxiv_max_pages=int(os.getenv("ARXIV_MAX_PAGES", "10")),
         output_dir=os.getenv("OUTPUT_DIR", "output"),
         firestore_project=os.getenv("GOOGLE_CLOUD_PROJECT", "").strip() or None,
+        # Firestore database id. Empty -> the "(default)" database. Set this to
+        # write to a named (non-default) database, e.g. "feed-mind-db".
+        firestore_database=os.getenv("FIRESTORE_DATABASE", "").strip() or None,
     )

@@ -39,6 +39,8 @@ Everything is env-driven via `config.py` (`load_config()`); there are no CLI fla
 
 Both backends return identical shapes. Firestore read access is public and governed by `firestore.rules` (public read, `write: if false` — the pipeline writes server-side via a service account that bypasses rules). The Latest/Archive queries need the composite index in `firestore.indexes.json` (mirrored in `infra/main.tf`).
 
+**Named database coupling:** `VITE_FIRESTORE_DATABASE` selects a non-default Firestore database and is passed to `getFirestore(app, id)` (unset → `(default)`). It **must match the pipeline's `FIRESTORE_DATABASE`** (default `feed-mind-db`) — the browser reads Firestore directly, so a mismatch silently reads an empty `(default)`. `VITE_*` values are inlined at build time, so changing the database requires a rebuild. Collections `runs`/`run_status` are never created explicitly; they appear on the pipeline's first write. On the gcloud path, `pipeline/deploy/01b-setup-firestore-db.sh` provisions the named database (create + TTL + `runs` index).
+
 ## Common commands
 
 **Pipeline (local, runs against live arXiv):**
@@ -73,5 +75,5 @@ There is **no automated test suite and no linter configured.** Validation is man
 ## Conventions worth matching
 
 - The interest **profile paragraphs** (`PROFILE_AIML` / `PROFILE_NLP` / `PROFILE_CV`) drive all ranking quality. `config.py` warns loudly if the placeholder examples are used verbatim — real profiles must be authored deliberately.
-- Env config is the only knob surface: `WINDOW_DAYS`, `TOP_K`, `RETENTION_DAYS`, `ARXIV_*` tuning, `SINK`, `GEMINI_*`. Add new tunables in `config.py`, wire them into `infra/run.tf` (`job_env`) and `pipeline/deploy/env.yaml.example` so all three deploy paths stay in sync.
+- Env config is the only knob surface: `WINDOW_DAYS`, `TOP_K`, `RETENTION_DAYS`, `ARXIV_*` tuning, `SINK`, `GEMINI_*`, `FIRESTORE_DATABASE`. Add new tunables in `config.py`, wire them into `infra/run.tf` (`job_env`) and `pipeline/deploy/env.yaml.example` so all three deploy paths stay in sync. A tunable that also affects the web reader (like `FIRESTORE_DATABASE` ↔ `VITE_FIRESTORE_DATABASE`) must be mirrored in `web/.env*` too.
 - Markdown files are gitignored except `docs/paper-prism-prd.md` and this `CLAUDE.md` (see `.gitignore`) — other `.md` docs are kept local-only.

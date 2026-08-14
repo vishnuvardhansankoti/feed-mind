@@ -38,7 +38,11 @@ async function db() {
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
   });
-  _db = getFirestore(app);
+  // VITE_FIRESTORE_DATABASE selects a named (non-default) database, and must
+  // match the pipeline's FIRESTORE_DATABASE — otherwise the SPA reads an empty
+  // "(default)". Unset -> the default database.
+  const databaseId = import.meta.env.VITE_FIRESTORE_DATABASE;
+  _db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
   return _db;
 }
 

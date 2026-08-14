@@ -8,6 +8,7 @@ Thumbs.db
 # --- secrets / local config (never commit) ---
 .env
 .env.local
+.env.prod
 *.tfvars
 !*.tfvars.example
 env.yaml
@@ -42,3 +43,4 @@ firebase-debug.log
 !docs/paper-prism-prd.md
 !docs/architecture.md
 !CLAUDE.md
+!.github/workflows/README.md

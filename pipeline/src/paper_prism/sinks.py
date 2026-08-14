@@ -43,10 +43,18 @@ class LocalJsonSink:
 
 
 class FirestoreSink:
-    def __init__(self, project: str | None = None) -> None:
+    def __init__(self, project: str | None = None, database: str | None = None) -> None:
         from google.cloud import firestore  # imported lazily
 
-        self.db = firestore.Client(project=project) if project else firestore.Client()
+        # `database` selects a named (non-default) Firestore database; None uses
+        # the "(default)" database. `google.cloud.firestore` treats None as the
+        # default, so passing it through is safe when unset.
+        kwargs: dict[str, str] = {}
+        if project:
+            kwargs["project"] = project
+        if database:
+            kwargs["database"] = database
+        self.db = firestore.Client(**kwargs)
 
     def write_run(self, doc: RunDocument) -> None:
         self.db.collection("runs").document(doc.doc_id).set(doc.to_dict())
@@ -57,9 +65,14 @@ class FirestoreSink:
         log.info("Firestore: run_status/%s", status.doc_id)
 
 
-def build_sink(name: str, output_dir: str, project: str | None) -> Sink:
+def build_sink(
+    name: str,
+    output_dir: str,
+    project: str | None,
+    database: str | None = None,
+) -> Sink:
     if name == "firestore":
-        return FirestoreSink(project)
+        return FirestoreSink(project, database)
     return LocalJsonSink(output_dir)
 
 

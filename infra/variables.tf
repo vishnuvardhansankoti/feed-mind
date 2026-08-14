@@ -14,6 +14,12 @@ variable "image" {
   description = "Full image ref for the pipeline (must be pushed before apply/execute), e.g. us-central1-docker.pkg.dev/PROJECT/paper-prism/paper-prism:latest"
 }
 
+variable "firestore_database" {
+  type        = string
+  description = "Firestore database id the pipeline writes runs/run_status to. Use a named (non-default) database; \"(default)\" is the auto-created one."
+  default     = "feed-mind-db"
+}
+
 variable "gemini_api_key" {
   type        = string
   description = "AI Studio Gemini API key (stored in Secret Manager)."

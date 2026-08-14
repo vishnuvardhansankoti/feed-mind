@@ -19,6 +19,9 @@ gcloud services enable \
   cloudbuild.googleapis.com \
   --project "$PROJECT_ID"
 
+# NOTE: this provisions the "(default)" database. The pipeline writes to
+# FIRESTORE_DATABASE (see 00-config.sh); run ./01b-setup-firestore-db.sh to set
+# up that named database (create + TTL + composite index).
 echo "==> Firestore (native mode)"
 gcloud firestore databases create \
   --location="$REGION" --type=firestore-native --project "$PROJECT_ID" \

@@ -4,6 +4,7 @@ locals {
   job_env = {
     SINK                   = "firestore"
     GOOGLE_CLOUD_PROJECT   = var.project_id
+    FIRESTORE_DATABASE     = var.firestore_database
     GEMINI_MODEL           = var.gemini_model
     WINDOW_DAYS            = tostring(var.window_days)
     TOP_K                  = tostring(var.top_k)

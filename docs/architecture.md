@@ -109,6 +109,11 @@ flowchart TD
 Latest/Archive queries require the composite index on `(category ASC, run_date
 DESC)` declared in both `firestore.indexes.json` and `infra/main.tf`.
 
+`VITE_FIRESTORE_DATABASE` (passed to `getFirestore(app, id)`; unset → `(default)`)
+selects the Firestore database the browser reads. It **must match the pipeline's
+`FIRESTORE_DATABASE`** (default `feed-mind-db`) — the read path is direct from the
+browser, so a mismatch silently reads an empty `(default)`.
+
 ## Shared data contract (Firestore)
 
 The one hard coupling across components — defined in
@@ -136,7 +141,9 @@ Doc IDs are deterministic, so re-runs overwrite idempotently.
 ## Provisioning: two parallel paths
 
 `infra/` (Terraform, IaC source of truth) and `pipeline/deploy/*.sh` (imperative
-`gcloud`) create the **same** GCP resources — Artifact Registry, Firestore + index
-+ TTL policies, two service accounts (least-privilege job SA + scheduler invoker
-SA), the Gemini secret, the Cloud Run Job, and the weekly Scheduler. Use one;
-running both double-creates.
+`gcloud`) create the **same** GCP resources — Artifact Registry, Firestore
+(named database via `FIRESTORE_DATABASE` / `var.firestore_database`, default
+`feed-mind-db`) + index + TTL policies, two service accounts (least-privilege job
+SA + scheduler invoker SA), the Gemini secret, the Cloud Run Job, and the weekly
+Scheduler. Use one; running both double-creates. On the gcloud path,
+`pipeline/deploy/01b-setup-firestore-db.sh` provisions the named database.
