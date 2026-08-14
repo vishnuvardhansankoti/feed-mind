@@ -29,6 +29,7 @@ class Config:
     sink: str
     window_days: int
     top_k: int
+    retention_days: int
     arxiv_page_size: int
     arxiv_throttle_seconds: float
     arxiv_max_pages: int
@@ -66,6 +67,7 @@ def load_config() -> Config:
         sink=os.getenv("SINK", "local").strip().lower(),
         window_days=int(os.getenv("WINDOW_DAYS", "7")),
         top_k=int(os.getenv("TOP_K", "3")),
+        retention_days=int(os.getenv("RETENTION_DAYS", "45")),
         arxiv_page_size=int(os.getenv("ARXIV_PAGE_SIZE", "100")),
         arxiv_throttle_seconds=float(os.getenv("ARXIV_THROTTLE_SECONDS", "3")),
         arxiv_max_pages=int(os.getenv("ARXIV_MAX_PAGES", "10")),

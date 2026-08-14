@@ -36,3 +36,8 @@ crash.log
 # --- Firebase ---
 .firebase/
 firebase-debug.log
+
+# --- Markdown docs (kept local only; PRD + CLAUDE.md are the tracked exceptions) ---
+*.md
+!docs/paper-prism-prd.md
+!CLAUDE.md

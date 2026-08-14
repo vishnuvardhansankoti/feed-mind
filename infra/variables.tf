@@ -68,6 +68,12 @@ variable "top_k" {
   default = 3
 }
 
+variable "retention_days" {
+  type        = number
+  default     = 45
+  description = "Firestore records older than this are auto-deleted via TTL (writes expire_at = run_date + retention_days)."
+}
+
 # --- Firebase Hosting is optional in Terraform (many teams manage it via the
 #     firebase CLI). Off by default; see hosting.tf / README. ---
 variable "enable_firebase_hosting" {

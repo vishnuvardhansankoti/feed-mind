@@ -7,6 +7,7 @@ locals {
     GEMINI_MODEL           = var.gemini_model
     WINDOW_DAYS            = tostring(var.window_days)
     TOP_K                  = tostring(var.top_k)
+    RETENTION_DAYS         = tostring(var.retention_days)
     ARXIV_PAGE_SIZE        = "100"
     ARXIV_THROTTLE_SECONDS = "3"
     ARXIV_MAX_PAGES        = "10"

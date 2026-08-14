@@ -1,0 +1,77 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+paper-prism is a **$0, zero-ops personalized weekly arXiv digest**. A scheduled batch job fetches the last 7 days of preprints across three research "lenses", ranks each against a personal interest profile using local ONNX embeddings, summarizes the top papers with Gemini, and writes results to Firestore. A Svelte SPA reads Firestore **directly from the browser** — there is no backend API and no request-path compute.
+
+Design source of truth: `docs/paper-prism-prd.md` (the code comments reference its sections, e.g. "PRD §3.2").
+
+## Three components, one data contract
+
+The repo is three loosely-coupled parts joined only by the Firestore document schema in `pipeline/src/paper_prism/models.py`:
+
+- **`pipeline/`** — Python batch job (P1/P2). arXiv → ONNX embed → cosine top-k → Gemini summary → Firestore.
+- **`web/`** — Svelte 5 + Vite SPA (P3). Reads `runs` / `run_status` collections directly via the Firebase client SDK.
+- **`infra/`** — Terraform for the whole GCP stack (P4). `pipeline/deploy/*.sh` is a **parallel** imperative `gcloud` path that provisions the *same* resources — pick one as source of truth; running both double-creates.
+
+If you change the document shape in `models.py`, you must update the reader in `web/src/lib/data.js` (`normalizeRun` / query field names) in lockstep — they are only coupled by convention, not types.
+
+## Pipeline architecture
+
+Entrypoint `pipeline/src/paper_prism/__main__.py` wires config → clients → `Pipeline`. Per-run flow in `pipeline.py`:
+
+- **Lenses** are defined in `models.py::LENSES`: `AIML`→(`cs.LG`,`cs.AI`), `NLP`→(`cs.CL`), `CV`→(`cs.CV`). Source category sets are **disjoint**, and a paper is kept only for the lens owning its *primary* arXiv category — this is how cross-listing duplication is resolved (`arxiv_client.py`), not a dedup pass.
+- **Ranking is authoritative; the LLM is not.** `embedder.py` runs `all-MiniLM-L6-v2` via **ONNX Runtime with no torch** (deliberate — keeps the image slim), producing L2-normalized vectors so cosine == dot product. `rank_top_k` picks `TOP_K` (default 3) per lens. Gemini (`summarizer.py`) only *summarizes* the survivors; it never re-ranks or filters.
+- **Best-effort degradation is the core reliability model.** A lens that throws is logged, recorded as `skipped` in `run_status`, and does not abort the other lenses. A failed Gemini call writes `summary: null` rather than dropping the paper. `run()` returns non-zero exit only if any lens failed (surfaced to Cloud Logging → log-based alert).
+- **Sinks are idempotent** (`sinks.py`): deterministic doc IDs (`runs/YYYY-MM-DD_<CATEGORY>`, `run_status/YYYY-MM-DD`) mean re-runs overwrite cleanly. `LocalJsonSink` (default, writes `./output/`) vs `FirestoreSink` (lazy-imports `google-cloud-firestore`).
+- **Firestore TTL retention:** the pipeline stamps `expire_at = run_date + RETENTION_DAYS` (default 45) on every doc. Firestore TTL policies on the `expire_at` field (declared in `infra/main.tf` and enabled by `pipeline/deploy/01-setup.sh`) sweep expired docs. TTL only affects docs written *after* the field was added; there is no built-in "delete N days after creation", which is why the field exists.
+
+Everything is env-driven via `config.py` (`load_config()`); there are no CLI flags.
+
+## Web architecture
+
+`web/src/lib/data.js` is a data-source abstraction exposing `getLatest()`, `getArchive()`, `getStatus()`. `VITE_DATA_SOURCE` selects the backend:
+
+- `mock` (default) — bundled JSON fixtures under `web/public/fixtures/`, so the UI runs with zero cloud setup.
+- `firestore` — reads Firestore directly from the browser. The Firebase SDK is loaded via **dynamic import**, so `mock` builds don't ship it.
+
+Both backends return identical shapes. Firestore read access is public and governed by `firestore.rules` (public read, `write: if false` — the pipeline writes server-side via a service account that bypasses rules). The Latest/Archive queries need the composite index in `firestore.indexes.json` (mirrored in `infra/main.tf`).
+
+## Common commands
+
+**Pipeline (local, runs against live arXiv):**
+```bash
+cd pipeline
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env            # edit the three PROFILE_* paragraphs — these ARE the product
+PYTHONPATH=src .venv/bin/python -m paper_prism
+```
+No `GEMINI_API_KEY` → summaries written as `null` (pipeline still runs). `SINK=local` (default) → JSON under `./output/`. First run downloads ~90 MB of ONNX weights (cached by `huggingface_hub`).
+
+**Web (local, mock data):**
+```bash
+cd web
+npm install
+npm run dev            # http://localhost:5173
+npm run build          # -> dist/
+```
+
+**Infra (Terraform):**
+```bash
+cd infra
+cp terraform.tfvars.example terraform.tfvars   # fill in
+export TF_VAR_gemini_api_key=...
+terraform init && terraform validate && terraform apply
+```
+
+**Deploy via gcloud scripts** (alternative to Terraform): `pipeline/deploy/00-config.sh` (sourced by the rest) → `01-setup.sh` (APIs, Firestore, TTL, SAs, secret) → `02-build-push.sh` → `03-deploy-job.sh` (needs `env.yaml`, copied from `env.yaml.example`) → `04-scheduler.sh`. All idempotent; require `PROJECT_ID` exported.
+
+There is **no automated test suite and no linter configured.** Validation is manual: run the pipeline locally and inspect `./output/`, and run the web app headless to check for console errors.
+
+## Conventions worth matching
+
+- The interest **profile paragraphs** (`PROFILE_AIML` / `PROFILE_NLP` / `PROFILE_CV`) drive all ranking quality. `config.py` warns loudly if the placeholder examples are used verbatim — real profiles must be authored deliberately.
+- Env config is the only knob surface: `WINDOW_DAYS`, `TOP_K`, `RETENTION_DAYS`, `ARXIV_*` tuning, `SINK`, `GEMINI_*`. Add new tunables in `config.py`, wire them into `infra/run.tf` (`job_env`) and `pipeline/deploy/env.yaml.example` so all three deploy paths stay in sync.
+- Markdown files are gitignored except `docs/paper-prism-prd.md` and this `CLAUDE.md` (see `.gitignore`) — other `.md` docs are kept local-only.

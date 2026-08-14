@@ -8,6 +8,7 @@ summarizes and its failure yields a null summary rather than dropping the paper.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 import numpy as np
 
@@ -38,11 +39,12 @@ class Pipeline:
 
     def run(self) -> RunStatus:
         run_date = utc_run_date()
-        status = RunStatus(run_date=run_date)
+        expire_at = run_date + timedelta(days=self.config.retention_days)
+        status = RunStatus(run_date=run_date, expire_at=expire_at)
 
         for category, sources in LENSES.items():
             try:
-                doc = self._run_lens(category, sources, run_date)
+                doc = self._run_lens(category, sources, run_date, expire_at)
                 self.sink.write_run(doc)
                 status.mark_ok(category, len(doc.papers))
             except Exception as exc:  # best-effort: isolate per-lens failures
@@ -55,11 +57,13 @@ class Pipeline:
             log.error("RUN COMPLETED WITH FAILURES: %s", status.to_dict()["categories"])
         return status
 
-    def _run_lens(self, category, sources, run_date) -> RunDocument:
+    def _run_lens(self, category, sources, run_date, expire_at) -> RunDocument:
         candidates = self.arxiv.fetch_lens(sources, self.config.window_days)
         if not candidates:
             log.warning("lens %s: no candidates in window", category)
-            return RunDocument(category=category, run_date=run_date, papers=[])
+            return RunDocument(
+                category=category, run_date=run_date, papers=[], expire_at=expire_at
+            )
 
         profile_vec = self.embedder.encode([self.config.profiles[category]])[0]
         candidate_vecs = self.embedder.encode([c.embed_text for c in candidates])
@@ -81,4 +85,6 @@ class Pipeline:
                 )
             )
         log.info("lens %s: ranked %d papers", category, len(papers))
-        return RunDocument(category=category, run_date=run_date, papers=papers)
+        return RunDocument(
+            category=category, run_date=run_date, papers=papers, expire_at=expire_at
+        )

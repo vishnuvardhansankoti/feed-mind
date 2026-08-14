@@ -31,6 +31,25 @@ resource "google_firestore_index" "runs_category_date" {
   }
 }
 
+# --- TTL: auto-delete records once expire_at (run_date + retention_days) passes.
+#     The pipeline writes expire_at on every doc; Firestore sweeps expired docs
+#     within ~24h of the timestamp. Applied to both collections. ---
+resource "google_firestore_field" "runs_ttl" {
+  database   = google_firestore_database.db.name
+  collection = "runs"
+  field      = "expire_at"
+
+  ttl_config {}
+}
+
+resource "google_firestore_field" "run_status_ttl" {
+  database   = google_firestore_database.db.name
+  collection = "run_status"
+  field      = "expire_at"
+
+  ttl_config {}
+}
+
 # --- Service accounts (least privilege; PRD §5 / §9c) ---
 resource "google_service_account" "job" {
   account_id   = "paper-prism-job"

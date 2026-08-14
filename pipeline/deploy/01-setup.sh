@@ -24,6 +24,15 @@ gcloud firestore databases create \
   --location="$REGION" --type=firestore-native --project "$PROJECT_ID" \
   2>/dev/null || echo "    Firestore database already exists — skipping"
 
+echo "==> Firestore TTL (auto-delete records past expire_at)"
+# The pipeline writes expire_at = run_date + RETENTION_DAYS on every doc; these
+# policies let Firestore sweep expired docs. Idempotent (re-enabling is a no-op).
+for cg in runs run_status; do
+  gcloud firestore fields ttls update expire_at \
+    --collection-group="$cg" --enable-ttl \
+    --project "$PROJECT_ID" --quiet
+done
+
 echo "==> Artifact Registry repo"
 gcloud artifacts repositories create "$REPO" \
   --repository-format=docker --location="$REGION" --project "$PROJECT_ID" \

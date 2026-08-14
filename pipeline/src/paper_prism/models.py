@@ -62,6 +62,8 @@ class RunDocument:
     category: str
     run_date: datetime
     papers: list[Paper] = field(default_factory=list)
+    # Firestore TTL field: the doc is auto-deleted once this timestamp passes.
+    expire_at: Optional[datetime] = None
 
     @property
     def doc_id(self) -> str:
@@ -69,12 +71,15 @@ class RunDocument:
         return f"{self.run_date.strftime('%Y-%m-%d')}_{self.category}"
 
     def to_dict(self) -> dict:
-        return {
+        doc = {
             "id": self.doc_id,
             "run_date": self.run_date,
             "category": self.category,
             "papers": [p.to_dict() for p in self.papers],
         }
+        if self.expire_at is not None:
+            doc["expire_at"] = self.expire_at
+        return doc
 
 
 @dataclass
@@ -83,6 +88,8 @@ class RunStatus:
 
     run_date: datetime
     categories: dict[str, dict] = field(default_factory=dict)
+    # Firestore TTL field: the doc is auto-deleted once this timestamp passes.
+    expire_at: Optional[datetime] = None
 
     @property
     def doc_id(self) -> str:
@@ -99,11 +106,14 @@ class RunStatus:
         return any(c["status"] != "ok" for c in self.categories.values())
 
     def to_dict(self) -> dict:
-        return {
+        doc = {
             "id": self.doc_id,
             "run_date": self.run_date,
             "categories": self.categories,
         }
+        if self.expire_at is not None:
+            doc["expire_at"] = self.expire_at
+        return doc
 
 
 def utc_run_date() -> datetime:
