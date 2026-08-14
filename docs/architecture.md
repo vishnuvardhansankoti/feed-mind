@@ -18,7 +18,7 @@ flowchart LR
 
     subgraph External
         ARX[(arXiv Atom XML API)]
-        GEM[Gemini 2.5 Flash<br/>AI Studio REST]
+        GEM[gemini 3.5 Flash<br/>AI Studio REST]
     end
 
     subgraph GCP["Google Cloud"]
