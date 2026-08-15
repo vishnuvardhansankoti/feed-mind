@@ -41,6 +41,16 @@ Both backends return identical shapes. Firestore read access is public and gover
 
 **Named database coupling:** `VITE_FIRESTORE_DATABASE` selects a non-default Firestore database and is passed to `getFirestore(app, id)` (unset → `(default)`). It **must match the pipeline's `FIRESTORE_DATABASE`** (default `feed-mind-db`) — the browser reads Firestore directly, so a mismatch silently reads an empty `(default)`. `VITE_*` values are inlined at build time, so changing the database requires a rebuild. Collections `runs`/`run_status` are never created explicitly; they appear on the pipeline's first write. On the gcloud path, `pipeline/deploy/01b-setup-firestore-db.sh` provisions the named database (create + TTL + `runs` index).
 
+### News feed (second data source: the `feed-mind` repo)
+
+The web app is a two-section SPA behind a minimal hash router in `App.svelte`: **Papers** (`#/`, the arXiv digest above) and **News** (`#/news`). The News section reads a **different collection written by a different repo** — `processed_articles` in the *same* `feed-mind-db` database, produced by the sibling `feed-mind` RSS→Telegram pipeline (`../feed-mind`). paper-prism's pipeline does not write it.
+
+- **Schema coupling (cross-repo):** `getNews()` in `data.js` and `ArticleCard.svelte` depend on the doc shape written by `feed-mind/feedmind/deduplication.py::mark_as_delivered` (`title`, `url`, `feed_source`, `feed_category`, `summary`, `processed_at`, `published_at`). This is the same convention-only coupling as `models.py ↔ data.js`, but it spans repos — change one side and the other silently breaks. Notably, `summary` was **added** to feed-mind for this feature; docs written before that lack it and the card degrades to no-summary.
+- **Categories** come from `feed_category` ∈ `{academic, industry, cloud, open-source}`, listed data-driven in `constants.js::NEWS_CATEGORIES` (rendered as tabs). `open-source` is the daily `GitHub Trending` static link — feed-mind was changed to **persist static links** (idempotent fixed doc id, refreshed each run) so the OSS tab isn't empty.
+- **Recency is `processed_at`, not `published_at`** (`published_at` is an inconsistent per-feed string; `processed_at` is a uniform UTC ISO string). One query — `where processed_at >= now-7d, orderBy processed_at desc, limit ~200` — backs both News views: **Latest** = newest day-group (derived client-side), **Archive** = the whole 7-day window grouped by day. Single-field inequality+orderBy needs **no composite index**.
+- **Rules:** `firestore.rules` adds `processed_articles` as public-read / `write: if false`. feed-mind writes via the Admin SDK (bypasses rules) and does **not** manage rules, so paper-prism solely owns them on `feed-mind-db`.
+- **Mock parity:** `web/public/fixtures/news.json` backs `VITE_DATA_SOURCE=mock`. The mock path deliberately skips the 7-day cutoff (a static fixture would otherwise age out and render empty).
+
 ## Common commands
 
 **Pipeline (local, runs against live arXiv):**

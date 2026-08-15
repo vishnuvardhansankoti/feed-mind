@@ -1,10 +1,18 @@
 <script>
   import { onMount } from "svelte";
   import { LENSES } from "./lib/constants.js";
-  import { getLatest, getArchive, getStatus } from "./lib/data.js";
+  import { getLatest, getArchive, getStatus, getNews } from "./lib/data.js";
   import LensColumn from "./components/LensColumn.svelte";
   import PaperCard from "./components/PaperCard.svelte";
   import FreshnessBadge from "./components/FreshnessBadge.svelte";
+  import NewsFeed from "./components/NewsFeed.svelte";
+
+  // Top-level section from the URL hash: "#/papers" -> papers, anything else
+  // (incl. the default "#/") -> news, which is the landing section.
+  const pageFromHash = () =>
+    (typeof location !== "undefined" && location.hash === "#/papers") ? "papers" : "news";
+  let page = $state(pageFromHash());
+  const goto = (p) => { location.hash = p === "papers" ? "#/papers" : "#/"; };
 
   let tab = $state("latest");
   let loading = $state(true);
@@ -12,6 +20,23 @@
   let latest = $state({});
   let archive = $state({});
   let status = $state(null);
+
+  // News is loaded lazily the first time the News section is opened.
+  let news = $state(null);            // { articles } once loaded
+  let newsLoading = $state(false);
+  let newsError = $state(null);
+
+  async function loadNews() {
+    if (news || newsLoading) return;
+    newsLoading = true;
+    try {
+      news = await getNews();
+    } catch (e) {
+      newsError = e?.message ?? String(e);
+    } finally {
+      newsLoading = false;
+    }
+  }
 
   const dateFmt = new Intl.DateTimeFormat(undefined, {
     year: "numeric", month: "short", day: "numeric",
@@ -23,6 +48,9 @@
   );
 
   onMount(async () => {
+    const onHash = () => { page = pageFromHash(); };
+    window.addEventListener("hashchange", onHash);
+
     try {
       [latest, status, archive] = await Promise.all([
         getLatest(), getStatus(), getArchive(),
@@ -32,7 +60,12 @@
     } finally {
       loading = false;
     }
+
+    return () => window.removeEventListener("hashchange", onHash);
   });
+
+  // Kick off the news fetch whenever the News section becomes active.
+  $effect(() => { if (page === "news") loadNews(); });
 </script>
 
 <div class="wrap">
@@ -42,12 +75,35 @@
       <div>
         <h1>paper-prism</h1>
         <p class="tagline">
-          Personalized weekly arXiv digest{#if latestDate} · run of {fmt(latestDate)}{/if}
+          {#if page === "news"}
+            Weekly AI, industry &amp; cloud news feed
+          {:else}
+            Personalized weekly arXiv digest{#if latestDate} · run of {fmt(latestDate)}{/if}
+          {/if}
         </p>
       </div>
     </div>
-    {#if status}<FreshnessBadge {status} />{/if}
+    {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
   </header>
+
+  <nav class="nav" aria-label="Sections">
+    <button aria-current={page === "news"} class:active={page === "news"} onclick={() => goto("news")}>
+      News
+    </button>
+    <button aria-current={page === "papers"} class:active={page === "papers"} onclick={() => goto("papers")}>
+      Papers
+    </button>
+  </nav>
+
+  {#if page === "news"}
+    {#if newsLoading}
+      <div class="state"><span class="spinner"></span> Loading news…</div>
+    {:else if newsError}
+      <div class="state err">Couldn’t load the news feed: {newsError}</div>
+    {:else}
+      <NewsFeed articles={news?.articles ?? []} />
+    {/if}
+  {:else}
 
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected={tab === "latest"} class:active={tab === "latest"} onclick={() => (tab = "latest")}>
@@ -94,6 +150,7 @@
       {/each}
     </div>
   {/if}
+  {/if}
 
   <footer>
     <span>$0 serverless digest · ranked by local embeddings, summarized by Gemini</span>
@@ -113,6 +170,17 @@
   }
   h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; }
   .tagline { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+  .nav {
+    display: flex; gap: 0.4rem; margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav button {
+    font: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    padding: 0.5rem 0.9rem; background: none; border: none;
+    color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .nav button.active { color: var(--text); border-bottom-color: var(--accent); }
 
   .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; }
   .tabs button {

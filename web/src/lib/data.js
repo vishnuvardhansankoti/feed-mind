@@ -5,7 +5,7 @@
 // browser (the production Path-A contract); "mock" reads bundled JSON fixtures
 // so the UI runs with no cloud project.
 
-import { LENS_CODES } from "./constants.js";
+import { LENS_CODES, NEWS_WINDOW_DAYS, NEWS_MAX_ARTICLES } from "./constants.js";
 
 const SOURCE = import.meta.env.VITE_DATA_SOURCE || "mock";
 
@@ -24,6 +24,16 @@ export function getArchive() {
 /** Most recent run_status doc, or null. */
 export function getStatus() {
   return SOURCE === "firestore" ? firestoreStatus() : mockStatus();
+}
+
+/**
+ * Last NEWS_WINDOW_DAYS of news articles from `processed_articles`, newest
+ * first. One read backs both the News "Latest" (newest day) and "Archive"
+ * (whole window) views; the UI slices/groups client-side.
+ * -> { articles: Article[] }
+ */
+export function getNews() {
+  return SOURCE === "firestore" ? firestoreNews() : mockNews();
 }
 
 // --- Firestore source ------------------------------------------------------
@@ -87,6 +97,22 @@ async function firestoreStatus() {
   return snap.empty ? null : snap.docs[0].data();
 }
 
+async function firestoreNews() {
+  const { collection, query, where, orderBy, limit, getDocs } =
+    await import("firebase/firestore");
+  // processed_at is a uniform UTC ISO string, so a lexicographic >= range is
+  // chronological. Single-field inequality + orderBy needs no composite index.
+  const cutoff = newsCutoffIso();
+  const q = query(
+    collection(await db(), "processed_articles"),
+    where("processed_at", ">=", cutoff),
+    orderBy("processed_at", "desc"),
+    limit(NEWS_MAX_ARTICLES),
+  );
+  const snap = await getDocs(q);
+  return { articles: snap.docs.map((d) => normalizeArticle(d.data())) };
+}
+
 // --- Mock source (bundled fixtures) ---------------------------------------
 
 async function fixture(path) {
@@ -132,10 +158,44 @@ async function mockStatus() {
   }
 }
 
+async function mockNews() {
+  // fixtures/news.json holds raw article docs (same shape as Firestore). Unlike
+  // the Firestore path we do NOT apply the 7-day window cutoff here: the fixture
+  // is a curated, static "this week" set, and cutoff-filtering would make it age
+  // out and render empty after a week. We still sort + cap + normalize.
+  let docs;
+  try {
+    docs = await fixture("news.json");
+  } catch {
+    return { articles: [] };
+  }
+  const articles = docs
+    .sort((a, b) => (b.processed_at ?? "").localeCompare(a.processed_at ?? ""))
+    .slice(0, NEWS_MAX_ARTICLES)
+    .map(normalizeArticle);
+  return { articles };
+}
+
 // --- helpers ---------------------------------------------------------------
+
+function newsCutoffIso() {
+  return new Date(Date.now() - NEWS_WINDOW_DAYS * 86_400_000).toISOString();
+}
 
 function normalizeRun(run) {
   return { ...run, run_date: toDate(run.run_date) };
+}
+
+// processed_at drives ordering/grouping; keep the raw ISO string for day
+// bucketing and expose a Date for display. `summary` may be absent on docs
+// written before feed-mind persisted it.
+function normalizeArticle(a) {
+  return {
+    ...a,
+    summary: a.summary ?? "",
+    processed_date: toDate(a.processed_at),
+    published_date: toDate(a.published_at),
+  };
 }
 
 // Firestore Timestamp | ISO string | Date -> Date

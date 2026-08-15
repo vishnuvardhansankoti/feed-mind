@@ -7,5 +7,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /runs/{doc}       { allow read: if true; allow write: if false; }
     match /run_status/{doc} { allow read: if true; allow write: if false; }
+    // News feed: articles written server-side by the feed-mind pipeline
+    // (Admin SDK bypasses these rules); the browser only reads.
+    match /processed_articles/{doc} { allow read: if true; allow write: if false; }
   }
 }
