@@ -214,13 +214,19 @@ def feedmind(request):
 
         if all_chunks_delivered:
             # Mark all as delivered only if all message chunks for this category succeeded
-            for article, _ in items:
-                if not article.article_id.startswith("static_"):
-                    if is_local_run:
-                        print(f"--- WOULD MARK AS DELIVERED IN FIRESTORE: {article.article_id} ---")
-                    else:
-                        mark_as_delivered(db, article)
-                    articles_delivered += 1
+            # Persist every delivered item — including static links (e.g. the
+            # daily "GitHub Trending" reminder). Static links use a fixed
+            # article_id, so the write is idempotent: the same doc is refreshed
+            # each run (processed_at bumped), which keeps it surfacing as the
+            # newest entry for its category in the web feed. This does NOT
+            # suppress the daily Telegram reminder — static links are appended
+            # unconditionally and are never gated by the dedup check.
+            for article, summary in items:
+                if is_local_run:
+                    print(f"--- WOULD MARK AS DELIVERED IN FIRESTORE: {article.article_id} ---")
+                else:
+                    mark_as_delivered(db, article, summary)
+                articles_delivered += 1
 
     # ------------------------------------------------------------------
     # Step 5: Emit run summary

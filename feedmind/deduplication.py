@@ -25,12 +25,15 @@ def is_duplicate(db: firestore.Client, article: Article) -> bool:
     return snapshot.exists
 
 
-def mark_as_delivered(db: firestore.Client, article: Article) -> None:
+def mark_as_delivered(db: firestore.Client, article: Article, summary: str = "") -> None:
     """
     Write the article metadata to Firestore after successful Telegram delivery.
     This is the only Firestore write in the pipeline.
 
-    Fields written match the schema defined in the PRD (Section 6).
+    Fields written match the schema defined in the PRD (Section 6). `summary` is
+    the one-sentence summary already generated for the Telegram message; it is
+    persisted so the paper-prism web app can render it (docs written before this
+    field existed simply lack it, and the reader degrades gracefully).
     """
     now = datetime.now(UTC)
     doc_ref = db.collection(config.FIRESTORE_COLLECTION).document(article.article_id)
@@ -41,6 +44,7 @@ def mark_as_delivered(db: firestore.Client, article: Article) -> None:
             "title":        article.title,
             "feed_source":  article.feed_source,
             "feed_category": article.feed_category,
+            "summary":      summary,
             "published_at": article.published_at,
             "processed_at": now.isoformat(),
             # Firestore TTL requires a native datetime object, not a string
