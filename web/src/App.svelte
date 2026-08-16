@@ -43,10 +43,6 @@
   });
   const fmt = (d) => (d ? dateFmt.format(d instanceof Date ? d : new Date(d)) : "");
 
-  let latestDate = $derived(
-    Object.values(latest).find((r) => r?.run_date)?.run_date ?? null,
-  );
-
   onMount(async () => {
     const onHash = () => { page = pageFromHash(); };
     window.addEventListener("hashchange", onHash);
@@ -73,14 +69,8 @@
     <div class="brand">
       <span class="prism" aria-hidden="true"></span>
       <div>
-        <h1>paper-prism</h1>
-        <p class="tagline">
-          {#if page === "news"}
-            Weekly AI, industry &amp; cloud news feed
-          {:else}
-            Personalized weekly arXiv digest{#if latestDate} · run of {fmt(latestDate)}{/if}
-          {/if}
-        </p>
+        <h1>feed-mind</h1>
+        <p class="tagline">Daily Tech News and Weekly Research Papers Digest</p>
       </div>
     </div>
     {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
@@ -153,7 +143,7 @@
   {/if}
 
   <footer>
-    <span>$0 serverless digest · ranked by local embeddings, summarized by Gemini</span>
+    <span>Daily tech news across academia, industry, cloud &amp; open source · Weekly arXiv research ranked to your interests and summarized by AI</span>
   </footer>
 </div>
 
