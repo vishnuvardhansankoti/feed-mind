@@ -5,7 +5,12 @@
 // browser (the production Path-A contract); "mock" reads bundled JSON fixtures
 // so the UI runs with no cloud project.
 
-import { LENS_CODES, NEWS_WINDOW_DAYS, NEWS_MAX_ARTICLES } from "./constants.js";
+import {
+  LENS_CODES,
+  NEWS_WINDOW_DAYS,
+  NEWS_MAX_ARTICLES,
+  STATIC_NEWS_LINKS,
+} from "./constants.js";
 
 const SOURCE = import.meta.env.VITE_DATA_SOURCE || "mock";
 
@@ -110,7 +115,7 @@ async function firestoreNews() {
     limit(NEWS_MAX_ARTICLES),
   );
   const snap = await getDocs(q);
-  return { articles: snap.docs.map((d) => normalizeArticle(d.data())) };
+  return { articles: withPinnedLinks(snap.docs.map((d) => d.data())) };
 }
 
 // --- Mock source (bundled fixtures) ---------------------------------------
@@ -169,17 +174,33 @@ async function mockNews() {
   } catch {
     return { articles: [] };
   }
-  const articles = docs
-    .sort((a, b) => (b.processed_at ?? "").localeCompare(a.processed_at ?? ""))
-    .slice(0, NEWS_MAX_ARTICLES)
-    .map(normalizeArticle);
-  return { articles };
+  return { articles: withPinnedLinks(docs.slice(0, NEWS_MAX_ARTICLES)) };
 }
 
 // --- helpers ---------------------------------------------------------------
 
 function newsCutoffIso() {
   return new Date(Date.now() - NEWS_WINDOW_DAYS * 86_400_000).toISOString();
+}
+
+// Merge the reader-pinned static links (e.g. GitHub Trending) into the fetched
+// docs so they appear every day. Pinned links get a fresh "now" timestamp (so
+// they sort into today's "Latest") and win any article_id collision with a
+// pipeline-written doc — so a static link is shown exactly once whether or not
+// feed-mind also persisted it. Input docs are raw (Firestore/fixture) shape.
+function withPinnedLinks(docs) {
+  const nowIso = new Date().toISOString();
+  const pinned = STATIC_NEWS_LINKS.map((link) => ({
+    ...link,
+    processed_at: nowIso,
+    published_at: nowIso,
+    status: "pinned",
+  }));
+  const pinnedIds = new Set(pinned.map((p) => p.article_id));
+  const rest = docs.filter((d) => !pinnedIds.has(d.article_id));
+  return [...pinned, ...rest]
+    .sort((a, b) => (b.processed_at ?? "").localeCompare(a.processed_at ?? ""))
+    .map(normalizeArticle);
 }
 
 function normalizeRun(run) {

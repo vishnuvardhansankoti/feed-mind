@@ -8,14 +8,29 @@ export const LENSES = [
 export const LENS_CODES = LENSES.map((l) => l.code);
 
 // News-feed categories — keyed by the `feed_category` values the feed-mind
-// pipeline writes to the `processed_articles` collection. `open-source` is the
-// daily static "GitHub Trending" link (feed-mind now persists static links, so
-// it appears here as a single, daily-refreshed entry).
+// pipeline writes to the `processed_articles` collection. `open-source` has no
+// RSS source; its content is the pinned static link(s) below.
 export const NEWS_CATEGORIES = [
   { code: "academic", label: "Academic" },
   { code: "industry", label: "Industry" },
   { code: "cloud", label: "Cloud" },
   { code: "open-source", label: "Open Source" },
+];
+
+// Evergreen links pinned into the feed by the reader itself, independent of the
+// pipeline — so they show *every day* regardless of whether feed-mind ran. Each
+// is shaped like a `processed_articles` doc; `getNews()` stamps a fresh
+// timestamp (so they land in today's "Latest") and dedupes by `article_id`
+// against Firestore, so a matching pipeline-written doc never doubles them up.
+export const STATIC_NEWS_LINKS = [
+  {
+    article_id: "static_github_trending",
+    url: "https://github.com/trending",
+    title: "GitHub Trending",
+    feed_source: "GitHub",
+    feed_category: "open-source",
+    summary: "Today's trending open-source repositories.",
+  },
 ];
 
 export const NEWS_CATEGORY_CODES = NEWS_CATEGORIES.map((c) => c.code);
