@@ -5,6 +5,7 @@
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   },
   "firestore": {
+    "database": "feed-mind-db",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   }
