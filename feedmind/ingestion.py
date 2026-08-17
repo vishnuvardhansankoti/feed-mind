@@ -47,13 +47,87 @@ def _parse_published_at(entry) -> str:
 
 @dataclass
 class Article:
-    article_id:    str
-    url:           str
-    title:         str
-    snippet:       str           # truncated to MAX_SNIPPET_CHARS
-    feed_source:   str
+    article_id: str
+    url: str
+    title: str
+    snippet: str  # truncated to MAX_SNIPPET_CHARS
+    feed_source: str
     feed_category: str
-    published_at:  str
+    published_at: str
+
+
+@dataclass
+class Video:
+    video_id: str  # YouTube video ID (used as Firestore document ID)
+    url: str  # canonical watch URL
+    title: str
+    channel: str  # human-readable channel name
+    thumbnail_url: str  # derived from video_id
+    published_at: str
+
+
+def _youtube_thumbnail(video_id: str) -> str:
+    """Return the standard high-quality thumbnail URL for a YouTube video ID."""
+    return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+
+
+def fetch_youtube_feed(channel_name: str, feed_url: str) -> list[Video]:
+    """
+    Fetch and parse a single YouTube channel Atom feed.
+
+    Returns a list of Video objects published within MAX_VIDEO_AGE_DAYS.
+    Returns an empty list on any error so the caller can continue with the
+    remaining channels. Videos are NOT summarized or sent to Telegram — they are
+    written to the `youtube_videos` Firestore collection for the web reader.
+    """
+    logger.info("Fetching YouTube feed: %s (%s)", channel_name, feed_url)
+    try:
+        parsed = feedparser.parse(
+            feed_url,
+            request_headers={"User-Agent": "FeedMind/1.0 (RSS Reader)"},
+        )
+    except Exception as exc:
+        logger.warning("YouTube feed fetch exception: channel=%s error=%s", channel_name, exc)
+        return []
+
+    if parsed.get("bozo") and not parsed.entries:
+        logger.warning(
+            "YouTube feed bozo error: channel=%s bozo_exception=%s",
+            channel_name,
+            parsed.get("bozo_exception"),
+        )
+        return []
+
+    videos: list[Video] = []
+    for entry in parsed.entries:
+        video_id: str | None = getattr(entry, "yt_videoid", None)
+        url: str | None = getattr(entry, "link", None)
+        if not video_id or not url:
+            continue
+
+        title: str = getattr(entry, "title", "Untitled").strip()
+
+        published_at_str = _parse_published_at(entry)
+        try:
+            pub_dt = datetime.fromisoformat(published_at_str)
+            if (datetime.now(UTC) - pub_dt).days > config.MAX_VIDEO_AGE_DAYS:
+                continue
+        except Exception:
+            pass
+
+        videos.append(
+            Video(
+                video_id=video_id,
+                url=url,
+                title=title,
+                channel=channel_name,
+                thumbnail_url=_youtube_thumbnail(video_id),
+                published_at=published_at_str,
+            )
+        )
+
+    logger.info("YouTube feed parsed: channel=%s videos_found=%d", channel_name, len(videos))
+    return videos
 
 
 def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> list[Article]:
@@ -71,9 +145,7 @@ def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> list[Arti
             # feedparser uses socket.setdefaulttimeout; we set it in main.py
         )
     except Exception as exc:
-        logger.warning(
-            "Feed fetch exception: source=%s error=%s", feed_source, exc
-        )
+        logger.warning("Feed fetch exception: source=%s error=%s", feed_source, exc)
         return []
 
     if parsed.get("bozo") and not parsed.entries:
@@ -107,17 +179,15 @@ def fetch_feed(feed_source: str, feed_url: str, feed_category: str) -> list[Arti
 
         articles.append(
             Article(
-                article_id    = _compute_article_id(url),
-                url           = url,
-                title         = title,
-                snippet       = snippet,
-                feed_source   = feed_source,
-                feed_category = feed_category,
-                published_at  = published_at_str,
+                article_id=_compute_article_id(url),
+                url=url,
+                title=title,
+                snippet=snippet,
+                feed_source=feed_source,
+                feed_category=feed_category,
+                published_at=published_at_str,
             )
         )
 
-    logger.info(
-        "Feed parsed: source=%s entries_found=%d", feed_source, len(articles)
-    )
+    logger.info("Feed parsed: source=%s entries_found=%d", feed_source, len(articles))
     return articles

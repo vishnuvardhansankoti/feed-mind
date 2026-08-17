@@ -62,8 +62,8 @@ def init_gemini(api_key: str) -> genai.GenerativeModel:
         model_name=config.GEMINI_MODEL,
         system_instruction=config.GEMINI_SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
-            max_output_tokens=150,   # 3 bullets × ~50 tokens — keep it tight
-            temperature=0.3,         # low temperature for deterministic, factual output
+            max_output_tokens=150,  # 3 bullets × ~50 tokens — keep it tight
+            temperature=0.3,  # low temperature for deterministic, factual output
         ),
     )
     logger.info("Gemini model initialised: %s", config.GEMINI_MODEL)
@@ -83,15 +83,10 @@ def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
         retries it on the next run).
     """
     if not article.snippet:
-        logger.warning(
-            "Empty snippet — skipping summarization: article_id=%s", article.article_id
-        )
+        logger.warning("Empty snippet — skipping summarization: article_id=%s", article.article_id)
         return None
 
-    prompt = (
-        f"Article title: {article.title}\n\n"
-        f"Article content:\n{article.snippet}"
-    )
+    prompt = f"Article title: {article.title}\n\nArticle content:\n{article.snippet}"
 
     try:
         response = model.generate_content(
@@ -156,4 +151,3 @@ def summarize_with_sumy(article: Article) -> str:
     except Exception as exc:
         logger.error("Sumy summarization failed for article_id=%s: %s", article.article_id, exc)
         return _truncate_to_words(article.title)
-
