@@ -10,5 +10,8 @@ service cloud.firestore {
     // News feed: articles written server-side by the feed-mind pipeline
     // (Admin SDK bypasses these rules); the browser only reads.
     match /processed_articles/{doc} { allow read: if true; allow write: if false; }
+    // YouTube videos written server-side by the feed-mind pipeline; the browser
+    // only reads. Surfaced by the "Videos" page.
+    match /youtube_videos/{doc} { allow read: if true; allow write: if false; }
   }
 }

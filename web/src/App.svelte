@@ -1,18 +1,24 @@
 <script>
   import { onMount } from "svelte";
   import { LENSES } from "./lib/constants.js";
-  import { getLatest, getArchive, getStatus, getNews } from "./lib/data.js";
+  import { getLatest, getArchive, getStatus, getNews, getVideos } from "./lib/data.js";
   import LensColumn from "./components/LensColumn.svelte";
   import PaperCard from "./components/PaperCard.svelte";
   import FreshnessBadge from "./components/FreshnessBadge.svelte";
   import NewsFeed from "./components/NewsFeed.svelte";
+  import VideoFeed from "./components/VideoFeed.svelte";
 
-  // Top-level section from the URL hash: "#/papers" -> papers, anything else
-  // (incl. the default "#/") -> news, which is the landing section.
-  const pageFromHash = () =>
-    (typeof location !== "undefined" && location.hash === "#/papers") ? "papers" : "news";
+  // Top-level section from the URL hash: "#/papers" -> papers, "#/videos" ->
+  // videos, anything else (incl. the default "#/") -> news, the landing section.
+  const pageFromHash = () => {
+    if (typeof location === "undefined") return "news";
+    if (location.hash === "#/papers") return "papers";
+    if (location.hash === "#/videos") return "videos";
+    return "news";
+  };
   let page = $state(pageFromHash());
-  const goto = (p) => { location.hash = p === "papers" ? "#/papers" : "#/"; };
+  const HASH = { papers: "#/papers", videos: "#/videos", news: "#/" };
+  const goto = (p) => { location.hash = HASH[p] ?? "#/"; };
 
   let tab = $state("latest");
   let loading = $state(true);
@@ -38,6 +44,23 @@
     }
   }
 
+  // Videos are loaded lazily the first time the Videos section is opened.
+  let videos = $state(null);          // { videos } once loaded
+  let videosLoading = $state(false);
+  let videosError = $state(null);
+
+  async function loadVideos() {
+    if (videos || videosLoading) return;
+    videosLoading = true;
+    try {
+      videos = await getVideos();
+    } catch (e) {
+      videosError = e?.message ?? String(e);
+    } finally {
+      videosLoading = false;
+    }
+  }
+
   const dateFmt = new Intl.DateTimeFormat(undefined, {
     year: "numeric", month: "short", day: "numeric",
   });
@@ -60,8 +83,9 @@
     return () => window.removeEventListener("hashchange", onHash);
   });
 
-  // Kick off the news fetch whenever the News section becomes active.
+  // Kick off the lazy fetch whenever a lazy section becomes active.
   $effect(() => { if (page === "news") loadNews(); });
+  $effect(() => { if (page === "videos") loadVideos(); });
 </script>
 
 <div class="wrap">
@@ -83,6 +107,9 @@
     <button aria-current={page === "papers"} class:active={page === "papers"} onclick={() => goto("papers")}>
       Papers
     </button>
+    <button aria-current={page === "videos"} class:active={page === "videos"} onclick={() => goto("videos")}>
+      Videos
+    </button>
   </nav>
 
   {#if page === "news"}
@@ -92,6 +119,14 @@
       <div class="state err">Couldn’t load the news feed: {newsError}</div>
     {:else}
       <NewsFeed articles={news?.articles ?? []} />
+    {/if}
+  {:else if page === "videos"}
+    {#if videosLoading}
+      <div class="state"><span class="spinner"></span> Loading videos…</div>
+    {:else if videosError}
+      <div class="state err">Couldn’t load the videos feed: {videosError}</div>
+    {:else}
+      <VideoFeed videos={videos?.videos ?? []} />
     {/if}
   {:else}
 

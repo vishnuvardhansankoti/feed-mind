@@ -10,6 +10,8 @@ import {
   NEWS_WINDOW_DAYS,
   NEWS_MAX_ARTICLES,
   STATIC_NEWS_LINKS,
+  VIDEO_WINDOW_DAYS,
+  VIDEO_MAX_ITEMS,
 } from "./constants.js";
 
 const SOURCE = import.meta.env.VITE_DATA_SOURCE || "mock";
@@ -39,6 +41,16 @@ export function getStatus() {
  */
 export function getNews() {
   return SOURCE === "firestore" ? firestoreNews() : mockNews();
+}
+
+/**
+ * Last VIDEO_WINDOW_DAYS of YouTube videos from `youtube_videos`, newest first.
+ * One read backs both the Videos "Latest" (newest day) and "Archive" (whole
+ * window) tabs; the UI slices/groups client-side.
+ * -> { videos: Video[] }
+ */
+export function getVideos() {
+  return SOURCE === "firestore" ? firestoreVideos() : mockVideos();
 }
 
 // --- Firestore source ------------------------------------------------------
@@ -118,6 +130,22 @@ async function firestoreNews() {
   return { articles: withPinnedLinks(snap.docs.map((d) => d.data())) };
 }
 
+async function firestoreVideos() {
+  const { collection, query, where, orderBy, limit, getDocs } =
+    await import("firebase/firestore");
+  // published_at is a uniform UTC ISO string, so a lexicographic >= range is
+  // chronological. Single-field inequality + orderBy needs no composite index.
+  const cutoff = videoCutoffIso();
+  const q = query(
+    collection(await db(), "youtube_videos"),
+    where("published_at", ">=", cutoff),
+    orderBy("published_at", "desc"),
+    limit(VIDEO_MAX_ITEMS),
+  );
+  const snap = await getDocs(q);
+  return { videos: snap.docs.map((d) => normalizeVideo(d.data())) };
+}
+
 // --- Mock source (bundled fixtures) ---------------------------------------
 
 async function fixture(path) {
@@ -177,10 +205,32 @@ async function mockNews() {
   return { articles: withPinnedLinks(docs.slice(0, NEWS_MAX_ARTICLES)) };
 }
 
+async function mockVideos() {
+  // fixtures/videos.json holds raw video docs (same shape as Firestore). Like
+  // mockNews, we do NOT apply the window cutoff to the static fixture — we only
+  // sort, cap and normalize — so it doesn't age out and render empty.
+  let docs;
+  try {
+    docs = await fixture("videos.json");
+  } catch {
+    return { videos: [] };
+  }
+  return {
+    videos: [...docs]
+      .sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""))
+      .slice(0, VIDEO_MAX_ITEMS)
+      .map(normalizeVideo),
+  };
+}
+
 // --- helpers ---------------------------------------------------------------
 
 function newsCutoffIso() {
   return new Date(Date.now() - NEWS_WINDOW_DAYS * 86_400_000).toISOString();
+}
+
+function videoCutoffIso() {
+  return new Date(Date.now() - VIDEO_WINDOW_DAYS * 86_400_000).toISOString();
 }
 
 // Merge the reader-pinned static links (e.g. GitHub Trending) into the fetched
@@ -216,6 +266,16 @@ function normalizeArticle(a) {
     summary: a.summary ?? "",
     processed_date: toDate(a.processed_at),
     published_date: toDate(a.published_at),
+  };
+}
+
+// published_at drives ordering/day-bucketing; keep the raw ISO string and also
+// expose a Date for display.
+function normalizeVideo(v) {
+  return {
+    ...v,
+    published_date: toDate(v.published_at),
+    processed_date: toDate(v.processed_at),
   };
 }
 

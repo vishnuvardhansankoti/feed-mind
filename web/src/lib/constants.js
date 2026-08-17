@@ -38,3 +38,9 @@ export const NEWS_CATEGORY_CODES = NEWS_CATEGORIES.map((c) => c.code);
 // Rolling window (days) and hard read cap for the news feed.
 export const NEWS_WINDOW_DAYS = 7;
 export const NEWS_MAX_ARTICLES = 200;
+
+// Videos page: YouTube subscriptions written to `youtube_videos` by feed-mind.
+// One read backs both tabs — Latest (newest day) and Archive (last 3 days) —
+// with client-side slicing.
+export const VIDEO_WINDOW_DAYS = 3;
+export const VIDEO_MAX_ITEMS = 200;
