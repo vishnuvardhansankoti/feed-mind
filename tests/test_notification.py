@@ -6,6 +6,7 @@ def test_build_category_messages_empty():
     messages = build_category_messages("academic", [])
     assert messages == []
 
+
 def test_build_category_messages_single():
     article = Article(
         article_id="1",
@@ -14,7 +15,7 @@ def test_build_category_messages_single():
         feed_source="Test Source",
         feed_category="industry",
         published_at="2023-01-01",
-        snippet="Snippet"
+        snippet="Snippet",
     )
 
     # 1. With summary
@@ -30,6 +31,7 @@ def test_build_category_messages_single():
     assert "Test Title" in msgs_no_sum[0]
     # In my logic, if summary == title, the summary isn't appended with a dash
 
+
 def test_build_category_messages_chunking(monkeypatch):
     from feedmind import config
 
@@ -43,7 +45,7 @@ def test_build_category_messages_chunking(monkeypatch):
         feed_source="Source",
         feed_category="cloud",
         published_at="2023-01-01",
-        snippet=""
+        snippet="",
     )
 
     # Passing 3 items should exceed the 200 character limit and chunk them

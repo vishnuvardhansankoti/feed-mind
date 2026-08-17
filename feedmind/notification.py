@@ -62,7 +62,9 @@ def build_category_messages(category: str, items: list[tuple[Article, str]]) -> 
 
         if len(current_message) + len(item_text) > config.TELEGRAM_MAX_MESSAGE_LENGTH:
             messages.append(current_message.strip())
-            current_message = f"*{emoji} {_escape_md(category.capitalize())} News \\(Cont\\.\\)*\n\n"
+            current_message = (
+                f"*{emoji} {_escape_md(category.capitalize())} News \\(Cont\\.\\)*\n\n"
+            )
 
         current_message += item_text
 
@@ -83,10 +85,10 @@ def send_message(
     Returns True on success, False on failure.
     Sleeps TELEGRAM_MESSAGE_DELAY_S after each call to respect rate limits.
     """
-    url     = f"{config.TELEGRAM_API_BASE}/bot{telegram_token}/sendMessage"
+    url = f"{config.TELEGRAM_API_BASE}/bot{telegram_token}/sendMessage"
     payload = {
-        "chat_id":    chat_id,
-        "text":       text,
+        "chat_id": chat_id,
+        "text": text,
         "parse_mode": "MarkdownV2",
         "disable_web_page_preview": True,
     }

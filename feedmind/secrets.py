@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 def _load_secret(client: secretmanager.SecretManagerServiceClient, name: str) -> str:
     """Fetch the latest version of a secret from Secret Manager."""
-    secret_path = (
-        f"projects/{config.GCP_PROJECT_ID}/secrets/{name}/versions/latest"
-    )
+    secret_path = f"projects/{config.GCP_PROJECT_ID}/secrets/{name}/versions/latest"
     response = client.access_secret_version(request={"name": secret_path})
     return response.payload.data.decode("utf-8").strip()
 
@@ -33,9 +31,9 @@ def load_all_secrets() -> dict:
     client = secretmanager.SecretManagerServiceClient()
 
     required = {
-        "telegram_token":   config.SECRET_NAME_TELEGRAM_TOKEN,
+        "telegram_token": config.SECRET_NAME_TELEGRAM_TOKEN,
         "telegram_chat_id": config.SECRET_NAME_TELEGRAM_CHAT_ID,
-        "gemini_api_key":   config.SECRET_NAME_GEMINI_API_KEY,
+        "gemini_api_key": config.SECRET_NAME_GEMINI_API_KEY,
     }
 
     secrets = {}
@@ -44,8 +42,6 @@ def load_all_secrets() -> dict:
             secrets[key] = _load_secret(client, secret_name)
             logger.info("Secret loaded: %s", secret_name)
         except Exception as exc:
-            raise RuntimeError(
-                f"Failed to load secret '{secret_name}': {exc}"
-            ) from exc
+            raise RuntimeError(f"Failed to load secret '{secret_name}': {exc}") from exc
 
     return secrets

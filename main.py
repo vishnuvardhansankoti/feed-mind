@@ -15,8 +15,13 @@ import functions_framework
 from google.cloud import firestore
 
 from feedmind import config
-from feedmind.deduplication import is_duplicate, mark_as_delivered
-from feedmind.ingestion import fetch_feed
+from feedmind.deduplication import (
+    is_duplicate,
+    is_duplicate_video,
+    mark_as_delivered,
+    save_video,
+)
+from feedmind.ingestion import fetch_feed, fetch_youtube_feed
 from feedmind.notification import build_category_messages, send_message
 from feedmind.secrets import load_all_secrets
 from feedmind.summarization import init_gemini, summarize, summarize_with_sumy
@@ -46,7 +51,7 @@ def feedmind(request):
     Cloud Scheduler calls this endpoint once daily with an OIDC token.
     The Cloud Function platform validates the token before invoking this handler.
     """
-    is_local_run = (request is None)
+    is_local_run = request is None
 
     run_start = time.monotonic()
     started_at = datetime.now(UTC).isoformat()
@@ -54,13 +59,16 @@ def feedmind(request):
     logger.info(json.dumps({"message": "FeedMind run started", "timestamp": started_at}))
 
     # --- Counters ---
-    feeds_checked          = 0
-    feeds_failed           = 0
-    new_articles_found     = 0
-    articles_summarized    = 0
-    articles_delivered     = 0
-    gemini_failures        = 0
-    telegram_failures      = 0
+    feeds_checked = 0
+    feeds_failed = 0
+    new_articles_found = 0
+    articles_summarized = 0
+    articles_delivered = 0
+    gemini_failures = 0
+    telegram_failures = 0
+    youtube_feeds_checked = 0
+    new_videos_found = 0
+    videos_saved = 0
 
     # ------------------------------------------------------------------
     # Step 1: Load secrets
@@ -71,9 +79,9 @@ def feedmind(request):
         logger.critical("Secret loading failed — aborting run: %s", exc)
         return ("Secret loading failed. See Cloud Logging for details.", 500)
 
-    telegram_token   = secrets["telegram_token"]
+    telegram_token = secrets["telegram_token"]
     telegram_chat_id = secrets["telegram_chat_id"]
-    gemini_api_key   = secrets["gemini_api_key"]
+    gemini_api_key = secrets["gemini_api_key"]
 
     # ------------------------------------------------------------------
     # Step 2: Initialise Gemini model and Firestore client
@@ -87,6 +95,7 @@ def feedmind(request):
         import os
 
         import nltk
+
         nltk_data_dir = "/tmp/nltk_data"
         os.makedirs(nltk_data_dir, exist_ok=True)
         if nltk_data_dir not in nltk.data.path:
@@ -94,10 +103,7 @@ def feedmind(request):
         nltk.download("punkt", download_dir=nltk_data_dir, quiet=True)
         nltk.download("punkt_tab", download_dir=nltk_data_dir, quiet=True)
 
-    db = firestore.Client(
-        project=config.GCP_PROJECT_ID,
-        database=config.FIRESTORE_DATABASE
-    )
+    db = firestore.Client(project=config.GCP_PROJECT_ID, database=config.FIRESTORE_DATABASE)
 
     category_items = {"academic": [], "industry": [], "cloud": []}
 
@@ -105,18 +111,19 @@ def feedmind(request):
     # Step 3: Process feeds sequentially
     # ------------------------------------------------------------------
     for feed_source, feed_url, feed_category in config.RSS_FEEDS:
-
         # Soft timeout guard — exit gracefully before the 5-minute hard limit
         elapsed = time.monotonic() - run_start
         if elapsed >= config.FUNCTION_SOFT_TIMEOUT_S:
             logger.warning(
-                json.dumps({
-                    "message": "Soft timeout reached — stopping early",
-                    "elapsed_seconds": round(elapsed, 1),
-                    "feeds_remaining": config.RSS_FEEDS.index(
-                        (feed_source, feed_url, feed_category)
-                    ),
-                })
+                json.dumps(
+                    {
+                        "message": "Soft timeout reached — stopping early",
+                        "elapsed_seconds": round(elapsed, 1),
+                        "feeds_remaining": config.RSS_FEEDS.index(
+                            (feed_source, feed_url, feed_category)
+                        ),
+                    }
+                )
             )
             break
 
@@ -128,11 +135,10 @@ def feedmind(request):
             feeds_failed += 1
             continue
 
-        feed_new        = 0
+        feed_new = 0
         feed_duplicates = 0
 
         for article in articles:
-
             # --- Deduplication ---
             if is_duplicate(db, article):
                 feed_duplicates += 1
@@ -144,7 +150,7 @@ def feedmind(request):
                 logger.warning("Soft timeout reached inside feed loop — stopping early")
                 break
 
-            feed_new          += 1
+            feed_new += 1
             new_articles_found += 1
 
             # --- Summarization ---
@@ -152,7 +158,7 @@ def feedmind(request):
                 summary = summarize(gemini_model, article)
                 if summary is None:
                     gemini_failures += 1
-                    continue   # do NOT write to Firestore; allow retry on next run
+                    continue  # do NOT write to Firestore; allow retry on next run
                 articles_summarized += 1
             else:
                 summary = summarize_with_sumy(article)
@@ -164,14 +170,16 @@ def feedmind(request):
             category_items[article.feed_category].append((article, summary))
 
         logger.info(
-            json.dumps({
-                "message":           "Feed processed",
-                "feed_source":       feed_source,
-                "feed_category":     feed_category,
-                "entries_found":     len(articles),
-                "new_articles":      feed_new,
-                "skipped_duplicates": feed_duplicates,
-            })
+            json.dumps(
+                {
+                    "message": "Feed processed",
+                    "feed_source": feed_source,
+                    "feed_category": feed_category,
+                    "entries_found": len(articles),
+                    "new_articles": feed_new,
+                    "skipped_duplicates": feed_duplicates,
+                }
+            )
         )
 
     # ------------------------------------------------------------------
@@ -179,6 +187,7 @@ def feedmind(request):
     # ------------------------------------------------------------------
     # --- Append static daily reminders ---
     from feedmind.ingestion import Article
+
     for title, url, category, msg in getattr(config, "STATIC_LINKS", []):
         dummy_id = f"static_{title.replace(' ', '_').lower()}"
         dummy_article = Article(
@@ -188,7 +197,7 @@ def feedmind(request):
             snippet="",
             feed_source="Daily Reminder",
             feed_category=category,
-            published_at=datetime.now(UTC).isoformat()
+            published_at=datetime.now(UTC).isoformat(),
         )
         if category not in category_items:
             category_items[category] = []
@@ -203,7 +212,9 @@ def feedmind(request):
         all_chunks_delivered = True
         for msg_text in messages:
             if is_local_run:
-                print(f"--- WOULD SEND TO TELEGRAM ({category}) ---\n{msg_text}\n-----------------------------")
+                print(
+                    f"--- WOULD SEND TO TELEGRAM ({category}) ---\n{msg_text}\n-----------------------------"
+                )
                 delivered = True
             else:
                 delivered = send_message(telegram_token, telegram_chat_id, msg_text)
@@ -227,23 +238,71 @@ def feedmind(request):
                     articles_delivered += 1
 
     # ------------------------------------------------------------------
+    # Step 4b: Ingest YouTube subscriptions -> Firestore (no Telegram)
+    # ------------------------------------------------------------------
+    # New videos from the last MAX_VIDEO_AGE_DAYS are written to the
+    # `youtube_videos` collection. They are NOT summarized or delivered via
+    # Telegram — the paper-prism web app's "Videos" page reads them directly.
+    for channel_name, feed_url in getattr(config, "YOUTUBE_FEEDS", []):
+        # Honor the same soft-timeout guard as the RSS loop.
+        if time.monotonic() - run_start >= config.FUNCTION_SOFT_TIMEOUT_S:
+            logger.warning("Soft timeout reached before YouTube ingest — stopping early")
+            break
+
+        videos = fetch_youtube_feed(channel_name, feed_url)
+        youtube_feeds_checked += 1
+
+        channel_new = 0
+        for video in videos:
+            if is_duplicate_video(db, video):
+                logger.debug("SKIP duplicate video: video_id=%s", video.video_id)
+                continue
+
+            channel_new += 1
+            new_videos_found += 1
+
+            if is_local_run:
+                print(
+                    f"--- WOULD SAVE VIDEO TO FIRESTORE: {video.video_id} "
+                    f"({video.channel}) {video.title} ---"
+                )
+            else:
+                save_video(db, video)
+            videos_saved += 1
+
+        logger.info(
+            json.dumps(
+                {
+                    "message": "YouTube feed processed",
+                    "channel": channel_name,
+                    "videos_found": len(videos),
+                    "new_videos": channel_new,
+                }
+            )
+        )
+
+    # ------------------------------------------------------------------
     # Step 5: Emit run summary
     # ------------------------------------------------------------------
     duration = round(time.monotonic() - run_start, 2)
     summary_log = {
-        "message":               "FeedMind run complete",
-        "feeds_checked":         feeds_checked,
-        "feeds_failed":          feeds_failed,
-        "new_articles_found":    new_articles_found,
-        "articles_summarized":   articles_summarized,
-        "articles_delivered":    articles_delivered,
-        "gemini_failures":       gemini_failures,
-        "telegram_failures":     telegram_failures,
-        "duration_seconds":      duration,
+        "message": "FeedMind run complete",
+        "feeds_checked": feeds_checked,
+        "feeds_failed": feeds_failed,
+        "new_articles_found": new_articles_found,
+        "articles_summarized": articles_summarized,
+        "articles_delivered": articles_delivered,
+        "gemini_failures": gemini_failures,
+        "telegram_failures": telegram_failures,
+        "youtube_feeds_checked": youtube_feeds_checked,
+        "new_videos_found": new_videos_found,
+        "videos_saved": videos_saved,
+        "duration_seconds": duration,
     }
     logger.info(json.dumps(summary_log))
 
     return (json.dumps(summary_log), 200, {"Content-Type": "application/json"})
+
 
 if __name__ == "__main__":
     # Allow running the script directly without functions-framework
