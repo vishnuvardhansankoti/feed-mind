@@ -7,6 +7,10 @@
   import FreshnessBadge from "./components/FreshnessBadge.svelte";
   import NewsFeed from "./components/NewsFeed.svelte";
   import VideoFeed from "./components/VideoFeed.svelte";
+  import SearchBar from "./components/SearchBar.svelte";
+  import ConsentBanner from "./components/ConsentBanner.svelte";
+  import { analyticsEnabled } from "./lib/analytics.js";
+  import { openConsent } from "./lib/consentUi.svelte.js";
 
   // Top-level section from the URL hash: "#/papers" -> papers, "#/videos" ->
   // videos, anything else (incl. the default "#/") -> news, the landing section.
@@ -86,6 +90,16 @@
   // Kick off the lazy fetch whenever a lazy section becomes active.
   $effect(() => { if (page === "news") loadNews(); });
   $effect(() => { if (page === "videos") loadVideos(); });
+
+  // The element whose text the global search scans, and a key that changes
+  // whenever its contents change so the search can re-highlight.
+  let contentEl;
+  const getContentEl = () => contentEl;
+  let searchRevision = $derived(
+    `${page}|${tab}|${loading}|${newsLoading}|${videosLoading}|` +
+      `${news ? news.articles?.length : 0}|${videos ? videos.videos?.length : 0}|` +
+      `${Object.keys(latest).length}|${Object.keys(archive).length}`,
+  );
 </script>
 
 <div class="wrap">
@@ -97,7 +111,10 @@
         <p class="tagline">Daily Tech News and Weekly Research Papers Digest</p>
       </div>
     </div>
-    {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
+    <div class="masthead-tools">
+      <SearchBar root={getContentEl} revision={searchRevision} />
+      {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
+    </div>
   </header>
 
   <nav class="nav" aria-label="Sections">
@@ -112,6 +129,7 @@
     </button>
   </nav>
 
+  <main bind:this={contentEl}>
   {#if page === "news"}
     {#if newsLoading}
       <div class="state"><span class="spinner"></span> Loading news…</div>
@@ -176,11 +194,18 @@
     </div>
   {/if}
   {/if}
+  </main>
 
   <footer>
     <span>Daily tech news across academia, industry, cloud &amp; open source · Weekly arXiv research ranked to your interests and summarized by AI</span>
+    {#if analyticsEnabled}
+      <span class="footsep">·</span>
+      <button type="button" class="cookie-link" onclick={openConsent}>Cookie settings</button>
+    {/if}
   </footer>
 </div>
+
+<ConsentBanner />
 
 <style>
   .wrap { max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
@@ -189,6 +214,7 @@
     align-items: center; justify-content: space-between; margin-bottom: 1.25rem;
   }
   .brand { display: flex; align-items: center; gap: 0.9rem; }
+  .masthead-tools { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
   .prism {
     width: 34px; height: 34px; border-radius: 9px;
     background: conic-gradient(from 210deg, #ff6b6b, #ffd166, #4ade80, #38bdf8, #a78bfa, #ff6b6b);
@@ -256,4 +282,10 @@
     margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
     color: var(--muted); font-size: 0.78rem; text-align: center;
   }
+  .footsep { margin: 0 0.4rem; }
+  .cookie-link {
+    font: inherit; font-size: inherit; cursor: pointer; padding: 0;
+    background: none; border: none; color: var(--accent); text-decoration: none;
+  }
+  .cookie-link:hover { text-decoration: underline; }
 </style>

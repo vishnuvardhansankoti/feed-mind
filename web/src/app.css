@@ -40,3 +40,14 @@ body {
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Global "find on this page" search highlights (SearchBar.svelte). ::highlight()
+   is a document-level pseudo and can't live in a scoped component style. */
+::highlight(pp-search) {
+  background-color: rgba(251, 191, 36, 0.35);
+  color: inherit;
+}
+::highlight(pp-search-current) {
+  background-color: var(--warn);
+  color: #0b0d12;
+}
