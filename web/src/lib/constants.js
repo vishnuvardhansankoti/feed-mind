@@ -40,7 +40,12 @@ export const NEWS_WINDOW_DAYS = 7;
 export const NEWS_MAX_ARTICLES = 200;
 
 // Videos page: YouTube subscriptions written to `youtube_videos` by feed-mind.
-// One read backs both tabs — Latest (newest day) and Archive (last 3 days) —
-// with client-side slicing.
+// One read backs both tabs — Latest (rolling VIDEO_LATEST_HOURS) and Archive
+// (last VIDEO_WINDOW_DAYS days) — with client-side slicing.
 export const VIDEO_WINDOW_DAYS = 3;
 export const VIDEO_MAX_ITEMS = 200;
+
+// Latest is a rolling window, not a calendar-day bucket: feed-mind ingests once
+// a day, so most of a day's uploads are already "yesterday" by the time they
+// land and a calendar-day Latest would show almost nothing.
+export const VIDEO_LATEST_HOURS = 24;

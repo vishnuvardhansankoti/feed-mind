@@ -1,8 +1,9 @@
 <script>
-  // Videos section: Latest (newest day that has videos) + Archive (whole
-  // 3-day window). All slicing is client-side over the single `videos` list
-  // handed in by App (newest first).
+  // Videos section: Latest (rolling VIDEO_LATEST_HOURS) + Archive (whole 3-day
+  // window, bucketed by calendar day). All slicing is client-side over the
+  // single `videos` list handed in by App (newest first).
   import VideoCard from "./VideoCard.svelte";
+  import { VIDEO_LATEST_HOURS } from "../lib/constants.js";
 
   let { videos = [] } = $props();
 
@@ -12,7 +13,18 @@
     weekday: "short", month: "short", day: "numeric",
   });
 
-  // Group into calendar-day buckets, preserving newest-first order.
+  // Latest = rolling window measured back from now, so an upload stays "latest"
+  // for a full day instead of aging out at local midnight. Videos with an
+  // unparseable published_at are excluded here but still reachable in Archive.
+  let latestItems = $derived.by(() => {
+    const cutoff = Date.now() - VIDEO_LATEST_HOURS * 3_600_000;
+    return videos.filter((v) => {
+      const d = v.published_date;
+      return d instanceof Date && !isNaN(d) && d.getTime() >= cutoff;
+    });
+  });
+
+  // Archive groups into calendar-day buckets, preserving newest-first order.
   let days = $derived.by(() => {
     const groups = [];
     let current = null;
@@ -28,14 +40,18 @@
     return groups;
   });
 
-  // Latest = just the newest day bucket; Archive = every bucket in the window.
-  let shownDays = $derived(view === "latest" ? days.slice(0, 1) : days);
+  // Both views render as day groups; Latest is one unlabelled group.
+  let shownDays = $derived(
+    view === "latest"
+      ? (latestItems.length ? [{ key: "latest", date: null, items: latestItems }] : [])
+      : days
+  );
 </script>
 
 <div class="videos">
   <div class="subtabs" role="tablist" aria-label="Videos window">
     <button role="tab" aria-selected={view === "latest"} class:active={view === "latest"} onclick={() => (view = "latest")}>
-      Latest
+      Latest · 24h
     </button>
     <button role="tab" aria-selected={view === "archive"} class:active={view === "archive"} onclick={() => (view = "archive")}>
       Archive · 3 days
@@ -56,7 +72,13 @@
       </section>
     {/each}
   {:else}
-    <p class="empty">No new videos from your subscriptions.</p>
+    <p class="empty">
+      {#if view === "latest" && days.length}
+        Nothing in the last 24 hours — check Archive.
+      {:else}
+        No new videos from your subscriptions.
+      {/if}
+    </p>
   {/if}
 </div>
 
