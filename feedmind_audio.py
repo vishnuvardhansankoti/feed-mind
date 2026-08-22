@@ -12,8 +12,11 @@ Two sources, selected with --process-doc:
 
 Both then follow the same tail:
 
-    text -> spaCy extractive filter -> LLM rewrite -> pyttsx3 -> ffmpeg
+    text -> spaCy extractive filter -> LLM rewrite -> speech
          -> Cloud Storage -> Firestore (ai_summary, audio_url, audio_generated_at)
+
+Speech comes from one of two backends, chosen with --tts: pyttsx3 plus an
+ffmpeg transcode locally, or the Google Text-to-Speech API when deployed.
 
 Items are independent: one failure is logged and the batch continues. Each
 Firestore write happens only after that item's upload succeeds, so a document
@@ -26,6 +29,7 @@ Usage:
     python feedmind_audio.py --limit 2 --dry-run        # no uploads, no writes
     python feedmind_audio.py --force                    # redo finished items
     python feedmind_audio.py --article-id <id>          # article_id, or arxiv_id
+    python feedmind_audio.py --tts cloud                # Google Text-to-Speech
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ from google.api_core import exceptions as gcp_exceptions  # noqa: E402
 from google.cloud import firestore, storage  # noqa: E402
 
 from webscraper import config as ws_config  # noqa: E402
+from webscraper.cloud_speech import synthesize_mp3  # noqa: E402
 from webscraper.condense import compression_note, extractive_filter  # noqa: E402
 from webscraper.errors import ScraperError  # noqa: E402
 from webscraper.extractor import extract_article  # noqa: E402
@@ -75,6 +80,14 @@ AUDIO_BITRATE = "64k"
 
 RSS_FEED = "RSS_FEED"
 RESEARCH_PAPERS = "RESEARCH_PAPERS"
+
+# Which speech engine to use. `local` is pyttsx3 plus an ffmpeg transcode, and
+# needs a machine with a speech engine on it. `cloud` is the Text-to-Speech API,
+# which returns MP3 directly and is the only one that works on a serverless
+# runtime - so the deployed function sets FEEDMIND_TTS=cloud.
+TTS_LOCAL = "local"
+TTS_CLOUD = "cloud"
+TTS_ENV_VAR = "FEEDMIND_TTS"
 
 # Fields this script adds. FeedMind's own fields are never touched.
 AI_SUMMARY_FIELD = "ai_summary"
@@ -350,6 +363,12 @@ def to_mp3(source, target, ffmpeg):
 
 def synthesize(text, workdir, args, ffmpeg):
     """Speak `text` into an MP3 inside `workdir`."""
+    if args.tts == TTS_CLOUD:
+        # The API encodes MP3 itself, so there is nothing to transcode.
+        return synthesize_mp3(
+            text, workdir / "speech.mp3", voice=args.voice, rate=args.rate
+        )
+
     # pyttsx3's macOS driver writes AIFF whatever extension it is handed.
     raw = speak(text, voice=args.voice, rate=args.rate, output=workdir / "speech.aiff")
     return to_mp3(raw, workdir / "speech.mp3", ffmpeg)
@@ -440,7 +459,18 @@ def build_parser():
         "--select-ratio", type=float,
         help="fraction of sentences spaCy keeps (default: 0.25)",
     )
-    parser.add_argument("--voice", help="pyttsx3 voice name or id")
+    parser.add_argument(
+        "--tts", choices=[TTS_LOCAL, TTS_CLOUD],
+        default=os.environ.get(TTS_ENV_VAR, TTS_LOCAL),
+        help=f"speech engine: {TTS_LOCAL} (pyttsx3 + ffmpeg) or {TTS_CLOUD} "
+             f"(Google Text-to-Speech). Defaults to ${TTS_ENV_VAR}, else "
+             f"{TTS_LOCAL}",
+    )
+    parser.add_argument(
+        "--voice",
+        help=f"a pyttsx3 voice name or id, or a Cloud TTS voice name such as "
+             f"en-US-Neural2-F with --tts {TTS_CLOUD}",
+    )
     parser.add_argument("--rate", type=int, help="speech rate in words per minute")
     return parser
 
@@ -491,13 +521,15 @@ def main(argv=None):
                 config, {"select_ratio": args.select_ratio}
             ),
             "storage": storage.Client(project=GCP_PROJECT_ID),
-            "ffmpeg": require_ffmpeg(),
+            # Only the local backend transcodes, so only it needs ffmpeg.
+            "ffmpeg": require_ffmpeg() if args.tts == TTS_LOCAL else None,
         }
     except (ScraperError, PipelineError) as error:
         log(str(error))
         return EXIT_ALL_FAILED
 
     log(f"  model: {settings['model']} via {settings['name']}")
+    log(f"  speech: {args.tts}" + (f" ({args.voice})" if args.voice else ""))
     if args.dry_run:
         log("  DRY RUN - no uploads, no Firestore writes")
     log()

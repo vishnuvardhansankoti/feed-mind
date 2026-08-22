@@ -68,11 +68,17 @@ BUILTIN_PROVIDER = {
 BUILTIN_PROVIDER_NAME = "ollama (built-in default)"
 
 # Environment variable -> provider setting it overrides.
+#
+# max_tokens is here because a reasoning model spends part of the budget
+# thinking before it writes anything, so the 300 that suits a plain chat model
+# can leave nothing for the answer. Somewhere with no config file on disk - a
+# deployment - would otherwise have no way to raise it.
 ENV_OVERRIDES = {
     "LLM_API": "api",
     "LLM_BASE_URL": "base_url",
     "LLM_MODEL": "model",
     "LLM_API_KEY": "api_key",
+    "LLM_MAX_TOKENS": "max_tokens",
 }
 
 PROVIDER_ENV_VAR = "LLM_PROVIDER"
@@ -112,6 +118,17 @@ SAMPLE_CONFIG = {
             "api": "ollama",
             "base_url": "http://localhost:11434",
             "model": "llama3.2:latest",
+        },
+        # Hosted Ollama. It speaks the OpenAI wire format, not the native
+        # /api/chat one, so this is an "openai" provider despite the name.
+        # max_tokens is raised because gpt-oss reasons before it answers and
+        # both come out of the same budget - see ENV_OVERRIDES.
+        "ollama-cloud": {
+            "api": "openai",
+            "base_url": "https://ollama.com/v1",
+            "model": "gpt-oss:120b",
+            "api_key_env": "OLLAMA_API_KEY",
+            "max_tokens": 1200,
         },
         "openai": {
             "api": "openai",

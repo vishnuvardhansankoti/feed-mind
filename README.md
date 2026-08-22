@@ -15,7 +15,7 @@ The core extraction path is standard library only. spaCy, pyttsx3 and the Google
 ```bash
 uv venv                                   # if .venv does not exist yet
 uv pip install --python .venv/bin/python spacy pyttsx3 \
-    google-cloud-firestore google-cloud-storage
+    google-cloud-firestore google-cloud-storage google-cloud-texttospeech
 .venv/bin/python -m spacy download en_core_web_sm
 brew install ffmpeg                       # only for MP3 output
 ```
@@ -27,6 +27,7 @@ brew install ffmpeg                       # only for MP3 output
 | `--condense` (two-step) | `spacy` + `en_core_web_sm` |
 | `--speak` / `--audio` | `pyttsx3` |
 | MP3 output | `ffmpeg` on `PATH` |
+| `--tts cloud` | `google-cloud-texttospeech` — no `pyttsx3`, no `ffmpeg` |
 | `feedmind_audio.py` | all of the above, plus GCP credentials (`gcloud auth application-default login`) |
 
 ---
@@ -83,14 +84,19 @@ Resolution order: `--config PATH` → `$WEB_SCRAPER_CONFIG` → `./scraper-confi
   "condense": { "enabled": false, "select_ratio": 0.25, "model": "en_core_web_sm" },
   "tts": { "voice": "Samantha", "rate": 175, "volume": 1.0 },
   "providers": {
-    "ollama":    { "api": "openai", "base_url": "http://localhost:11434/v1", "model": "llama3.2:latest" },
-    "openai":    { "api": "openai", "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini", "api_key_env": "OPENAI_API_KEY" },
-    "anthropic": { "api": "anthropic", "base_url": "https://api.anthropic.com", "model": "claude-sonnet-5", "api_key_env": "ANTHROPIC_API_KEY" }
+    "ollama":       { "api": "openai", "base_url": "http://localhost:11434/v1", "model": "llama3.2:latest" },
+    "ollama-cloud": { "api": "openai", "base_url": "https://ollama.com/v1", "model": "gpt-oss:120b", "api_key_env": "OLLAMA_API_KEY" },
+    "openai":       { "api": "openai", "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini", "api_key_env": "OPENAI_API_KEY" },
+    "anthropic":    { "api": "anthropic", "base_url": "https://api.anthropic.com", "model": "claude-sonnet-5", "api_key_env": "ANTHROPIC_API_KEY" }
   }
 }
 ```
 
-Per-field precedence is **CLI flag > env var (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API`, `LLM_API_KEY`, `LLM_PROVIDER`) > config file > built-in**. API keys are read from the env var named by `api_key_env` and never stored in the file.
+`ollama-cloud` is hosted Ollama — the provider the deployed function uses. Despite the name it is an **`openai`** provider: `ollama.com` speaks the OpenAI wire format, while the `ollama` adapter is for the native `/api/chat` a *local* Ollama serves.
+
+Per-field precedence is **CLI flag > env var (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API`, `LLM_API_KEY`, `LLM_MAX_TOKENS`, `LLM_PROVIDER`) > config file > built-in**. API keys are read from the env var named by `api_key_env` and never stored in the file.
+
+`LLM_MAX_TOKENS` exists for reasoning models: they spend part of the budget thinking before writing, so the built-in 300 — sized for a model that starts answering immediately — can leave nothing for the answer. Somewhere with no config file on disk, such as the deployed function, would otherwise have no way to raise it.
 
 Three wire formats cover most providers:
 
@@ -134,7 +140,7 @@ Publishes **one audio file per item** from the newest FeedMind content. Two sour
                         |                            |
                         +------------ spaCy condense +
                                        LLM rewrite
-                                       pyttsx3 -> ffmpeg -> MP3
+                                       speech -> MP3     (--tts local|cloud)
                                        Cloud Storage
                                        Firestore write
 ```
@@ -146,7 +152,23 @@ Publishes **one audio file per item** from the newest FeedMind content. Two sour
 .venv/bin/python feedmind_audio.py --limit 2 --dry-run      # no uploads, no writes
 .venv/bin/python feedmind_audio.py --force                  # redo finished items
 .venv/bin/python feedmind_audio.py --article-id <id>        # article_id, or arxiv_id
+.venv/bin/python feedmind_audio.py --tts cloud              # Google Text-to-Speech
 ```
+
+### Speech backends
+
+`--tts` picks the engine, defaulting to `$FEEDMIND_TTS` and then to `local`.
+
+| | `local` *(default)* | `cloud` |
+|---|---|---|
+| Engine | pyttsx3 → the OS voice | Google Text-to-Speech API |
+| Output | driver-native audio, transcoded by **ffmpeg** to 64 kbps MP3 | MP3 straight from the API — no ffmpeg |
+| `--voice` | a pyttsx3 voice name or id (`Samantha`) | a Cloud TTS voice name (`en-US-Neural2-F`) |
+| `--rate` | words per minute, passed to the driver | words per minute, converted to the API's rate multiplier against a 175 wpm baseline |
+| Cost | free | billed per character |
+| Runs on | a machine with a speech engine | anything with credentials |
+
+`cloud` is what makes the script deployable, and long text is split on sentence boundaries to stay under the API's 5000-byte request cap.
 
 ```
 RESEARCH_PAPERS - latest run per category: AIML 2026-08-22 (3), CV 2026-08-22 (3), NLP 2026-08-22 (3)
@@ -199,7 +221,93 @@ Exit codes: `0` ok (even with some failures) · `1` no articles found · `2` eve
 - The Firestore database is **named**. `firestore.Client(project='feed-mind')` fails with a 404 pointing at the Datastore setup page; you must pass `database='feed-mind-db'`.
 - `processed_at` is stored as an **ISO-8601 string**, not a Firestore timestamp. Ordering works only because every writer uses `datetime.now(UTC).isoformat()`.
 - The bucket is **public-read**, and `roles/storage.objectViewer` on `allUsers` also grants listing — anyone who knows the bucket name can enumerate every summary.
-- Ollama and pyttsx3 are local, so this script cannot move into a Cloud Function without swapping both for hosted services.
+- Ollama and pyttsx3 are local. Deploying means swapping **both** for hosted services — `--tts cloud` handles the speech half, and the LLM half is a matter of pointing `LLM_*` at a hosted provider. See below.
+
+---
+
+## Deploying as a Cloud Function
+
+`main.py` wraps `feedmind_audio.main()` in a gen2 HTTP function, so the CLI and the deployment can't drift — the function just turns a request into argv.
+
+Two things from the local setup cannot come along: **pyttsx3** (the runtime has no speech engine, and buildpacks can't `apt-get` one) and **ffmpeg** (same reason). The deployment therefore sets `FEEDMIND_TTS=cloud`, which takes both out of the path. Local **Ollama** can't come either — the deployment points `LLM_*` at **Ollama Cloud** instead, which keeps the model catalogue familiar.
+
+```bash
+./deploy/setup.sh      # once per project: APIs, service accounts, IAM
+./deploy/deploy.sh     # after every code change
+./deploy/schedule.sh   # once: the two Cloud Scheduler cron jobs
+```
+
+Everything configurable lives in `deploy/config.sh` and can be overridden from the environment (`REGION=europe-west1 ./deploy/deploy.sh`).
+
+📖 **[`deploy/README.md`](deploy/README.md)** is the full runbook — prerequisites, what each step does, smoke tests, troubleshooting and teardown. Start there for an actual deploy; what follows here is the summary.
+
+| File | Job |
+|---|---|
+| `main.py` | HTTP entrypoint — request → argv → `feedmind_audio.main()` |
+| `requirements.txt` | Runtime deps, including the spaCy model from its release URL |
+| `.gcloudignore` | Keeps the venv, `.git` and `deploy/` out of the upload |
+| `deploy/config.sh` | Every setting, sourced by the other three |
+| `deploy/setup.sh` | APIs, service accounts, IAM — idempotent |
+| `deploy/deploy.sh` | `gcloud functions deploy`, then grants the invoker binding |
+| `deploy/schedule.sh` | Upserts one scheduler job per `--process-doc` mode |
+
+**Before the first deploy**, create the LLM API key secret — it is the one thing the scripts won't invent for you. Get a key from <https://ollama.com/settings/keys>, then:
+
+```bash
+printf '%s' "$YOUR_KEY" | gcloud secrets create feedmind-llm-api-key \
+    --project=feed-mind --data-file=-
+```
+
+`deploy.sh` mounts it as `LLM_API_KEY`, which `webscraper/config.py` reads like any other override — so the key never appears in a deploy command or in the function's environment configuration. The secret name is provider-neutral on purpose: switching providers later is a new secret *version*, not a new secret.
+
+| `deploy/config.sh` | Default |
+|---|---|
+| `LLM_API` | `openai` — Ollama Cloud speaks the OpenAI wire format |
+| `LLM_BASE_URL` | `https://ollama.com/v1` → `POST /v1/chat/completions` |
+| `LLM_MODEL` | `gpt-oss:120b` |
+| `LLM_MAX_TOKENS` | `1200` — headroom for `gpt-oss`'s reasoning, not longer output |
+| `LLM_API_KEY_SECRET` | `feedmind-llm-api-key` |
+
+Ollama Cloud hosts a fixed catalogue rather than whatever you've pulled locally, so `LLM_MODEL` can't mirror the CLI's `llama3.2:latest`. The catalogue is public and needs no key:
+
+```bash
+curl -s https://ollama.com/v1/models | jq -r '.data[].id' | sort
+```
+
+`gpt-oss:20b` is the same family at roughly a fifth the size — worth trying, since a batch is a serial loop and most of its wall time is spent waiting on this call.
+
+To run exactly what the function will run, before spending a deploy on it:
+
+```bash
+LLM_API=openai LLM_BASE_URL=https://ollama.com/v1 \
+LLM_MODEL=gpt-oss:120b LLM_MAX_TOKENS=1200 LLM_API_KEY=... FEEDMIND_TTS=cloud \
+    .venv/bin/python feedmind_audio.py --limit 1 --force --dry-run
+```
+
+The env vars are the same four the function gets, so this needs no config file. If you'd rather have it as a named provider, `--init-config` writes an `ollama-cloud` block that reads the key from `$OLLAMA_API_KEY`; then `--provider ollama-cloud` selects it.
+
+### Invoking it
+
+The function is private. A JSON body or query string maps onto the CLI flags — `process_doc`, `category`, `article_id`, `limit`, `force`, `dry_run`, `timeout`, `provider`, `model`, `select_ratio`, `voice`, `rate`, `tts`. Body beats query string beats the `FEEDMIND_*` environment defaults.
+
+```bash
+URL=$(gcloud functions describe feedmind-audio --gen2 --region=us-central1 \
+      --format='value(serviceConfig.uri)')
+
+curl -X POST "$URL" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -H 'Content-Type: application/json' \
+  -d '{"process_doc": "RESEARCH_PAPERS", "category": "CV", "limit": 1, "dry_run": true}'
+```
+
+The response body is the list of audio URLs — the same thing the CLI prints to stdout. Progress goes to stderr and lands in Cloud Logging.
+
+### Shape of the deployment
+
+- **One instance, one request** (`--max-instances=1 --concurrency=1`). Papers mode rewrites the whole `papers` array, so overlapping runs would clobber each other.
+- **1 GiB, 3600s.** spaCy's pipeline is the memory floor; a batch is a serial loop of scrape + LLM + synthesis, and 3600s is the gen2 HTTP ceiling. You're billed for time used, not time reserved.
+- **Scheduler waits 1800s** (`ATTEMPT_DEADLINE`), under the function timeout so a retry can't overlap a batch still running. `--max-retry-attempts=1`, since the pipeline is idempotent but not free.
+- **"Nothing to do" is a 200.** Most scheduled runs legitimately find no new items; only exit code `2` — every item failed — returns 500 and triggers the retry.
 
 ---
 
@@ -226,6 +334,7 @@ print(summarize(text, resolve_provider(load_config())))
 | `condense.py` | spaCy extractive pre-filter *(optional dep)* |
 | `llm.py` | Provider adapters and `summarize()` |
 | `speech.py` | pyttsx3 text-to-speech *(optional dep)* |
+| `cloud_speech.py` | Google Text-to-Speech, the deployable backend *(optional dep)* |
 | `config.py` | Layering config file, env and CLI overrides |
 | `cli.py` | Argument parsing and console output |
 
