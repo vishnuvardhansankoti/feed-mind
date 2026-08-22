@@ -1,3 +1,4 @@
+// @vitest-environment node
 // Exercises the default "mock" data source (VITE_DATA_SOURCE unset) by stubbing
 // global fetch, so no fixtures on disk and no Firestore are required.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";

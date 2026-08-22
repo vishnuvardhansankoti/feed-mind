@@ -133,14 +133,34 @@ src/
     VideoCard.svelte         # one video
     SearchBar.svelte         # find-on-page over the rendered feed
     ConsentBanner.svelte     # analytics opt-in
+  test/setup.js              # jsdom setup: fake Audio, jest-dom matchers
 public/fixtures/             # bundled mock data (manifest, runs, run_status, news, videos)
 ```
 
 ## Tests
 
 ```bash
-npm test                     # vitest: data-source normalization + constants
+npm test                     # vitest: lib + component suites
+npm run test:watch
 ```
 
-The suite stubs `fetch` and exercises the default mock source, so it needs
-neither fixtures on disk nor a Firestore project.
+Two kinds of suite, split by environment:
+
+- **`src/lib/*.test.js`** — data-source normalization and constants. They stub
+  `fetch` and exercise the default mock source, so they need neither fixtures on
+  disk nor a Firestore project. They opt into Node with a
+  `// @vitest-environment node` docblock.
+- **`src/components/*.test.js`** — real components mounted in jsdom via
+  `@testing-library/svelte`. jsdom is the project-wide default environment, and
+  `resolve.conditions: ["browser"]` (set only under `VITEST`) is what makes
+  Svelte resolve its client build; without it `mount()` renders nothing.
+
+`src/test/setup.js` replaces `Audio` with a controllable fake — jsdom has no
+media stack, so `play()` would throw and no `playing`/`pause`/`ended` event
+would ever fire, which is the whole state machine behind `ListenButton`. The
+setup file is global, so it no-ops when there is no `window` (the Node suites).
+
+Time-dependent tests (`VideoFeed`) pin the clock with
+`vi.useFakeTimers({ toFake: ["Date"] })`. The Videos "Latest" window is defined
+against *local midnight*, so a floating `now` would make those tests pass or
+fail depending on the hour they ran.

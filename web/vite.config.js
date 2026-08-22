@@ -45,4 +45,13 @@ export default defineConfig({
     }),
   ],
   build: { outDir: "dist" },
+  // Component tests mount real Svelte components, so they need a DOM and the
+  // browser export condition (without it Svelte resolves its SSR build and
+  // `mount()` renders nothing). Lib tests opt back out with a
+  // `@vitest-environment node` docblock — they only touch plain functions.
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.js"],
+  },
+  resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined,
 });
