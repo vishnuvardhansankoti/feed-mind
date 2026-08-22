@@ -12,7 +12,8 @@ missing-field / empty-window states throughout. See PRD §3.5 / §4.
 | Videos | `#/videos` | `youtube_videos` | sibling `feed-mind` repo |
 
 Every optional field degrades to "control not rendered" rather than an error —
-paper `summary`/`abstract`, article `summary`/`ai_summary`/`audio_url`. This
+paper `summary`/`abstract`/`ai_summary`/`audio_url`, article
+`summary`/`ai_summary`/`audio_url`. This
 matters because two of the three collections are written by another repo, so
 the reader routinely meets documents older than the field it wants.
 
@@ -85,13 +86,20 @@ so they need **no composite index** (only the Papers queries do — see
 
 ### Audio summaries
 
-`normalizeArticle` runs `audio_url` through `publicAudioUrl()`, which accepts an
-`https://` URL as-is, rewrites `gs://bucket/object` to its
-`storage.googleapis.com` public form, and returns `""` for anything it does not
-recognize — so a malformed value hides the player instead of producing a dead
-one. `ArticleCard` creates the `<audio>` element on first click (a feed page
-holds up to 200 cards, and eager elements would mean 200 media requests), and
-module-scoped state ensures **only one card plays at a time**.
+Both news articles and papers carry an optional `ai_summary` (a longer LLM
+summary, behind an "AI summary" disclosure) and `audio_url` (its spoken version).
+On articles the pair sits on the doc; on papers it sits **per-paper inside the
+run doc**, alongside `audio_generated_at`.
+
+`normalizeArticle` and `normalizePaper` both run `audio_url` through
+`publicAudioUrl()`, which accepts an `https://` URL as-is, rewrites
+`gs://bucket/object` to its `storage.googleapis.com` public form, and returns
+`""` for anything it does not recognize — so a malformed value hides the player
+instead of producing a dead one. `ListenButton.svelte` (shared by `ArticleCard`
+and `PaperCard`) creates the `<audio>` element on first click — a feed page
+holds up to 200 cards, and eager elements would mean 200 media requests — and
+its module-scoped state ensures **only one clip plays at a time app-wide**,
+across sections as well as within one.
 
 The bucket must be public-read and serve a real audio `Content-Type`; the
 browser fetches the object with a plain `GET` and no credentials.
@@ -116,10 +124,11 @@ src/
   lib/analytics.js           # consent-gated Google Analytics loader
   components/
     LensColumn.svelte        # lens heading + papers (empty-window state)
-    PaperCard.svelte         # one paper (null-summary state, abstract disclosure)
+    PaperCard.svelte         # one paper (null-summary state, ai_summary + abstract disclosures)
     FreshnessBadge.svelte    # per-lens fresh/stale chips from run_status
     NewsFeed.svelte          # category tabs + day grouping for News
-    ArticleCard.svelte       # one article (audio player, ai_summary disclosure)
+    ArticleCard.svelte       # one article (ai_summary disclosure)
+    ListenButton.svelte      # shared audio player (one clip at a time, app-wide)
     VideoFeed.svelte         # Latest (24h rolling) + Archive for Videos
     VideoCard.svelte         # one video
     SearchBar.svelte         # find-on-page over the rendered feed

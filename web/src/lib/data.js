@@ -165,7 +165,10 @@ async function mockPerLens(n) {
   for (const code of LENS_CODES) {
     const ids = (manifest.runs[code] || []).slice(0, n);
     const runs = await Promise.all(ids.map((id) => fixture(`runs/${id}.json`)));
-    out[code] = n === 1 ? (runs[0] ?? null) : runs.map(normalizeRun);
+    // Normalize on both branches: the single-run path feeds the same PaperCard,
+    // which needs the defaulted ai_summary/audio_url the raw fixture lacks.
+    const normalized = runs.map(normalizeRun);
+    out[code] = n === 1 ? (normalized[0] ?? null) : normalized;
   }
   return out;
 }
@@ -254,7 +257,23 @@ function withPinnedLinks(docs) {
 }
 
 function normalizeRun(run) {
-  return { ...run, run_date: toDate(run.run_date) };
+  return {
+    ...run,
+    run_date: toDate(run.run_date),
+    papers: (run.papers ?? []).map(normalizePaper),
+  };
+}
+
+// Papers carry the same optional `ai_summary` / `audio_url` pair as articles,
+// written per-paper inside the run doc. Runs written before the pipeline
+// generated them have neither, so both default to "" and the card hides the
+// control rather than rendering an empty disclosure or a dead player.
+function normalizePaper(p) {
+  return {
+    ...p,
+    ai_summary: p.ai_summary ?? "",
+    audio_url: publicAudioUrl(p.audio_url),
+  };
 }
 
 // processed_at drives ordering/grouping; keep the raw ISO string for day
@@ -281,8 +300,11 @@ function publicAudioUrl(value) {
   if (value.startsWith("https://") || value.startsWith("http://")) return value;
   if (value.startsWith("gs://")) {
     const [bucket, ...object] = value.slice(5).split("/");
-    if (!bucket || !object.length) return "";
+    // A trailing slash still yields one (empty) segment, so check the joined
+    // path rather than the segment count — "gs://bucket/" names no object, and
+    // the bucket root would be a dead player rather than audio.
     const path = object.map(encodeURIComponent).join("/");
+    if (!bucket || !path) return "";
     return `https://storage.googleapis.com/${bucket}/${path}`;
   }
   return "";

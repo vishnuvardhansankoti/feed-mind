@@ -10,7 +10,10 @@
       "url": "http://arxiv.org/abs/2608.10743v1",
       "score": 0.6255,
       "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks.",
-      "abstract": "Sample abstract: Search agents accumulate retrieved context across turns, and irrelevant passages measurably degrade later decisions. We characterize this interference, show it grows with trajectory length rather than with context size alone, and propose a selective carry-over mechanism that keeps only evidence the agent has actually cited. Accuracy improves while token spend drops."
+      "abstract": "Sample abstract: Search agents accumulate retrieved context across turns, and irrelevant passages measurably degrade later decisions. We characterize this interference, show it grows with trajectory length rather than with context size alone, and propose a selective carry-over mechanism that keeps only evidence the agent has actually cited. Accuracy improves while token spend drops.",
+      "ai_summary": "Interleaving retrieved passages into the pretraining stream, rather than bolting retrieval on afterwards, improves closed-book factuality and the gain survives instruction tuning. The evaluation leans on standard QA benchmarks, so transfer to open-ended generation is untested.",
+      "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/research-papers/2026-08-13/NLP/2608.10743.mp3",
+      "audio_generated_at": "2026-08-13T06:12:00+00:00"
     },
     {
       "rank": 2,
@@ -19,7 +22,10 @@
       "url": "http://arxiv.org/abs/2608.09154v1",
       "score": 0.5692,
       "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings.",
-      "abstract": "Sample abstract: Instruction-following benchmarks frequently admit a copy-and-paste shortcut in which the model reproduces constraint text rather than satisfying it. We synthesize general constraints that are cheap to verify but not satisfiable by copying, and show that several strong models lose a substantial fraction of their reported score under this evaluation."
+      "abstract": "Sample abstract: Instruction-following benchmarks frequently admit a copy-and-paste shortcut in which the model reproduces constraint text rather than satisfying it. We synthesize general constraints that are cheap to verify but not satisfiable by copying, and show that several strong models lose a substantial fraction of their reported score under this evaluation.",
+      "ai_summary": "A decoding-time constraint keeps generated citations grounded in the retrieved set. Hallucinated references drop sharply; latency rises with the number of candidates checked per token.",
+      "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/research-papers/2026-08-13/NLP/2608.09154.mp3",
+      "audio_generated_at": "2026-08-13T06:12:00+00:00"
     },
     {
       "rank": 3,

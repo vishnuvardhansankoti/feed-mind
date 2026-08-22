@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { LENSES, LENS_CODES } from "./constants.js";
+import {
+  LENSES,
+  LENS_CODES,
+  NEWS_CATEGORIES,
+  NEWS_CATEGORY_CODES,
+  STATIC_NEWS_LINKS,
+  NEWS_WINDOW_DAYS,
+  NEWS_MAX_ARTICLES,
+  VIDEO_WINDOW_DAYS,
+  VIDEO_MAX_ITEMS,
+  VIDEO_LATEST_HOURS,
+} from "./constants.js";
 
 describe("lens metadata", () => {
   it("defines the three lenses in Firestore-category order", () => {
@@ -17,5 +28,86 @@ describe("lens metadata", () => {
 
   it("LENS_CODES is derived from LENSES", () => {
     expect(LENS_CODES).toEqual(LENSES.map((l) => l.code));
+  });
+});
+
+describe("news categories", () => {
+  it("matches the feed_category values feed-mind writes", () => {
+    expect(NEWS_CATEGORY_CODES).toEqual([
+      "academic",
+      "industry",
+      "cloud",
+      "open-source",
+    ]);
+  });
+
+  it("NEWS_CATEGORY_CODES is derived from NEWS_CATEGORIES", () => {
+    expect(NEWS_CATEGORY_CODES).toEqual(NEWS_CATEGORIES.map((c) => c.code));
+  });
+
+  it("every category carries a code and a tab label", () => {
+    for (const c of NEWS_CATEGORIES) {
+      expect(c.code).toBeTruthy();
+      expect(c.label).toBeTruthy();
+    }
+  });
+});
+
+describe("pinned static news links", () => {
+  it("declares at least one link, so the open-source tab is never empty", () => {
+    // open-source has no RSS source; these links are its entire content.
+    expect(STATIC_NEWS_LINKS.length).toBeGreaterThan(0);
+  });
+
+  it("uses a static_ id prefix, which feed-mind skips when persisting", () => {
+    // The writer deliberately never stores these; a drifting prefix here would
+    // let the same link be both pinned and persisted under different ids.
+    for (const link of STATIC_NEWS_LINKS) {
+      expect(link.article_id.startsWith("static_")).toBe(true);
+    }
+  });
+
+  it("files every link under a real category tab", () => {
+    for (const link of STATIC_NEWS_LINKS) {
+      expect(NEWS_CATEGORY_CODES).toContain(link.feed_category);
+    }
+  });
+
+  it("carries the fields ArticleCard renders", () => {
+    for (const link of STATIC_NEWS_LINKS) {
+      expect(link.url).toMatch(/^https:\/\//);
+      expect(link.title).toBeTruthy();
+      expect(link.feed_source).toBeTruthy();
+    }
+  });
+
+  it("carries no audio or ai_summary — there is no pipeline behind them", () => {
+    for (const link of STATIC_NEWS_LINKS) {
+      expect(link.audio_url ?? "").toBe("");
+      expect(link.ai_summary ?? "").toBe("");
+    }
+  });
+
+  it("does not hard-code a timestamp — getNews stamps a fresh one per load", () => {
+    // A baked-in processed_at would age out of the rolling window and the link
+    // would silently stop appearing.
+    for (const link of STATIC_NEWS_LINKS) {
+      expect(link.processed_at).toBeUndefined();
+      expect(link.published_at).toBeUndefined();
+    }
+  });
+});
+
+describe("window and cap constants", () => {
+  it("keeps the news window inside the read cap's intent", () => {
+    expect(NEWS_WINDOW_DAYS).toBeGreaterThan(0);
+    expect(NEWS_MAX_ARTICLES).toBeGreaterThan(0);
+  });
+
+  it("keeps the videos Latest window no wider than the Archive window", () => {
+    // Latest is a rolling hour window carved out of the day-based Archive
+    // window; if it grew past it, Latest could show items Archive omits.
+    expect(VIDEO_LATEST_HOURS).toBeLessThanOrEqual(VIDEO_WINDOW_DAYS * 24);
+    expect(VIDEO_MAX_ITEMS).toBeGreaterThan(0);
   });
 });

@@ -1,5 +1,10 @@
 <script>
   // One ranked paper. Handles the null-summary state (PRD §3.3 / §3.5).
+  // `ai_summary` and `audio_url` arrive per-paper on newer run docs; runs
+  // written before the pipeline generated them have neither, so both degrade
+  // to "not shown" exactly as they do on a news card.
+  import ListenButton from "./ListenButton.svelte";
+
   let { paper } = $props();
 </script>
 
@@ -14,11 +19,22 @@
       <span class="score" title="cosine similarity to the interest profile">
         match {(paper.score * 100).toFixed(0)}%
       </span>
+      {#if paper.audio_url}
+        <ListenButton url={paper.audio_url} label={paper.title} />
+      {/if}
     </div>
     {#if paper.summary}
       <p class="summary">{paper.summary}</p>
     {:else}
       <p class="summary muted">Summary unavailable for this paper.</p>
+    {/if}
+    <!-- The longer LLM summary, collapsed like the abstract so a lens column
+         stays scannable. Distinct from `summary`, which is the one-liner. -->
+    {#if paper.ai_summary}
+      <details class="ai-summary">
+        <summary>AI summary</summary>
+        <p>{paper.ai_summary}</p>
+      </details>
     {/if}
     <!-- The author's abstract, verbatim from arXiv. Absent on docs written
          before the pipeline persisted it, so it's collapsed and optional. -->
@@ -57,6 +73,8 @@
   .title { margin: 0 0 0.35rem; font-size: 0.98rem; font-weight: 600; }
   .meta {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 0.75rem;
     font-size: 0.75rem;
     color: var(--muted);
@@ -65,14 +83,14 @@
   .score { color: var(--accent); }
   .summary { margin: 0; font-size: 0.88rem; color: var(--text); }
   .summary.muted { color: var(--muted); font-style: italic; }
-  .abstract { margin-top: 0.5rem; font-size: 0.82rem; }
-  .abstract summary {
+  .ai-summary, .abstract { margin-top: 0.5rem; font-size: 0.82rem; }
+  .ai-summary summary, .abstract summary {
     cursor: pointer;
     color: var(--muted);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  .abstract summary:hover { color: var(--accent); }
-  .abstract p { margin: 0.4rem 0 0; color: var(--muted); line-height: 1.5; }
+  .ai-summary summary:hover, .abstract summary:hover { color: var(--accent); }
+  .ai-summary p, .abstract p { margin: 0.4rem 0 0; color: var(--muted); line-height: 1.5; }
 </style>
