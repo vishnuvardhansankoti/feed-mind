@@ -259,14 +259,33 @@ function normalizeRun(run) {
 
 // processed_at drives ordering/grouping; keep the raw ISO string for day
 // bucketing and expose a Date for display. `summary` may be absent on docs
-// written before feed-mind persisted it.
+// written before feed-mind persisted it; `ai_summary` / `audio_url` likewise,
+// and they are absent by design on the pinned `open-source` links, which have
+// no pipeline-generated content at all.
 function normalizeArticle(a) {
   return {
     ...a,
     summary: a.summary ?? "",
+    ai_summary: a.ai_summary ?? "",
+    audio_url: publicAudioUrl(a.audio_url),
     processed_date: toDate(a.processed_at),
     published_date: toDate(a.published_at),
   };
+}
+
+// feed-mind writes the Cloud Storage object for the audio summary. Accept both
+// an already-public https URL and a bare gs:// URI, so the reader keeps working
+// whichever form the writer settles on. Anything else -> "" (no audio).
+function publicAudioUrl(value) {
+  if (typeof value !== "string" || !value) return "";
+  if (value.startsWith("https://") || value.startsWith("http://")) return value;
+  if (value.startsWith("gs://")) {
+    const [bucket, ...object] = value.slice(5).split("/");
+    if (!bucket || !object.length) return "";
+    const path = object.map(encodeURIComponent).join("/");
+    return `https://storage.googleapis.com/${bucket}/${path}`;
+  }
+  return "";
 }
 
 // published_at drives ordering/day-bucketing; keep the raw ISO string and also

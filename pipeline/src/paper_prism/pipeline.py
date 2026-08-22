@@ -82,6 +82,7 @@ class Pipeline:
                     url=c.url,
                     score=score,
                     summary=summary,
+                    abstract=c.abstract,
                 )
             )
         log.info("lens %s: ranked %d papers", category, len(papers))

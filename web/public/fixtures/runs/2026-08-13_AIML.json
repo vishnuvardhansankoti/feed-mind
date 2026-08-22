@@ -9,7 +9,8 @@
       "arxiv_id": "2608.11859",
       "url": "http://arxiv.org/abs/2608.11859v1",
       "score": 0.5248,
-      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks."
+      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks.",
+      "abstract": "Sample abstract: Small-scale experiments remain the dominant evaluation protocol in much of the literature, yet their predictive value for production-scale systems is rarely quantified. We study the correlation between small- and large-scale outcomes across a suite of training runs, identify the regimes in which the ordering of methods is preserved, and characterize where it breaks down. Our results suggest concrete guidelines for when a small-scale result should be trusted."
     },
     {
       "rank": 2,
@@ -17,7 +18,8 @@
       "arxiv_id": "2608.08878",
       "url": "http://arxiv.org/abs/2608.08878v1",
       "score": 0.5154,
-      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings."
+      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings.",
+      "abstract": "Sample abstract: KV-cache memory dominates the footprint of long-context LLM inference. We propose an eviction policy that scores cached entries by their KL contribution to the output distribution rather than by attention mass alone, yielding a criterion that is cheap to compute and stable across layers. On long-context benchmarks the method retains quality at substantially reduced cache budgets."
     },
     {
       "rank": 3,
@@ -25,7 +27,8 @@
       "arxiv_id": "2608.11020",
       "url": "http://arxiv.org/abs/2608.11020v1",
       "score": 0.4949,
-      "summary": null
+      "summary": null,
+      "abstract": "Sample abstract: Physics-informed neural networks require derivatives of the network output with respect to its inputs. We compare automatic differentiation against finite-difference and spectral alternatives in terms of cost, accuracy, and conditioning, and show that the best choice depends on the stiffness of the underlying operator rather than on the architecture."
     }
   ]
 }

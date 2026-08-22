@@ -20,6 +20,14 @@
     {:else}
       <p class="summary muted">Summary unavailable for this paper.</p>
     {/if}
+    <!-- The author's abstract, verbatim from arXiv. Absent on docs written
+         before the pipeline persisted it, so it's collapsed and optional. -->
+    {#if paper.abstract}
+      <details class="abstract">
+        <summary>Abstract</summary>
+        <p>{paper.abstract}</p>
+      </details>
+    {/if}
   </div>
 </article>
 
@@ -57,4 +65,14 @@
   .score { color: var(--accent); }
   .summary { margin: 0; font-size: 0.88rem; color: var(--text); }
   .summary.muted { color: var(--muted); font-style: italic; }
+  .abstract { margin-top: 0.5rem; font-size: 0.82rem; }
+  .abstract summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .abstract summary:hover { color: var(--accent); }
+  .abstract p { margin: 0.4rem 0 0; color: var(--muted); line-height: 1.5; }
 </style>

@@ -34,6 +34,9 @@ def test_run_document_to_dict_includes_expire_at_when_set():
     assert out["id"] == "2026-08-13_CV"
     # score is rounded to 4 dp on serialization
     assert out["papers"][0]["score"] == 0.1235
+    # both text fields are always present; null when unset
+    assert out["papers"][0]["summary"] is None
+    assert out["papers"][0]["abstract"] is None
 
 
 def test_run_status_marks_and_detects_failure():

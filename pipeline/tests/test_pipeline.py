@@ -101,6 +101,9 @@ def test_run_ranks_top_k_and_stamps_expire_at():
         # longest abstract (idx 2) ranks first
         assert doc.papers[0].title == "paper 2"
         assert doc.papers[0].summary == "summary of paper 2"
+        # The arXiv abstract is carried through to the doc alongside the
+        # Gemini summary, not consumed and discarded by ranking.
+        assert doc.papers[0].abstract == "xxx"
 
     assert sink.status is not None
     assert sink.status.expire_at == expected_expire

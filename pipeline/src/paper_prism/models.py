@@ -26,7 +26,10 @@ class Paper:
     arxiv_id: str
     url: str
     score: float
+    # `summary` is the Gemini-generated blurb (null when that call failed);
+    # `abstract` is the author's abstract straight from the arXiv feed.
     summary: Optional[str] = None
+    abstract: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -36,6 +39,7 @@ class Paper:
             "url": self.url,
             "score": round(float(self.score), 4),
             "summary": self.summary,
+            "abstract": self.abstract,
         }
 
 

@@ -1,9 +1,20 @@
 # paper-prism — web (P3)
 
-Lightweight **Svelte SPA** that reads the digest **directly from Firestore**
-(Path A — no backend API). Two tabs (Latest, Archive), a per-lens freshness
-badge from `run_status`, and graceful null-summary / empty-window states. See
-PRD §3.5 / §4.
+Lightweight **Svelte SPA** that reads **directly from Firestore** (Path A — no
+backend API). Three sections behind a hash router, each with Latest + Archive
+sub-tabs, plus a per-lens freshness badge from `run_status` and graceful
+missing-field / empty-window states throughout. See PRD §3.5 / §4.
+
+| Section | Route | Collection | Written by |
+|---|---|---|---|
+| News | `#/` (landing) | `processed_articles` | sibling `feed-mind` repo |
+| Papers | `#/papers` | `runs`, `run_status` | this repo's `pipeline/` |
+| Videos | `#/videos` | `youtube_videos` | sibling `feed-mind` repo |
+
+Every optional field degrades to "control not rendered" rather than an error —
+paper `summary`/`abstract`, article `summary`/`ai_summary`/`audio_url`. This
+matters because two of the three collections are written by another repo, so
+the reader routinely meets documents older than the field it wants.
 
 ## Run locally (mock data, no cloud)
 
@@ -38,8 +49,18 @@ rebuild (`npm run build`) after changing them.
 
 ## Build & deploy (Firebase Hosting, free Spark tier)
 
+> **Env precedence is load-bearing.** Vite loads `.env.local` in *every* mode,
+> above `.env` — and `.env.local` (gitignored) pins `VITE_DATA_SOURCE=mock` with
+> empty keys for local dev. So a plain `vite build` bakes **mock**, and shipping
+> that `dist/` serves fixture data in production. `npm run build` therefore runs
+> `vite build --mode prod`, which loads `.env.prod` *after* `.env.local` and
+> flips the source back to firestore. `.env.prod` must carry the real
+> `VITE_FIREBASE_*` values, since `.env.local`'s empty ones would clobber
+> `.env`. To force a mock QA build, prefix `VITE_DATA_SOURCE=mock` — a shell
+> variable beats every `.env*` file.
+
 ```bash
-npm run build             # -> dist/
+npm run build             # -> dist/  (firestore/prod; see the note above)
 # from the repo root (uses ../firebase.json + firestore.rules + indexes):
 firebase deploy --only hosting
 firebase deploy --only firestore:rules,firestore:indexes
@@ -47,31 +68,70 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 ## Data source abstraction
 
-`src/lib/data.js` exposes `getLatest()`, `getArchive()`, `getStatus()`.
-Both backends return the same shapes:
+`src/lib/data.js` exposes `getLatest()`, `getArchive()`, `getStatus()`,
+`getNews()` and `getVideos()`. Both backends return the same shapes:
 
 | view | query |
 |---|---|
-| Latest | per lens: `where(category==X).orderBy(run_date desc).limit(1)` |
-| Archive | per lens: same, `limit(5)` |
+| Papers · Latest | per lens: `where(category==X).orderBy(run_date desc).limit(1)` |
+| Papers · Archive | per lens: same, `limit(5)` |
 | Freshness | latest `run_status` doc |
+| News (both views) | one query: `where(processed_at >= now-7d).orderBy(processed_at desc).limit(200)` — Latest/Archive are sliced client-side |
+| Videos (both views) | one query: same shape on `published_at`, 3-day window |
+
+The News and Videos queries use a single-field inequality + matching `orderBy`,
+so they need **no composite index** (only the Papers queries do — see
+`../firestore.indexes.json`).
+
+### Audio summaries
+
+`normalizeArticle` runs `audio_url` through `publicAudioUrl()`, which accepts an
+`https://` URL as-is, rewrites `gs://bucket/object` to its
+`storage.googleapis.com` public form, and returns `""` for anything it does not
+recognize — so a malformed value hides the player instead of producing a dead
+one. `ArticleCard` creates the `<audio>` element on first click (a feed page
+holds up to 200 cards, and eager elements would mean 200 media requests), and
+module-scoped state ensures **only one card plays at a time**.
+
+The bucket must be public-read and serve a real audio `Content-Type`; the
+browser fetches the object with a plain `GET` and no credentials.
 
 ## Regenerating fixtures
 
-After a pipeline run writes `../pipeline/output/`, rebuild the mock fixtures with
-the snippet in the repo (see commit history) or point `VITE_DATA_SOURCE=firestore`
-at a real project.
+`runs/` + `run_status/` + `manifest.json` come from a pipeline run under
+`../pipeline/output/`. `news.json` and `videos.json` are curated by hand, since
+the feed-mind pipeline writes those collections from a different repo — keep
+them shaped like real documents, including a couple of entries that *omit* the
+optional fields so the degrade paths stay exercised. The mock source
+deliberately skips the rolling-window cutoff for news and videos, so a static
+fixture doesn't age out and render empty.
 
 ## Layout
 
 ```
 src/
-  App.svelte                 # tabs, loading/error, Latest + Archive layouts
+  App.svelte                 # hash router (News/Papers/Videos), loading/error, layouts
   lib/data.js                # firestore | mock source abstraction
-  lib/constants.js           # lens display metadata
+  lib/constants.js           # lens + news-category metadata, pinned static links, windows
+  lib/analytics.js           # consent-gated Google Analytics loader
   components/
     LensColumn.svelte        # lens heading + papers (empty-window state)
-    PaperCard.svelte         # one paper (null-summary state)
+    PaperCard.svelte         # one paper (null-summary state, abstract disclosure)
     FreshnessBadge.svelte    # per-lens fresh/stale chips from run_status
-public/fixtures/             # bundled mock data (manifest + runs + run_status)
+    NewsFeed.svelte          # category tabs + day grouping for News
+    ArticleCard.svelte       # one article (audio player, ai_summary disclosure)
+    VideoFeed.svelte         # Latest (24h rolling) + Archive for Videos
+    VideoCard.svelte         # one video
+    SearchBar.svelte         # find-on-page over the rendered feed
+    ConsentBanner.svelte     # analytics opt-in
+public/fixtures/             # bundled mock data (manifest, runs, run_status, news, videos)
 ```
+
+## Tests
+
+```bash
+npm test                     # vitest: data-source normalization + constants
+```
+
+The suite stubs `fetch` and exercises the default mock source, so it needs
+neither fixtures on disk nor a Firestore project.

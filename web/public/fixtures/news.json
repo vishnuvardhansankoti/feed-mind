@@ -8,7 +8,9 @@
     "summary": "A fused attention kernel cuts long-context inference memory by 40% without accuracy loss.",
     "published_at": "2026-08-15T06:10:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "The post walks through a fused attention kernel that keeps the softmax denominator in registers instead of materializing the full score matrix. On a 128k-token context the authors measure a 40% drop in peak memory with no measurable change in perplexity, and they publish the Triton source alongside benchmarks against FlashAttention-3.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-acad-01.mp3"
   },
   {
     "article_id": "n-acad-02",
@@ -19,7 +21,9 @@
     "summary": "Interleaving retrieval into pretraining improves factuality on downstream QA benchmarks.",
     "published_at": "2026-08-15T05:30:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "Rather than bolting retrieval onto a finished model, the team interleaves retrieved passages into the pretraining stream itself. Downstream factuality on closed-book QA improves substantially, and the gain persists after instruction tuning — suggesting the model learns to rely on retrieved evidence rather than memorized text.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-acad-02.mp3"
   },
   {
     "article_id": "n-acad-03",
@@ -41,7 +45,9 @@
     "summary": "A walkthrough of quantizing and deploying ONNX transformer models to mobile runtimes.",
     "published_at": "2026-08-11T09:00:00+00:00",
     "processed_at": "2026-08-12T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "A practical guide to getting transformer models onto phones: post-training quantization to int8, graph surgery to remove unsupported ops, and a comparison of ONNX Runtime Mobile against Core ML and TFLite on the same hardware. The tradeoff table at the end is the useful part.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-12/n-acad-04.mp3"
   },
   {
     "article_id": "n-ind-01",
@@ -52,7 +58,9 @@
     "summary": "The updated API adds structured tool calls and parallel execution for agent workflows.",
     "published_at": "2026-08-15T04:00:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "The updated API replaces free-text function descriptions with a structured tool schema and allows several calls to be dispatched in parallel from one turn. Latency for multi-step agent workflows drops accordingly, and the post documents the new error semantics when one call in a batch fails.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-ind-01.mp3"
   },
   {
     "article_id": "n-ind-02",
@@ -63,7 +71,9 @@
     "summary": "One policy transfers across dozens of manipulation tasks with minimal fine-tuning.",
     "published_at": "2026-08-14T18:00:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "A single policy handles dozens of dexterous manipulation tasks — opening drawers, threading cables, folding cloth — with only a handful of demonstrations per new task. Transfer holds across two different robot embodiments, which is the headline claim; the failure cases involve deformable objects.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-ind-02.mp3"
   },
   {
     "article_id": "n-ind-03",
@@ -74,7 +84,9 @@
     "summary": "The round funds expansion of a low-latency inference network for enterprise customers.",
     "published_at": "2026-08-13T11:00:00+00:00",
     "processed_at": "2026-08-14T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "The Series C funds buildout of a low-latency inference network aimed at enterprises that cannot send traffic to a public API. Coverage notes the crowded competitive field and that the company has not disclosed utilization figures for its existing regions.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-ind-03.mp3"
   },
   {
     "article_id": "n-ind-04",
@@ -96,7 +108,9 @@
     "summary": "Snapshot-based restore cuts container function cold starts by up to 70%.",
     "published_at": "2026-08-15T03:00:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "Cold starts for containerized functions are cut by restoring from a pre-initialized memory snapshot rather than booting the runtime from scratch. The post reports up to 70% improvement, with the caveat that snapshots must be invalidated on any layer change and that entropy sources need reseeding after restore.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-cloud-01.mp3"
   },
   {
     "article_id": "n-cloud-02",
@@ -107,7 +121,9 @@
     "summary": "Native nearest-neighbor queries let apps run semantic search without an external index.",
     "published_at": "2026-08-14T15:00:00+00:00",
     "processed_at": "2026-08-14T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "Firestore can now run nearest-neighbor queries over stored vectors directly, removing the need to sync embeddings into a separate vector database. Preview limits apply to index size and dimensionality, and the query path composes with existing field filters.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-cloud-02.mp3"
   },
   {
     "article_id": "n-cloud-03",
@@ -118,6 +134,8 @@
     "summary": "The release stabilizes in-place pod resizing and improves sidecar lifecycle handling.",
     "published_at": "2026-08-11T12:00:00+00:00",
     "processed_at": "2026-08-11T07:00:00+00:00",
-    "status": "delivered"
+    "status": "delivered",
+    "ai_summary": "The 1.34 release stabilizes in-place pod resizing — changing CPU and memory without a restart — and tightens sidecar lifecycle ordering so init containers and sidecars terminate predictably. Several long-deprecated beta APIs are removed in this release, so upgrade notes are worth reading.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-11/n-cloud-03.mp3"
   }
 ]

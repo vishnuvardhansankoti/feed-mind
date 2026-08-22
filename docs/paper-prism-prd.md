@@ -205,7 +205,8 @@ Flat collection, one document per (run, category), denormalized `papers[]` inlin
       "arxiv_id": "2508.01234",
       "url": "https://arxiv.org/abs/2508.01234",
       "score": 0.94,
-      "summary": "… two sentences …"
+      "summary": "… two sentences …",
+      "abstract": "… the author's abstract, verbatim from arXiv …"
     }
   ]
 }
@@ -215,6 +216,11 @@ Flat collection, one document per (run, category), denormalized `papers[]` inlin
 - `run_date` — **Firestore Timestamp**, sortable, drives "latest" and "archive".
 - `category` — enum `{ "AIML", "NLP", "CV" }`.
 - `papers[]` — length 0–3; `summary` is **nullable**.
+- `summary` vs `abstract` — `summary` is the **Gemini-generated** blurb (null when
+  that call fails); `abstract` is the **author's abstract** as fetched from the
+  arXiv Atom feed (where the field is confusingly also named `summary`). The
+  abstract is not backfilled, so it is absent on documents written before it was
+  added — readers must tolerate `undefined`.
 - `score` — raw cosine similarity to the lens profile.
 
 ### 4.2 Collection: `run_status`

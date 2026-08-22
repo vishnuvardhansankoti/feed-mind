@@ -1,7 +1,7 @@
 // Exercises the default "mock" data source (VITE_DATA_SOURCE unset) by stubbing
 // global fetch, so no fixtures on disk and no Firestore are required.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getLatest, getArchive, getStatus } from "./data.js";
+import { getLatest, getArchive, getStatus, getNews } from "./data.js";
 
 const MANIFEST = {
   runs: {
@@ -64,5 +64,74 @@ describe("mock data source", () => {
   it("getStatus returns null when the manifest fetch fails", async () => {
     global.fetch = vi.fn(async () => ({ ok: false }));
     expect(await getStatus()).toBeNull();
+  });
+});
+
+describe("news audio + ai_summary normalization", () => {
+  const news = [
+    {
+      article_id: "a-https",
+      feed_category: "cloud",
+      processed_at: "2026-08-15T07:00:00+00:00",
+      ai_summary: "Long form summary.",
+      audio_url: "https://storage.googleapis.com/bucket/2026-08-15/a-https.mp3",
+    },
+    {
+      article_id: "b-gs",
+      feed_category: "cloud",
+      processed_at: "2026-08-14T07:00:00+00:00",
+      audio_url: "gs://feed-mind-audio/2026-08-14/b gs.mp3",
+    },
+    {
+      article_id: "c-legacy",
+      feed_category: "cloud",
+      processed_at: "2026-08-13T07:00:00+00:00",
+    },
+    {
+      article_id: "d-junk",
+      feed_category: "cloud",
+      processed_at: "2026-08-12T07:00:00+00:00",
+      audio_url: "not-a-url",
+    },
+  ];
+
+  beforeEach(() => {
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => news }));
+  });
+
+  const byId = (articles, id) => articles.find((a) => a.article_id === id);
+
+  it("passes an already-public https audio url through untouched", async () => {
+    const { articles } = await getNews();
+    expect(byId(articles, "a-https").audio_url).toBe(
+      "https://storage.googleapis.com/bucket/2026-08-15/a-https.mp3",
+    );
+    expect(byId(articles, "a-https").ai_summary).toBe("Long form summary.");
+  });
+
+  it("rewrites a gs:// uri to its public https form, encoding the object path", async () => {
+    const { articles } = await getNews();
+    expect(byId(articles, "b-gs").audio_url).toBe(
+      "https://storage.googleapis.com/feed-mind-audio/2026-08-14/b%20gs.mp3",
+    );
+  });
+
+  it("degrades to empty strings on docs written before the fields existed", async () => {
+    const { articles } = await getNews();
+    expect(byId(articles, "c-legacy").audio_url).toBe("");
+    expect(byId(articles, "c-legacy").ai_summary).toBe("");
+  });
+
+  it("drops an unrecognized audio_url rather than rendering a dead player", async () => {
+    const { articles } = await getNews();
+    expect(byId(articles, "d-junk").audio_url).toBe("");
+  });
+
+  it("leaves the pinned open-source link without audio", async () => {
+    const { articles } = await getNews();
+    const pinned = byId(articles, "static_github_trending");
+    expect(pinned).toBeDefined();
+    expect(pinned.audio_url).toBe("");
+    expect(pinned.ai_summary).toBe("");
   });
 });

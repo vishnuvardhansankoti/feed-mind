@@ -125,7 +125,7 @@ erDiagram
         string id "YYYY-MM-DD_CATEGORY (doc id)"
         timestamp run_date
         string category "AIML | NLP | CV"
-        array papers "rank, title, arxiv_id, url, score, summary"
+        array papers "rank, title, arxiv_id, url, score, summary, abstract"
         timestamp expire_at "TTL: run_date + retention_days"
     }
     run_status {

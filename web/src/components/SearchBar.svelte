@@ -73,7 +73,12 @@
     current = ((i % ranges.length) + ranges.length) % ranges.length;
     const r = ranges[current];
     CSS.highlights.set("pp-search-current", new Highlight(r));
-    r.startContainer.parentElement?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const el = r.startContainer.parentElement;
+    // A match can sit inside a collapsed <details> (paper abstracts), where the
+    // text is in the DOM but invisible — open it so the hit is actually shown.
+    for (let d = el?.closest("details"); d; d = d.parentElement?.closest("details"))
+      d.open = true;
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
   const next = () => go(current + 1);
