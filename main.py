@@ -21,6 +21,7 @@ from feedmind.deduplication import (
     mark_as_delivered,
     save_video,
 )
+from feedmind.events import publish_content_ready
 from feedmind.ingestion import fetch_feed, fetch_youtube_feed
 from feedmind.notification import build_category_messages, send_message
 from feedmind.secrets import load_all_secrets
@@ -300,6 +301,20 @@ def feedmind(request):
         "duration_seconds": duration,
     }
     logger.info(json.dumps(summary_log))
+
+    # ------------------------------------------------------------------
+    # Step 6: Announce the run so downstream consumers can pick it up
+    # ------------------------------------------------------------------
+    # Published last, after every article is safely in Firestore — the
+    # consumer reads that collection, so announcing any earlier would race it.
+    # Best-effort: a failure here is logged, never raised. See events.py.
+    if is_local_run:
+        print(
+            f"--- WOULD PUBLISH CONTENT-READY EVENT: "
+            f"{articles_delivered} article(s) delivered ---"
+        )
+    else:
+        publish_content_ready(articles_delivered, run_summary=summary_log)
 
     return (json.dumps(summary_log), 200, {"Content-Type": "application/json"})
 

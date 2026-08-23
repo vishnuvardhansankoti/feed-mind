@@ -143,6 +143,20 @@ FIRESTORE_COLLECTION = "processed_articles"
 FIRESTORE_YOUTUBE_COLLECTION = "youtube_videos"
 
 # ---------------------------------------------------------------------------
+# Pub/Sub — telling downstream consumers a run has finished
+# ---------------------------------------------------------------------------
+# feed-mind-summarizer listens on this topic and turns the articles this run
+# wrote into spoken summaries. FeedMind is the only thing that knows when new
+# articles have actually landed, so it announces rather than letting the
+# consumer guess with a schedule of its own. See feedmind/events.py.
+ENABLE_CONTENT_READY_EVENTS = True
+CONTENT_READY_TOPIC = "feedmind-content-ready"
+
+# Which of the consumer's two pipelines to run. The papers pipeline is fed by
+# paper-prism, not by this service.
+CONTENT_READY_PROCESS_DOC = "RSS_FEED"
+
+# ---------------------------------------------------------------------------
 # Runtime
 # ---------------------------------------------------------------------------
 FUNCTION_SOFT_TIMEOUT_S = 240  # warn and exit gracefully before the 300s hard limit

@@ -18,7 +18,8 @@ feed-mind/
 │   ├── ingestion.py    # RSS feed fetching & parsing (feedparser)
 │   ├── deduplication.py # Firestore dedup check & write
 │   ├── summarization.py # Gemini AI & Sumy offline NLP summarization
-│   └── notification.py # Telegram batched message delivery
+│   ├── notification.py # Telegram batched message delivery
+│   └── events.py       # Pub/Sub announcement when a run finishes
 ├── tests/              # Unit tests
 │   ├── __init__.py
 │   └── test_config.py
@@ -113,6 +114,52 @@ gcloud logging read \
   --project=your-gcp-project-id \
   --format=json
 ```
+
+---
+
+## Downstream: announcing a finished run
+
+As its last step, FeedMind publishes to a Pub/Sub topic so downstream consumers
+know new articles have landed. Today there is one consumer —
+[`feed-mind-summarizer`](../feed-mind-summarizer), which turns those articles
+into spoken summaries.
+
+```
+FeedMind run ends ──publish──► feedmind-content-ready ──► feedmind-audio
+```
+
+FeedMind is the only thing that knows when its run actually finished, so it
+announces rather than leaving the consumer to guess with a schedule of its own.
+The message is small — `process_doc` selects which consumer pipeline to run, the
+rest is provenance:
+
+```json
+{"process_doc": "RSS_FEED", "source": "feed-mind", "articles_delivered": 7,
+ "run_completed_at": "2026-08-23T13:15:04+00:00"}
+```
+
+Two deliberate behaviours in `feedmind/events.py`:
+
+- **Nothing is published when no articles were delivered.** Waking the consumer
+  to find an empty batch costs a cold start and buys nothing.
+- **Publishing is best-effort.** A run that summarized and delivered has done
+  its job; failing it because Pub/Sub was unreachable would turn a good run into
+  a retried one, and the retry would re-deliver every article to Telegram.
+  Errors are logged and swallowed.
+
+Publishing happens after every article is written to Firestore — the consumer
+reads that collection, so announcing any earlier would race it.
+
+| Setting | In `feedmind/config.py` |
+|---|---|
+| `ENABLE_CONTENT_READY_EVENTS` | `True` — set `False` to stop announcing |
+| `CONTENT_READY_TOPIC` | `feedmind-content-ready` |
+| `CONTENT_READY_PROCESS_DOC` | `RSS_FEED` |
+
+The topic itself, and `feedmind-sa`'s `roles/pubsub.publisher` grant on it, are
+created by the consumer's `deploy/setup.sh` — the topic belongs to whoever reads
+it. Run that before deploying this side, or the first publish will log a
+permission error (and only that: the run still succeeds).
 
 ---
 

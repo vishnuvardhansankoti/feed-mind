@@ -50,6 +50,7 @@ google-api-core==2.25.2
     #   google-api-python-client
     #   google-cloud-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-generativeai
 google-api-python-client==2.198.0
@@ -62,6 +63,7 @@ google-auth==2.56.2
     #   google-auth-httplib2
     #   google-cloud-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-generativeai
 google-auth-httplib2==0.4.0
@@ -69,6 +71,8 @@ google-auth-httplib2==0.4.0
 google-cloud-core==2.6.0
     # via google-cloud-firestore
 google-cloud-firestore==2.19.0
+    # via feedmind (pyproject.toml)
+google-cloud-pubsub==2.31.1
     # via feedmind (pyproject.toml)
 google-cloud-secret-manager==2.20.0
     # via feedmind (pyproject.toml)
@@ -80,15 +84,20 @@ googleapis-common-protos==1.75.0
     #   grpc-google-iam-v1
     #   grpcio-status
 grpc-google-iam-v1==0.14.4
-    # via google-cloud-secret-manager
+    # via
+    #   google-cloud-pubsub
+    #   google-cloud-secret-manager
 grpcio==1.83.0
     # via
     #   google-api-core
+    #   google-cloud-pubsub
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
 grpcio-status==1.62.3
-    # via google-api-core
+    # via
+    #   google-api-core
+    #   google-cloud-pubsub
 gunicorn==26.0.0
     # via functions-framework
 h11==0.16.0
@@ -129,6 +138,15 @@ nltk==3.10.0
     #   sumy
 numpy==2.5.1
     # via feedmind (pyproject.toml)
+opentelemetry-api==1.44.0
+    # via
+    #   google-cloud-pubsub
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-sdk==1.44.0
+    # via google-cloud-pubsub
+opentelemetry-semantic-conventions==0.65b0
+    # via opentelemetry-sdk
 packaging==26.2
     # via
     #   deprecation
@@ -138,12 +156,14 @@ proto-plus==1.28.2
     #   google-ai-generativelanguage
     #   google-api-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
     #   google-cloud-secret-manager
 protobuf==4.25.9
     # via
     #   google-ai-generativelanguage
     #   google-api-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-generativeai
     #   googleapis-common-protos
@@ -187,6 +207,9 @@ typing-extensions==4.16.0
     #   anyio
     #   google-generativeai
     #   grpcio
+    #   opentelemetry-api
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
     #   typing-inspection
