@@ -5,6 +5,7 @@ locals {
     SINK                   = "firestore"
     GOOGLE_CLOUD_PROJECT   = var.project_id
     FIRESTORE_DATABASE     = var.firestore_database
+    CONTENT_READY_TOPIC    = var.content_ready_topic
     GEMINI_MODEL           = var.gemini_model
     WINDOW_DAYS            = tostring(var.window_days)
     TOP_K                  = tostring(var.top_k)

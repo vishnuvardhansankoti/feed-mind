@@ -36,10 +36,24 @@ class Config:
     output_dir: str
     firestore_project: str | None = field(default=None)
     firestore_database: str | None = field(default=None)
+    content_ready_topic: str | None = field(default=None)
 
     @property
     def summaries_enabled(self) -> bool:
         return bool(self.gemini_api_key)
+
+    @property
+    def content_ready_enabled(self) -> bool:
+        """Whether to announce a finished run on Pub/Sub (see events.py).
+
+        Requires a real Firestore write: a local run produces nothing a
+        downstream consumer could read, so announcing it would be a lie.
+        """
+        return bool(
+            self.content_ready_topic
+            and self.firestore_project
+            and self.sink == "firestore"
+        )
 
 
 def load_config() -> Config:
@@ -77,4 +91,10 @@ def load_config() -> Config:
         # Firestore database id. Empty -> the "(default)" database. Set this to
         # write to a named (non-default) database, e.g. "feed-mind-db".
         firestore_database=os.getenv("FIRESTORE_DATABASE", "").strip() or None,
+        # Pub/Sub topic announcing that a run finished, for downstream
+        # consumers (see events.py). Empty -> no announcement.
+        content_ready_topic=os.getenv(
+            "CONTENT_READY_TOPIC", "feedmind-content-ready"
+        ).strip()
+        or None,
     )

@@ -12,6 +12,7 @@ import sys
 from .arxiv_client import ArxivClient
 from .config import load_config
 from .embedder import Embedder
+from .events import publish_content_ready
 from .pipeline import Pipeline
 from .sinks import build_sink
 from .summarizer import Summarizer
@@ -51,6 +52,12 @@ def main() -> int:
     )
 
     status = pipeline.run()
+
+    # Announced after the sink has written every lens, so a consumer reading
+    # `runs` cannot arrive before the documents do. Best-effort: this never
+    # raises and never changes the exit code (see events.py).
+    publish_content_ready(config, status)
+
     return 1 if status.has_failure else 0
 
 

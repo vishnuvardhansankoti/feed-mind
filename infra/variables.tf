@@ -20,6 +20,12 @@ variable "firestore_database" {
   default     = "feed-mind-db"
 }
 
+variable "content_ready_topic" {
+  type        = string
+  description = "Pub/Sub topic the job publishes to when a run finishes, so downstream consumers (feed-mind-summarizer) can pick it up. The topic and the job SA's publisher grant are owned by the consumer's deploy/setup.sh, not by this Terraform. Empty disables the announcement."
+  default     = "feedmind-content-ready"
+}
+
 variable "gemini_api_key" {
   type        = string
   description = "AI Studio Gemini API key (stored in Secret Manager)."

@@ -5,6 +5,9 @@ locals {
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
     "firestore.googleapis.com",
+    # The job publishes a "run finished" message (pipeline/src/paper_prism/events.py).
+    # The topic itself belongs to the consumer, feed-mind-summarizer.
+    "pubsub.googleapis.com",
     "cloudbuild.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
