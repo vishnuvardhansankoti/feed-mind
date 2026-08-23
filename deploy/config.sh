@@ -16,8 +16,26 @@ PROJECT_ID="${PROJECT_ID:-feed-mind}"
 REGION="${REGION:-us-central1}"
 
 FUNCTION_NAME="${FUNCTION_NAME:-feedmind-audio}"
-ENTRY_POINT="${ENTRY_POINT:-summarize_feed}"
+ENTRY_POINT="${ENTRY_POINT:-on_content_ready}"
 RUNTIME="${RUNTIME:-python311}"
+
+# -- Trigger -----------------------------------------------------------------
+# The function runs when a publisher says there is new content, not on a clock.
+# Only the producing pipeline knows when its run finished, and a schedule could
+# only ever guess at that - too early and there is nothing to summarize, too
+# late and the audio is stale.
+#
+# One topic carries both modes; the message says which. See main.py.
+#
+#   feed-mind        publishes {"process_doc": "RSS_FEED"} at the end of its run
+#   paper-prism-job  publishes {"process_doc": "RESEARCH_PAPERS"} at the end of
+#                    its weekly run, having written the `runs` collection
+TOPIC_NAME="${TOPIC_NAME:-feedmind-content-ready}"
+
+# Service accounts allowed to publish to the topic, space separated. This is
+# where the grant lives for both producers: the topic belongs to whoever reads
+# it, so neither publisher's own deploy manages the binding.
+PUBLISHER_SERVICE_ACCOUNTS="${PUBLISHER_SERVICE_ACCOUNTS:-feedmind-sa@${PROJECT_ID}.iam.gserviceaccount.com paper-prism-job@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 # spaCy holds its pipeline in memory and the LLM call is mostly waiting, so the
 # function is memory-bound rather than CPU-bound. 1Gi fits en_core_web_sm with
@@ -25,10 +43,24 @@ RUNTIME="${RUNTIME:-python311}"
 MEMORY="${MEMORY:-1Gi}"
 CPU="${CPU:-1}"
 
-# A batch is a serial loop over every article in the day's feed, each one a
-# scrape plus an LLM call plus a synthesis. 3600s is the gen2 HTTP ceiling and
-# there is no cost to reserving it - the function is billed for time used.
-TIMEOUT="${TIMEOUT:-3600s}"
+# 540s is a hard platform ceiling for an event-driven function - the 3600s an
+# HTTP function may ask for is not available here, and gcloud rejects the deploy
+# rather than clamping. There is no cost to reserving it: the function is billed
+# for time used.
+#
+# A batch is a serial loop - scrape, LLM, synthesis, per item - at roughly a
+# minute an article, so 540s covers about eight. Anything larger is handled by
+# MAX_RUNTIME below rather than by being cut off mid-item.
+TIMEOUT="${TIMEOUT:-540s}"
+
+# When to stop starting new items, in seconds. Deliberately under TIMEOUT so the
+# run ends by choosing to, between items, instead of being killed part-way
+# through one - a kill between the upload and the Firestore write would leave an
+# orphaned object in the bucket.
+#
+# On stopping early the function republishes its own trigger message, so a long
+# batch drains across several invocations instead of silently truncating.
+MAX_RUNTIME="${MAX_RUNTIME:-450}"
 
 # One request at a time, one instance at a time. The pipeline writes to shared
 # Firestore documents (the papers array is rewritten wholesale), so overlapping
@@ -39,10 +71,13 @@ MAX_INSTANCES="${MAX_INSTANCES:-1}"
 SERVICE_ACCOUNT_ID="${SERVICE_ACCOUNT_ID:-feedmind-audio-fn}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-${SERVICE_ACCOUNT_ID}@${PROJECT_ID}.iam.gserviceaccount.com}"
 
-# The identity Cloud Scheduler uses to call the function. Kept separate from the
-# runtime account so that "may invoke" and "may write" are different grants.
-SCHEDULER_SA_ID="${SCHEDULER_SA_ID:-feedmind-audio-invoker}"
-SCHEDULER_SA="${SCHEDULER_SA:-${SCHEDULER_SA_ID}@${PROJECT_ID}.iam.gserviceaccount.com}"
+# The identity Eventarc uses to deliver a message to the function. Kept separate
+# from the runtime account so that "may invoke" and "may write" are different
+# grants. Without this, Eventarc falls back to the Compute Engine default
+# service account, which is over-privileged and shared with everything else in
+# the project.
+TRIGGER_SA_ID="${TRIGGER_SA_ID:-feedmind-audio-invoker}"
+TRIGGER_SA="${TRIGGER_SA:-${TRIGGER_SA_ID}@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 BUCKET_NAME="${BUCKET_NAME:-feed-mind-audio-summaries}"
 FIRESTORE_DATABASE="${FIRESTORE_DATABASE:-feed-mind-db}"
@@ -100,21 +135,21 @@ LLM_API_KEY_SECRET="${LLM_API_KEY_SECRET:-feedmind-llm-api-key}"
 TTS_VOICE="${TTS_VOICE:-en-US-Neural2-F}"
 TTS_RATE="${TTS_RATE:-175}"
 
-# -- Schedule ----------------------------------------------------------------
-# FeedMind's own pipeline has to have finished before there is anything to
-# summarize, so these run after it.
+# -- Pub/Sub delivery --------------------------------------------------------
+# Deploying with --trigger-topic makes Eventarc create a push subscription. The
+# ack deadline is how long Pub/Sub waits for the function before deciding the
+# delivery failed and sending the message again; 600s is the maximum a push
+# subscription allows.
 #
-# America/Chicago rather than a fixed UTC offset, so the wall-clock times hold
-# across the DST changeover instead of drifting an hour twice a year.
-SCHEDULE_TIMEZONE="${SCHEDULE_TIMEZONE:-America/Chicago}"
+# Kept above TIMEOUT (540s), so the function is always killed by its own
+# deadline before Pub/Sub concludes the delivery failed. That ordering is what
+# stops a slow run from being redelivered while it is still going.
+ACK_DEADLINE="${ACK_DEADLINE:-600}"
 
-# Daily at 08:15 CT.
-RSS_SCHEDULE="${RSS_SCHEDULE:-15 8 * * *}"
-
-# Mondays at 09:15 CT. An hour after the RSS run so the two cannot overlap -
-# MAX_INSTANCES is 1, and a second request arriving mid-batch would queue
-# against the scheduler's attempt deadline rather than run.
-PAPERS_SCHEDULE="${PAPERS_SCHEDULE:-15 9 * * 1}"
+# Messages Pub/Sub could not deliver are kept this long before being dropped.
+# The default is 7 days; a day is plenty here, because a summary that is a week
+# late is of no use to anyone and the next run supersedes it anyway.
+MESSAGE_RETENTION="${MESSAGE_RETENTION:-1d}"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 

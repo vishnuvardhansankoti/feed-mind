@@ -26,7 +26,7 @@ gcloud services enable \
     cloudbuild.googleapis.com \
     artifactregistry.googleapis.com \
     eventarc.googleapis.com \
-    cloudscheduler.googleapis.com \
+    pubsub.googleapis.com \
     texttospeech.googleapis.com \
     firestore.googleapis.com \
     storage.googleapis.com \
@@ -48,7 +48,14 @@ create_service_account() {
 
 say "Creating service accounts"
 create_service_account "$SERVICE_ACCOUNT_ID" "FeedMind audio function runtime"
-create_service_account "$SCHEDULER_SA_ID" "FeedMind audio function invoker"
+create_service_account "$TRIGGER_SA_ID" "FeedMind audio Eventarc trigger"
+
+# Eventarc will not deliver through an identity that cannot receive events.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${TRIGGER_SA}" \
+    --role="roles/eventarc.eventReceiver" \
+    --condition=None \
+    --quiet >/dev/null
 
 # ---------------------------------------------------------------------------
 say "Granting IAM roles to ${SERVICE_ACCOUNT}"
@@ -97,9 +104,39 @@ fi
 # Nothing extra is needed for Text-to-Speech: it authorizes on the caller's
 # credentials and the enabled API, with no per-identity role to grant.
 
-# The scheduler account only needs to be allowed to invoke. That binding is made
-# in deploy.sh, because it targets the deployed Cloud Run service by name and so
-# cannot be made before the function exists.
+# ---------------------------------------------------------------------------
+say "Creating the trigger topic ${TOPIC_NAME}"
+
+if gcloud pubsub topics describe "$TOPIC_NAME" --project="$PROJECT_ID" >/dev/null 2>&1; then
+    echo "  topic already exists"
+else
+    gcloud pubsub topics create "$TOPIC_NAME" \
+        --project="$PROJECT_ID" \
+        --message-retention-duration="$MESSAGE_RETENTION"
+fi
+
+# Publishers. Granted per topic rather than project-wide - being allowed to
+# start an audio run is not the same as being allowed to publish anywhere.
+#
+# The function's own runtime account is one of them: an event-driven function is
+# capped at 540s, so a batch too large for one pass republishes its trigger
+# message and continues in the next. See republish() in main.py.
+for publisher in $PUBLISHER_SERVICE_ACCOUNTS $SERVICE_ACCOUNT; do
+    if gcloud iam service-accounts describe "$publisher" \
+        --project="$PROJECT_ID" >/dev/null 2>&1; then
+        gcloud pubsub topics add-iam-policy-binding "$TOPIC_NAME" \
+            --project="$PROJECT_ID" \
+            --member="serviceAccount:${publisher}" \
+            --role="roles/pubsub.publisher" \
+            --quiet >/dev/null
+        echo "  granted publisher to ${publisher}"
+    else
+        echo "  skipping ${publisher} - no such service account" >&2
+    fi
+done
+
+# The Eventarc trigger that delivers messages to the function is created by
+# deploy.sh, because it cannot exist before the function does.
 
 say "Setup complete"
 echo "Next: ./deploy/deploy.sh"

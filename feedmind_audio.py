@@ -40,6 +40,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -89,6 +90,10 @@ TTS_LOCAL = "local"
 TTS_CLOUD = "cloud"
 TTS_ENV_VAR = "FEEDMIND_TTS"
 
+# Wall-clock budget for the batch, so a serverless runtime with a hard kill can
+# be given a deadline to stop short of. See --max-runtime.
+MAX_RUNTIME_ENV_VAR = "FEEDMIND_MAX_RUNTIME"
+
 # Fields this script adds. FeedMind's own fields are never touched.
 AI_SUMMARY_FIELD = "ai_summary"
 AUDIO_URL_FIELD = "audio_url"
@@ -100,6 +105,9 @@ LEGACY_SUMMARY_FIELD = "audio_summary"
 EXIT_OK = 0
 EXIT_NO_ITEMS = 1
 EXIT_ALL_FAILED = 2
+# Stopped on --max-runtime with items still to do. Distinct from EXIT_OK so a
+# caller can arrange to be called again; see main.py.
+EXIT_INCOMPLETE = 3
 
 
 class PipelineError(RuntimeError):
@@ -452,6 +460,13 @@ def build_parser():
     parser.add_argument(
         "--timeout", type=float, default=30, help="HTTP timeout when scraping"
     )
+    parser.add_argument(
+        "--max-runtime", type=float,
+        default=float(os.environ.get(MAX_RUNTIME_ENV_VAR) or 0),
+        help="stop starting new items after this many seconds, exiting "
+             f"{EXIT_INCOMPLETE} if any are left. 0 disables it. Defaults to "
+             f"${MAX_RUNTIME_ENV_VAR}",
+    )
     parser.add_argument("--config", help="path to the webscraper JSON config")
     parser.add_argument("--provider", help="LLM provider name from the config")
     parser.add_argument("--model", help="override the LLM model")
@@ -535,7 +550,18 @@ def main(argv=None):
     log()
 
     failures = []
+    started = time.monotonic()
+    remaining = 0
+
     for index, item in enumerate(chosen, start=1):
+        # Checked between items, never inside one: stopping here means every
+        # object uploaded has its matching Firestore write.
+        if args.max_runtime and time.monotonic() - started >= args.max_runtime:
+            remaining = len(chosen) - index + 1
+            log(f"\nstopping after {args.max_runtime}s with {remaining} item(s) "
+                f"still to do")
+            break
+
         tag = f"{item.note} " if item.note else ""
         log(f"[{index:2}/{len(chosen)}] {tag}{item.item_id[:14]}  {item.title[:58]}")
         try:
@@ -546,13 +572,17 @@ def main(argv=None):
             continue
         print(audio_url or f"(dry run) {item.item_id}", flush=True)
 
-    succeeded = len(chosen) - len(failures)
+    attempted = len(chosen) - remaining
+    succeeded = attempted - len(failures)
     log()
-    log(f"{succeeded} succeeded, {len(failures)} failed")
+    log(f"{succeeded} succeeded, {len(failures)} failed, {remaining} not started")
     for item_id, reason in failures:
         log(f"  {item_id[:14]}  {reason}")
 
-    return EXIT_ALL_FAILED if succeeded == 0 else EXIT_OK
+    if succeeded == 0:
+        # Nothing worked, so being called again would only repeat it.
+        return EXIT_ALL_FAILED
+    return EXIT_INCOMPLETE if remaining else EXIT_OK
 
 
 if __name__ == "__main__":

@@ -227,29 +227,48 @@ Exit codes: `0` ok (even with some failures) · `1` no articles found · `2` eve
 
 ## Deploying as a Cloud Function
 
-`main.py` wraps `feedmind_audio.main()` in a gen2 HTTP function, so the CLI and the deployment can't drift — the function just turns a request into argv.
+`main.py` wraps `feedmind_audio.main()` in a gen2 CloudEvent function, so the CLI and the deployment can't drift — the function just turns a message into argv.
 
 Two things from the local setup cannot come along: **pyttsx3** (the runtime has no speech engine, and buildpacks can't `apt-get` one) and **ffmpeg** (same reason). The deployment therefore sets `FEEDMIND_TTS=cloud`, which takes both out of the path. Local **Ollama** can't come either — the deployment points `LLM_*` at **Ollama Cloud** instead, which keeps the model catalogue familiar.
 
 ```bash
-./deploy/setup.sh      # once per project: APIs, service accounts, IAM
+./deploy/setup.sh      # once per project: APIs, service accounts, IAM, topic
 ./deploy/deploy.sh     # after every code change
-./deploy/schedule.sh   # once: the two Cloud Scheduler cron jobs
+./deploy/publish.sh    # trigger a run by hand, any time
 ```
 
 Everything configurable lives in `deploy/config.sh` and can be overridden from the environment (`REGION=europe-west1 ./deploy/deploy.sh`).
 
-📖 **[`deploy/README.md`](deploy/README.md)** is the full runbook — prerequisites, what each step does, smoke tests, troubleshooting and teardown. Start there for an actual deploy; what follows here is the summary.
+📖 **[`deploy/README.md`](deploy/README.md)** is the full runbook — prerequisites, what each step does, smoke tests, delivery semantics, troubleshooting and teardown. Start there for an actual deploy; what follows here is the summary.
 
 | File | Job |
 |---|---|
-| `main.py` | HTTP entrypoint — request → argv → `feedmind_audio.main()` |
+| `main.py` | `on_content_ready` (Pub/Sub, deployed) and `summarize_feed` (HTTP, kept) |
 | `requirements.txt` | Runtime deps, including the spaCy model from its release URL |
 | `.gcloudignore` | Keeps the venv, `.git` and `deploy/` out of the upload |
-| `deploy/config.sh` | Every setting, sourced by the other three |
-| `deploy/setup.sh` | APIs, service accounts, IAM — idempotent |
-| `deploy/deploy.sh` | `gcloud functions deploy`, then grants the invoker binding |
-| `deploy/schedule.sh` | Upserts one scheduler job per `--process-doc` mode |
+| `deploy/config.sh` | Every setting, sourced by the others |
+| `deploy/setup.sh` | APIs, service accounts, IAM, the topic — idempotent |
+| `deploy/deploy.sh` | `gcloud functions deploy`, the invoker binding, the ack deadline |
+| `deploy/publish.sh` | Publishes a trigger message by hand |
+
+### What triggers it
+
+A **Pub/Sub message**, not a clock. Only the producing pipeline knows when its run actually finished; a schedule can only guess — too early and there's nothing to summarize, too late and the audio is stale.
+
+```
+FeedMind run ends ──publish──► feedmind-content-ready ──Eventarc──► feedmind-audio
+```
+
+One topic carries both pipelines; the message says which.
+
+| Publisher | Message | Runs | Status |
+|---|---|---|---|
+| `feed-mind` | `{"process_doc": "RSS_FEED"}` | the latest RSS batch | **wired up** |
+| `paper-prism-job` | `{"process_doc": "RESEARCH_PAPERS"}` | the latest run per category | **wired up** |
+
+An empty message means the default: the latest RSS batch. Each producer publishes only after its own writes have landed — this function reads those collections, so announcing earlier would race it — and only when there is something new: FeedMind skips when no articles were delivered, paper-prism when no papers were written or the run wasn't writing to Firestore. Both swallow publish failures rather than failing a run that already did its work.
+
+The topic and both `pubsub.publisher` grants live in this repo's `deploy/setup.sh` — the topic belongs to whoever reads it — so run that before either producer's first publish.
 
 **Before the first deploy**, create the LLM API key secret — it is the one thing the scripts won't invent for you. Get a key from <https://ollama.com/settings/keys>, then:
 
@@ -288,26 +307,30 @@ The env vars are the same four the function gets, so this needs no config file. 
 
 ### Invoking it
 
-The function is private. A JSON body or query string maps onto the CLI flags — `process_doc`, `category`, `article_id`, `limit`, `force`, `dry_run`, `timeout`, `provider`, `model`, `select_ratio`, `voice`, `rate`, `tts`. Body beats query string beats the `FEEDMIND_*` environment defaults.
+`./deploy/publish.sh` builds the message for you — any `feedmind_audio.py` flag passes through:
 
 ```bash
-URL=$(gcloud functions describe feedmind-audio --gen2 --region=us-central1 \
-      --format='value(serviceConfig.uri)')
-
-curl -X POST "$URL" \
-  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-  -H 'Content-Type: application/json' \
-  -d '{"process_doc": "RESEARCH_PAPERS", "category": "CV", "limit": 1, "dry_run": true}'
+./deploy/publish.sh                                  # latest RSS batch
+./deploy/publish.sh RESEARCH_PAPERS --category CV
+./deploy/publish.sh RSS_FEED --limit 1 --dry-run     # no uploads, no writes
 ```
 
-The response body is the list of audio URLs — the same thing the CLI prints to stdout. Progress goes to stderr and lands in Cloud Logging.
+Or publish directly. The fields are the CLI flags — `process_doc`, `category`, `article_id`, `limit`, `force`, `dry_run`, `timeout`, `provider`, `model`, `select_ratio`, `voice`, `rate`, `tts` — as a JSON body or as attributes. Body beats attributes beats the `FEEDMIND_*` environment defaults.
+
+```bash
+gcloud pubsub topics publish feedmind-content-ready \
+    --message='{"process_doc": "RESEARCH_PAPERS", "category": "CV", "limit": 1}'
+```
+
+Progress goes to stderr and lands in Cloud Logging. A malformed message body is logged and treated as empty rather than failing — failing would only feed the identical message back through the retry.
 
 ### Shape of the deployment
 
 - **One instance, one request** (`--max-instances=1 --concurrency=1`). Papers mode rewrites the whole `papers` array, so overlapping runs would clobber each other.
-- **1 GiB, 3600s.** spaCy's pipeline is the memory floor; a batch is a serial loop of scrape + LLM + synthesis, and 3600s is the gen2 HTTP ceiling. You're billed for time used, not time reserved.
-- **Scheduler waits 1800s** (`ATTEMPT_DEADLINE`), under the function timeout so a retry can't overlap a batch still running. `--max-retry-attempts=1`, since the pipeline is idempotent but not free.
-- **"Nothing to do" is a 200.** Most scheduled runs legitimately find no new items; only exit code `2` — every item failed — returns 500 and triggers the retry.
+- **1 GiB, 540s.** spaCy's pipeline is the memory floor. 540s is a hard ceiling for an event-driven function — the 3600s an HTTP function may ask for is not available — and covers about eight articles at a minute each.
+- **A large batch drains across invocations.** Rather than truncate, the run stops at `MAX_RUNTIME` (450s) *between items*, exits `3`, and republishes its own trigger message; the next pass skips whatever now has an `audio_url`. Continuation only follows a pass that completed at least one item, so it cannot loop.
+- **At-least-once delivery is safe.** The pipeline skips items that already have an `audio_url`, so a duplicate no-ops. `MAX_RUNTIME` < `TIMEOUT` < `ACK_DEADLINE` (450 < 540 < 600), so a slow run always ends on its own deadline before Pub/Sub decides the delivery failed.
+- **The function never nacks.** A partly-succeeded batch would otherwise redo the whole thing on redelivery, retrying exactly the items least likely to succeed. Failures are logged and tallied; the next run picks up whatever still lacks audio.
 
 ---
 
