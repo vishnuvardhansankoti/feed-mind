@@ -133,7 +133,18 @@ LLM_API_KEY_SECRET="${LLM_API_KEY_SECRET:-feedmind-llm-api-key}"
 # See webscraper/cloud_speech.py. `gcloud text-to-speech voices list` shows the
 # full catalogue; Neural2 and Studio voices cost more per character than Standard.
 TTS_VOICE="${TTS_VOICE:-en-US-Neural2-F}"
-TTS_RATE="${TTS_RATE:-175}"
+
+# 200 rather than the 175 baseline, to match what the CLI produces: pyttsx3 with
+# no --rate uses the macOS driver default of 200 WPM, and 175 here sounded
+# noticeably slower by comparison.
+#
+# Measured on one 45-word summary through en-US-Neural2-F, so the multiplier is
+# tuned to this voice; a different TTS_VOICE may want a different number:
+#
+#     local, pyttsx3 default    17.35s
+#     TTS_RATE=175 (rate 1.00)  19.39s   12% slower
+#     TTS_RATE=200 (rate 1.14)  16.94s    2% faster
+TTS_RATE="${TTS_RATE:-200}"
 
 # -- Pub/Sub delivery --------------------------------------------------------
 # Deploying with --trigger-topic makes Eventarc create a push subscription. The
