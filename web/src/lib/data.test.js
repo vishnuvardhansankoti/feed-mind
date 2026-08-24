@@ -418,6 +418,30 @@ describe("videos", () => {
     expect(videos).toHaveLength(VIDEO_MAX_ITEMS);
   });
 
+  it("caps by keeping the newest, not the head of the fixture", async () => {
+    // The fixture is oldest-first, so slicing before sorting would keep exactly
+    // the wrong items.
+    const many = Array.from({ length: VIDEO_MAX_ITEMS + 5 }, (_, i) =>
+      video(`v${i}`, new Date(Date.UTC(2026, 7, 16, 0, 0, i)).toISOString()),
+    );
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => many }));
+    const { videos } = await getVideos();
+    // v(N+4) is the newest; the 5 oldest must be the ones dropped.
+    expect(videos[0].video_id).toBe(`v${VIDEO_MAX_ITEMS + 4}`);
+    expect(videos.map((v) => v.video_id)).not.toContain("v0");
+  });
+
+  it("keeps processed_at so the Latest view can group by ingest batch", async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => [video("a", "2026-08-16T14:05:00+00:00")],
+    }));
+    const { videos } = await getVideos();
+    // latestBatch() reads processed_date; losing it would silently empty Latest.
+    expect(videos[0].processed_date).toBeInstanceOf(Date);
+    expect(videos[0].processed_date.toISOString()).toBe("2026-08-16T15:00:00.000Z");
+  });
+
   it("does not mutate the fetched array while sorting", async () => {
     const docs = [
       video("a", "2026-08-14T00:00:00+00:00"),

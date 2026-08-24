@@ -40,12 +40,19 @@ export const NEWS_WINDOW_DAYS = 7;
 export const NEWS_MAX_ARTICLES = 200;
 
 // Videos page: YouTube subscriptions written to `youtube_videos` by feed-mind.
-// One read backs both tabs — Latest (rolling VIDEO_LATEST_HOURS) and Archive
+// One read backs both tabs — Latest (the most recent ingest batch) and Archive
 // (last VIDEO_WINDOW_DAYS days) — with client-side slicing.
 export const VIDEO_WINDOW_DAYS = 3;
 export const VIDEO_MAX_ITEMS = 200;
 
-// Latest is a rolling window, not a calendar-day bucket: feed-mind ingests once
-// a day, so most of a day's uploads are already "yesterday" by the time they
-// land and a calendar-day Latest would show almost nothing.
-export const VIDEO_LATEST_HOURS = 24;
+// Latest is the newest *ingest batch*, not a window measured back from now.
+// A clock-relative window (the previous "last 24h" rule) made the tab shrink
+// video-by-video as the day wore on, so the same visit showed fewer items each
+// time. Anchoring to the newest `processed_at` in the data instead means the
+// set only changes when feed-mind actually runs again.
+//
+// feed-mind stamps each doc in a run with its own `now`, so one batch spans
+// seconds-to-minutes rather than a single instant. This tolerance is what
+// "same batch" means: comfortably wider than one run, comfortably narrower
+// than the daily cadence between runs.
+export const VIDEO_BATCH_TOLERANCE_HOURS = 6;

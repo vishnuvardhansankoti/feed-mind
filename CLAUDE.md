@@ -59,6 +59,14 @@ The web app is a two-section SPA behind a minimal hash router in `App.svelte`: *
 - **Rules:** `firestore.rules` adds `processed_articles` as public-read / `write: if false`. feed-mind writes via the Admin SDK (bypasses rules) and does **not** manage rules, so paper-prism solely owns them on `feed-mind-db`.
 - **Mock parity:** `web/public/fixtures/news.json` backs `VITE_DATA_SOURCE=mock`. The mock path deliberately skips the 7-day cutoff (a static fixture would otherwise age out and render empty).
 
+### Videos (third section, also from `feed-mind`)
+
+`#/videos` reads `youtube_videos` in `feed-mind-db`, written by `feed-mind/feedmind/deduplication.py::save_video` (`video_id`, `url`, `title`, `channel`, `thumbnail_url`, `published_at`, `processed_at`) — same convention-only, cross-repo coupling as `processed_articles`. One query backs both tabs (`VIDEO_WINDOW_DAYS` = 3, `VIDEO_MAX_ITEMS` = 200).
+
+**Latest is an ingest batch, not a time window — this is the whole design.** feed-mind writes a video once, on first sight, stamping `processed_at` with that run's `now`; the doc id is the video id, so re-runs never restamp. `lib/videos.js::latestBatch` anchors to the **newest `processed_at` present in the data** and keeps everything within `VIDEO_BATCH_TOLERANCE_HOURS` (6) of it. Any clock-relative rule (the two earlier ones: newest calendar day, then rolling 24h) makes the tab **shrink through the day** as videos age past the cutoff with no new run — the failure this design exists to prevent, pinned by tests in `videos.test.js` and `VideoFeed.test.js` that advance the clock and assert the count holds. For the same reason the Firestore query windows on `processed_at`, not `published_at`: a batch then ages out of the 3-day window all at once instead of one video at a time. Display order is still `published_at` desc (`byPublishedDesc` re-sorts, since `processed_at` is uniform within a batch), and Archive buckets by publish day.
+
+Videos with no parseable `processed_at` can't be placed in a batch, so Latest omits them and says so; Archive still lists them under a `—` header. Both `VideoFeed` and `VideoCard` must guard dates with `isDate`, never truthiness — an Invalid Date is truthy and `Intl.DateTimeFormat` throws on it, taking down the whole feed render.
+
 ## Common commands
 
 **Pipeline (local, runs against live arXiv):**
@@ -88,7 +96,7 @@ terraform init && terraform validate && terraform apply
 
 **Deploy via gcloud scripts** (alternative to Terraform): `pipeline/deploy/00-config.sh` (sourced by the rest) → `01-setup.sh` (APIs, Firestore, TTL, SAs, secret) → `02-build-push.sh` → `03-deploy-job.sh` (needs `env.yaml`, copied from `env.yaml.example`) → `04-scheduler.sh`. All idempotent; require `PROJECT_ID` exported.
 
-There is **no automated test suite and no linter configured.** Validation is manual: run the pipeline locally and inspect `./output/`, and run the web app headless to check for console errors.
+**Web tests:** `cd web && npm test` (vitest; jsdom + `@testing-library/svelte` for components). The **pipeline has no test suite, and no linter is configured anywhere** — validate the pipeline by running it locally and inspecting `./output/`.
 
 ## Conventions worth matching
 

@@ -10,7 +10,7 @@ import {
   NEWS_MAX_ARTICLES,
   VIDEO_WINDOW_DAYS,
   VIDEO_MAX_ITEMS,
-  VIDEO_LATEST_HOURS,
+  VIDEO_BATCH_TOLERANCE_HOURS,
 } from "./constants.js";
 
 describe("lens metadata", () => {
@@ -105,10 +105,12 @@ describe("window and cap constants", () => {
     expect(NEWS_MAX_ARTICLES).toBeGreaterThan(0);
   });
 
-  it("keeps the videos Latest window no wider than the Archive window", () => {
-    // Latest is a rolling hour window carved out of the day-based Archive
-    // window; if it grew past it, Latest could show items Archive omits.
-    expect(VIDEO_LATEST_HOURS).toBeLessThanOrEqual(VIDEO_WINDOW_DAYS * 24);
+  it("keeps the batch tolerance inside the Archive window", () => {
+    // The tolerance defines "one ingest batch". Wider than the Archive window
+    // and Latest could span every batch the reader holds, making the two tabs
+    // identical.
+    expect(VIDEO_BATCH_TOLERANCE_HOURS).toBeGreaterThan(0);
+    expect(VIDEO_BATCH_TOLERANCE_HOURS).toBeLessThan(VIDEO_WINDOW_DAYS * 24);
     expect(VIDEO_MAX_ITEMS).toBeGreaterThan(0);
   });
 });

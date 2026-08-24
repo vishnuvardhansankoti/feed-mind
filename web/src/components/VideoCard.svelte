@@ -7,8 +7,10 @@
     month: "short", day: "numeric",
   });
 
+  const isDate = (d) => d instanceof Date && !isNaN(d);
+
   function relAge(d) {
-    if (!(d instanceof Date) || isNaN(d)) return "";
+    if (!isDate(d)) return "";
     const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
     if (s < 3600) return `${Math.floor(s / 60)}m`;
     if (s < 86_400) return `${Math.floor(s / 3600)}h`;
@@ -25,7 +27,10 @@
     <h3 class="title">{video.title}</h3>
     <div class="meta">
       <span class="channel">{video.channel}</span>
-      {#if video.published_date}
+      <!-- isDate, not truthiness: an Invalid Date (from an unparseable
+           published_at) is truthy and makes Intl.DateTimeFormat throw, which
+           takes down the whole feed render, not just this card. -->
+      {#if isDate(video.published_date)}
         <span class="age" title={video.published_date.toString()}>
           {dateFmt.format(video.published_date)} · {relAge(video.published_date)} ago
         </span>

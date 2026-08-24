@@ -133,17 +133,21 @@ async function firestoreNews() {
 async function firestoreVideos() {
   const { collection, query, where, orderBy, limit, getDocs } =
     await import("firebase/firestore");
-  // published_at is a uniform UTC ISO string, so a lexicographic >= range is
-  // chronological. Single-field inequality + orderBy needs no composite index.
+  // Window on `processed_at`, not `published_at`. Both are uniform UTC ISO
+  // strings, so either supports a lexicographic >= range — but every doc in one
+  // ingest batch shares a `processed_at`, so a batch ages out of the window all
+  // at once. Windowing on `published_at` instead dropped videos one by one as
+  // the clock advanced, quietly shrinking the tab between refreshes.
+  // Single-field inequality + matching orderBy still needs no composite index.
   const cutoff = videoCutoffIso();
   const q = query(
     collection(await db(), "youtube_videos"),
-    where("published_at", ">=", cutoff),
-    orderBy("published_at", "desc"),
+    where("processed_at", ">=", cutoff),
+    orderBy("processed_at", "desc"),
     limit(VIDEO_MAX_ITEMS),
   );
   const snap = await getDocs(q);
-  return { videos: snap.docs.map((d) => normalizeVideo(d.data())) };
+  return { videos: byPublishedDesc(snap.docs.map((d) => d.data())) };
 }
 
 // --- Mock source (bundled fixtures) ---------------------------------------
@@ -218,12 +222,9 @@ async function mockVideos() {
   } catch {
     return { videos: [] };
   }
-  return {
-    videos: [...docs]
-      .sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""))
-      .slice(0, VIDEO_MAX_ITEMS)
-      .map(normalizeVideo),
-  };
+  // Sort before capping, so the cap keeps the newest items rather than
+  // whichever ones happened to sit at the head of the fixture.
+  return { videos: byPublishedDesc(docs).slice(0, VIDEO_MAX_ITEMS) };
 }
 
 // --- helpers ---------------------------------------------------------------
@@ -310,8 +311,19 @@ function publicAudioUrl(value) {
   return "";
 }
 
+// Display order is by publish time, newest first — the query orders by
+// `processed_at` (see firestoreVideos), which is uniform within a batch and so
+// says nothing useful about the order inside one. Copies the input rather than
+// sorting it in place.
+function byPublishedDesc(docs) {
+  return [...docs]
+    .sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""))
+    .map(normalizeVideo);
+}
+
 // published_at drives ordering/day-bucketing; keep the raw ISO string and also
-// expose a Date for display.
+// expose a Date for display. `processed_at` is the ingest-batch stamp: uniform
+// across one feed-mind run, which is what the Latest view groups on.
 function normalizeVideo(v) {
   return {
     ...v,

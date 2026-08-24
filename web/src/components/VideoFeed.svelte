@@ -1,9 +1,9 @@
 <script>
-  // Videos section: Latest (rolling VIDEO_LATEST_HOURS) + Archive (whole 3-day
-  // window, bucketed by calendar day). All slicing is client-side over the
-  // single `videos` list handed in by App (newest first).
+  // Videos section: Latest (the most recent ingest batch) + Archive (whole
+  // 3-day window, bucketed by calendar day). All slicing is client-side over
+  // the single `videos` list handed in by App (newest first).
   import VideoCard from "./VideoCard.svelte";
-  import { VIDEO_LATEST_HOURS } from "../lib/constants.js";
+  import { latestBatch } from "../lib/videos.js";
 
   let { videos = [] } = $props();
 
@@ -13,16 +13,11 @@
     weekday: "short", month: "short", day: "numeric",
   });
 
-  // Latest = rolling window measured back from now, so an upload stays "latest"
-  // for a full day instead of aging out at local midnight. Videos with an
-  // unparseable published_at are excluded here but still reachable in Archive.
-  let latestItems = $derived.by(() => {
-    const cutoff = Date.now() - VIDEO_LATEST_HOURS * 3_600_000;
-    return videos.filter((v) => {
-      const d = v.published_date;
-      return d instanceof Date && !isNaN(d) && d.getTime() >= cutoff;
-    });
-  });
+  // Latest = the newest ingest batch (see lib/videos.js): stable until
+  // feed-mind runs again, rather than shrinking as the day wears on.
+  let latestItems = $derived(latestBatch(videos));
+
+  const isDate = (d) => d instanceof Date && !isNaN(d);
 
   // Archive groups into calendar-day buckets, preserving newest-first order.
   let days = $derived.by(() => {
@@ -30,7 +25,7 @@
     let current = null;
     for (const v of videos) {
       const d = v.published_date;
-      const key = d instanceof Date && !isNaN(d) ? d.toDateString() : "unknown";
+      const key = isDate(d) ? d.toDateString() : "unknown";
       if (!current || current.key !== key) {
         current = { key, date: d, items: [] };
         groups.push(current);
@@ -51,7 +46,7 @@
 <div class="videos">
   <div class="subtabs" role="tablist" aria-label="Videos window">
     <button role="tab" aria-selected={view === "latest"} class:active={view === "latest"} onclick={() => (view = "latest")}>
-      Latest · 24h
+      Latest
     </button>
     <button role="tab" aria-selected={view === "archive"} class:active={view === "archive"} onclick={() => (view = "archive")}>
       Archive · 3 days
@@ -62,7 +57,9 @@
     {#each shownDays as group (group.key)}
       <section class="day-group">
         {#if view === "archive"}
-          <div class="day-date">{group.date ? dayFmt.format(group.date) : "—"}</div>
+          <!-- isDate, not truthiness: an Invalid Date is truthy and makes
+               Intl.DateTimeFormat throw, taking the whole render down. -->
+          <div class="day-date">{isDate(group.date) ? dayFmt.format(group.date) : "—"}</div>
         {/if}
         <div class="grid">
           {#each group.items as video (video.video_id)}
@@ -74,7 +71,7 @@
   {:else}
     <p class="empty">
       {#if view === "latest" && days.length}
-        Nothing in the last 24 hours — check Archive.
+        No videos carry an ingest timestamp — check Archive.
       {:else}
         No new videos from your subscriptions.
       {/if}
