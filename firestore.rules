@@ -13,5 +13,38 @@ service cloud.firestore {
     // YouTube videos written server-side by the feed-mind pipeline; the browser
     // only reads. Surfaced by the "Videos" page.
     match /youtube_videos/{doc} { allow read: if true; allow write: if false; }
+
+    // Per-user preferences (bookmarks, followed sources) — the ONLY collection
+    // the browser may write, and the only one that is not public.
+    //
+    // ALLOWED_EMAILS is the whole allowlist: the client never carries a copy,
+    // it just reads its own doc and treats permission-denied as "not allowed"
+    // (see lib/prefs.js::probeAccess). Adding a person = edit this list and
+    // `firebase deploy --only firestore:rules`.
+    //
+    // Anyone with a Google account can *authenticate*; only these addresses can
+    // read or write anything. The uid check keeps one user out of another's doc
+    // even within the list. email_verified is required so the address can't be
+    // spoofed by a provider that doesn't verify it.
+    match /users/{uid} {
+      function allowed() {
+        return request.auth != null
+          && request.auth.uid == uid
+          && request.auth.token.email_verified == true
+          && request.auth.token.email in [
+            'shankotai@gmail.com'
+          ];
+      }
+      // Bookmarks are capped at 5 and stored as an array on this one document,
+      // which is what makes the cap enforceable here at all — rules cannot
+      // count the documents in a subcollection.
+      function withinLimits() {
+        return !('bookmarks' in request.resource.data)
+          || (request.resource.data.bookmarks is list
+              && request.resource.data.bookmarks.size() <= 5);
+      }
+      allow read: if allowed();
+      allow write: if allowed() && withinLimits();
+    }
   }
 }

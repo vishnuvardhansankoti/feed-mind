@@ -10,11 +10,18 @@ export const LENS_CODES = LENSES.map((l) => l.code);
 // News-feed categories — keyed by the `feed_category` values the feed-mind
 // pipeline writes to the `processed_articles` collection. `open-source` has no
 // RSS source; its content is the pinned static link(s) below.
+//
+// Order is tab order, and the first entry is the tab that opens by default —
+// so new categories go on the end unless they are meant to take over the
+// landing view. Each `code` must match feed-mind's `RSS_FEEDS` category string
+// byte-for-byte; note the inconsistent separators there (`open-source` hyphen,
+// `top_stories` underscore) are deliberate mirrors of the pipeline, not typos.
 export const NEWS_CATEGORIES = [
   { code: "academic", label: "Academic" },
   { code: "industry", label: "Industry" },
   { code: "cloud", label: "Cloud" },
   { code: "open-source", label: "Open Source" },
+  { code: "top_stories", label: "Top Stories" },
 ];
 
 // Evergreen links pinned into the feed by the reader itself, independent of the
@@ -56,3 +63,16 @@ export const VIDEO_MAX_ITEMS = 200;
 // "same batch" means: comfortably wider than one run, comfortably narrower
 // than the daily cadence between runs.
 export const VIDEO_BATCH_TOLERANCE_HOURS = 6;
+
+// Saved items, for signed-in users only. The cap is not a storage concern —
+// it is what lets the whole list live as an array on the single `users/{uid}`
+// document, which in turn is what makes the limit enforceable in
+// firestore.rules at all (rules can check `size()` on a list, but cannot count
+// the documents in a subcollection). Raising it is safe well into the hundreds
+// — a Firestore document holds 1 MiB and a snapshot is a couple of KB — but it
+// must be raised in BOTH places: here and in the rules.
+export const BOOKMARK_LIMIT = 5;
+
+// The saved item's `type`, which decides how the Saved view renders it and how
+// its id is namespaced (see prefs.js::bookmarkIdFor).
+export const BOOKMARK_TYPES = ["paper", "news", "video"];

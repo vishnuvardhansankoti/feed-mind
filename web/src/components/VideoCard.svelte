@@ -1,6 +1,8 @@
 <script>
   // One YouTube video from the `youtube_videos` collection. The whole card is a
   // link that opens the video on youtube.com in a new tab.
+  import BookmarkButton from "./BookmarkButton.svelte";
+
   let { video } = $props();
 
   const dateFmt = new Intl.DateTimeFormat(undefined, {
@@ -35,6 +37,9 @@
           {dateFmt.format(video.published_date)} · {relAge(video.published_date)} ago
         </span>
       {/if}
+      <!-- Inside the card-wide <a>: BookmarkButton stops the click so starring
+           doesn't navigate to YouTube. -->
+      <BookmarkButton type="video" item={video} />
     </div>
   </div>
 </a>

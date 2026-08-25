@@ -5,6 +5,7 @@
 // browser (the production Path-A contract); "mock" reads bundled JSON fixtures
 // so the UI runs with no cloud project.
 
+import { firestoreDb } from "./firebase.js";
 import {
   LENS_CODES,
   NEWS_WINDOW_DAYS,
@@ -55,23 +56,10 @@ export function getVideos() {
 
 // --- Firestore source ------------------------------------------------------
 
-let _db = null;
-async function db() {
-  if (_db) return _db;
-  const { initializeApp } = await import("firebase/app");
-  const { getFirestore } = await import("firebase/firestore");
-  const app = initializeApp({
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  });
-  // VITE_FIRESTORE_DATABASE selects a named (non-default) database, and must
-  // match the pipeline's FIRESTORE_DATABASE — otherwise the SPA reads an empty
-  // "(default)". Unset -> the default database.
-  const databaseId = import.meta.env.VITE_FIRESTORE_DATABASE;
-  _db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
-  return _db;
-}
+// The app instance and the named-database choice are shared with auth.js and
+// prefs.js (initializeApp() throws on a second call), so both live in
+// firebase.js. `db` keeps its old name here to leave the call sites untouched.
+const db = firestoreDb;
 
 async function firestoreLatest() {
   const out = {};

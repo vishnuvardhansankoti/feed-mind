@@ -9,19 +9,27 @@
   import VideoFeed from "./components/VideoFeed.svelte";
   import SearchBar from "./components/SearchBar.svelte";
   import ConsentBanner from "./components/ConsentBanner.svelte";
+  import AccountMenu from "./components/AccountMenu.svelte";
+  import SavedView from "./components/SavedView.svelte";
+  import SettingsSheet from "./components/SettingsSheet.svelte";
+  import { settingsUi } from "./lib/settingsUi.svelte.js";
   import { analyticsEnabled } from "./lib/analytics.js";
   import { openConsent } from "./lib/consentUi.svelte.js";
+  import { startSession, session } from "./lib/session.svelte.js";
+  import { bookmarks } from "./lib/bookmarks.svelte.js";
 
   // Top-level section from the URL hash: "#/papers" -> papers, "#/videos" ->
-  // videos, anything else (incl. the default "#/") -> news, the landing section.
+  // videos, "#/saved" -> saved, anything else (incl. the default "#/") -> news,
+  // the landing section.
   const pageFromHash = () => {
     if (typeof location === "undefined") return "news";
     if (location.hash === "#/papers") return "papers";
     if (location.hash === "#/videos") return "videos";
+    if (location.hash === "#/saved") return "saved";
     return "news";
   };
   let page = $state(pageFromHash());
-  const HASH = { papers: "#/papers", videos: "#/videos", news: "#/" };
+  const HASH = { papers: "#/papers", videos: "#/videos", saved: "#/saved", news: "#/" };
   const goto = (p) => { location.hash = HASH[p] ?? "#/"; };
 
   let tab = $state("latest");
@@ -74,6 +82,10 @@
     const onHash = () => { page = pageFromHash(); };
     window.addEventListener("hashchange", onHash);
 
+    // Independent of the digest fetch below: sign-in is additive, so a failure
+    // here must never keep the (public) content from rendering.
+    const stopSession = startSession();
+
     try {
       [latest, status, archive] = await Promise.all([
         getLatest(), getStatus(), getArchive(),
@@ -84,12 +96,22 @@
       loading = false;
     }
 
-    return () => window.removeEventListener("hashchange", onHash);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      stopSession();
+    };
   });
 
   // Kick off the lazy fetch whenever a lazy section becomes active.
   $effect(() => { if (page === "news") loadNews(); });
   $effect(() => { if (page === "videos") loadVideos(); });
+
+  // The settings sheet lists sources derived from the loaded documents, so both
+  // lazy sections have to be fetched before it can show a complete list —
+  // otherwise a user who never opened Videos would see no channels to manage.
+  $effect(() => {
+    if (settingsUi.open) { loadNews(); loadVideos(); }
+  });
 
   // The element whose text the global search scans, and a key that changes
   // whenever its contents change so the search can re-highlight.
@@ -98,7 +120,10 @@
   let searchRevision = $derived(
     `${page}|${tab}|${loading}|${newsLoading}|${videosLoading}|` +
       `${news ? news.articles?.length : 0}|${videos ? videos.videos?.length : 0}|` +
-      `${Object.keys(latest).length}|${Object.keys(archive).length}`,
+      `${Object.keys(latest).length}|${Object.keys(archive).length}|` +
+      // Saved items are searchable content too, and starring one re-renders
+      // the list without changing anything else in this key.
+      `${bookmarks.items.length}`,
   );
 </script>
 
@@ -114,6 +139,7 @@
     <div class="masthead-tools">
       <SearchBar root={getContentEl} revision={searchRevision} />
       {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
+      <AccountMenu />
     </div>
   </header>
 
@@ -127,6 +153,13 @@
     <button aria-current={page === "videos"} class:active={page === "videos"} onclick={() => goto("videos")}>
       Videos
     </button>
+    <!-- Only for signed-in users: there is nothing to show otherwise, and the
+         tab would advertise a section that immediately turns them away. -->
+    {#if session.status === "in"}
+      <button aria-current={page === "saved"} class:active={page === "saved"} onclick={() => goto("saved")}>
+        Saved
+      </button>
+    {/if}
   </nav>
 
   <main bind:this={contentEl}>
@@ -137,6 +170,15 @@
       <div class="state err">Couldn’t load the news feed: {newsError}</div>
     {:else}
       <NewsFeed articles={news?.articles ?? []} />
+    {/if}
+  {:else if page === "saved"}
+    <!-- Reachable by URL while signed out (a bookmarked link, or a sign-out
+         while the section is open), so it has to say why it's empty rather
+         than silently redirecting somewhere else. -->
+    {#if session.status === "in"}
+      <SavedView />
+    {:else}
+      <div class="state">Sign in to see the items you’ve saved.</div>
     {/if}
   {:else if page === "videos"}
     {#if videosLoading}
@@ -197,7 +239,7 @@
   </main>
 
   <footer>
-    <span>Daily tech news across academia, industry, cloud &amp; open source · Weekly arXiv research ranked to your interests and summarized by AI</span>
+    <span>Daily tech news across academia, industry, cloud, open source &amp; top stories · Weekly arXiv research ranked to your interests and summarized by AI</span>
     {#if analyticsEnabled}
       <span class="footsep">·</span>
       <button type="button" class="cookie-link" onclick={openConsent}>Cookie settings</button>
@@ -206,6 +248,10 @@
 </div>
 
 <ConsentBanner />
+
+{#if settingsUi.open && session.status === "in"}
+  <SettingsSheet articles={news?.articles ?? []} videos={videos?.videos ?? []} />
+{/if}
 
 <style>
   .wrap { max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }

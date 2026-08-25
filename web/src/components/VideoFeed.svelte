@@ -4,8 +4,15 @@
   // the single `videos` list handed in by App (newest first).
   import VideoCard from "./VideoCard.svelte";
   import { latestBatch } from "../lib/videos.js";
+  import { isFollowed } from "../lib/follows.svelte.js";
 
-  let { videos = [] } = $props();
+  let { videos: allVideos = [] } = $props();
+
+  // Channel filter runs BEFORE the batch is picked, so unfollowing a channel
+  // shrinks the latest batch rather than changing which batch counts as latest
+  // — filtering afterwards could empty Latest entirely while an older batch
+  // sat right below it in Archive.
+  let videos = $derived(allVideos.filter((v) => isFollowed("video", v.channel)));
 
   let view = $state("latest"); // "latest" | "archive"
 

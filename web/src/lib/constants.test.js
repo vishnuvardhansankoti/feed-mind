@@ -39,7 +39,31 @@ describe("news categories", () => {
       "industry",
       "cloud",
       "open-source",
+      "top_stories",
     ]);
+  });
+
+  it("keeps each code in the exact separator form the pipeline writes", () => {
+    // feed-mind's RSS_FEEDS is inconsistent — `open-source` hyphenates,
+    // `top_stories` underscores — and the reader matches on `feed_category`
+    // with ===. "Tidying" either one here silently empties that tab, with no
+    // error anywhere, so pin both spellings.
+    expect(NEWS_CATEGORY_CODES).toContain("open-source");
+    expect(NEWS_CATEGORY_CODES).toContain("top_stories");
+    expect(NEWS_CATEGORY_CODES).not.toContain("top-stories");
+    expect(NEWS_CATEGORY_CODES).not.toContain("open_source");
+  });
+
+  it("opens on Academic, so a new category cannot hijack the landing tab", () => {
+    // NewsFeed seeds its selected tab from NEWS_CATEGORIES[0].
+    expect(NEWS_CATEGORIES[0].code).toBe("academic");
+  });
+
+  it("gives every category a distinct code and label", () => {
+    const codes = NEWS_CATEGORIES.map((c) => c.code);
+    const labels = NEWS_CATEGORIES.map((c) => c.label);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
   it("NEWS_CATEGORY_CODES is derived from NEWS_CATEGORIES", () => {

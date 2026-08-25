@@ -22,32 +22,8 @@
     "published_at": "2026-08-15T05:30:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
     "status": "delivered",
-    "ai_summary": "Rather than bolting retrieval onto a finished model, the team interleaves retrieved passages into the pretraining stream itself. Downstream factuality on closed-book QA improves substantially, and the gain persists after instruction tuning — suggesting the model learns to rely on retrieved evidence rather than memorized text.",
+    "ai_summary": "Rather than bolting retrieval onto a finished model, the team interleaves retrieved passages into the pretraining stream itself. Downstream factuality on closed-book QA improves substantially, and the gain persists after instruction tuning \u2014 suggesting the model learns to rely on retrieved evidence rather than memorized text.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-acad-02.mp3"
-  },
-  {
-    "article_id": "n-acad-03",
-    "url": "https://www.microsoft.com/research/example-eval",
-    "title": "Rethinking evaluation for small language models",
-    "feed_source": "Microsoft Research",
-    "feed_category": "academic",
-    "summary": "",
-    "published_at": "2026-08-13T14:00:00+00:00",
-    "processed_at": "2026-08-14T07:00:00+00:00",
-    "status": "delivered"
-  },
-  {
-    "article_id": "n-acad-04",
-    "url": "https://developers.googleblog.com/example-onnx",
-    "title": "Shipping ONNX models to the edge",
-    "feed_source": "Google Developers Blog",
-    "feed_category": "academic",
-    "summary": "A walkthrough of quantizing and deploying ONNX transformer models to mobile runtimes.",
-    "published_at": "2026-08-11T09:00:00+00:00",
-    "processed_at": "2026-08-12T07:00:00+00:00",
-    "status": "delivered",
-    "ai_summary": "A practical guide to getting transformer models onto phones: post-training quantization to int8, graph surgery to remove unsupported ops, and a comparison of ONNX Runtime Mobile against Core ML and TFLite on the same hardware. The tradeoff table at the end is the useful part.",
-    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-12/n-acad-04.mp3"
   },
   {
     "article_id": "n-ind-01",
@@ -72,32 +48,8 @@
     "published_at": "2026-08-14T18:00:00+00:00",
     "processed_at": "2026-08-15T07:00:00+00:00",
     "status": "delivered",
-    "ai_summary": "A single policy handles dozens of dexterous manipulation tasks — opening drawers, threading cables, folding cloth — with only a handful of demonstrations per new task. Transfer holds across two different robot embodiments, which is the headline claim; the failure cases involve deformable objects.",
+    "ai_summary": "A single policy handles dozens of dexterous manipulation tasks \u2014 opening drawers, threading cables, folding cloth \u2014 with only a handful of demonstrations per new task. Transfer holds across two different robot embodiments, which is the headline claim; the failure cases involve deformable objects.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-ind-02.mp3"
-  },
-  {
-    "article_id": "n-ind-03",
-    "url": "https://techcrunch.com/example-funding",
-    "title": "AI infrastructure startup raises Series C",
-    "feed_source": "TechCrunch AI",
-    "feed_category": "industry",
-    "summary": "The round funds expansion of a low-latency inference network for enterprise customers.",
-    "published_at": "2026-08-13T11:00:00+00:00",
-    "processed_at": "2026-08-14T07:00:00+00:00",
-    "status": "delivered",
-    "ai_summary": "The Series C funds buildout of a low-latency inference network aimed at enterprises that cannot send traffic to a public API. Coverage notes the crowded competitive field and that the company has not disclosed utilization figures for its existing regions.",
-    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-ind-03.mp3"
-  },
-  {
-    "article_id": "n-ind-04",
-    "url": "https://netflixtechblog.com/example-recsys",
-    "title": "Serving recommendations with sub-10ms latency",
-    "feed_source": "Netflix Tech Blog",
-    "feed_category": "industry",
-    "summary": "",
-    "published_at": "2026-08-12T10:00:00+00:00",
-    "processed_at": "2026-08-12T07:00:00+00:00",
-    "status": "delivered"
   },
   {
     "article_id": "n-cloud-01",
@@ -113,6 +65,56 @@
     "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-cloud-01.mp3"
   },
   {
+    "article_id": "n-top-01",
+    "url": "https://timesofindia.indiatimes.com/india/example-monsoon-session",
+    "title": "Monsoon session opens with debate on data protection rules",
+    "feed_source": "TOI Top Stories",
+    "feed_category": "top_stories",
+    "summary": "The session opened with a scheduled debate on the draft data protection rules.",
+    "published_at": "2026-08-15T05:40:00+00:00",
+    "processed_at": "2026-08-15T07:00:00+00:00",
+    "status": "delivered",
+    "ai_summary": "The draft rules tighten consent requirements for cross-border transfers and introduce a graded penalty structure tied to turnover. Industry groups have asked for a longer compliance runway; the committee has not yet published a timeline.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-top-01.mp3"
+  },
+  {
+    "article_id": "n-top-02",
+    "url": "https://timesofindia.indiatimes.com/business/example-rate-decision",
+    "title": "Central bank holds rates, flags food inflation as the swing factor",
+    "feed_source": "TOI Top Stories",
+    "feed_category": "top_stories",
+    "summary": "Rates were left unchanged for a fourth consecutive meeting.",
+    "published_at": "2026-08-14T09:15:00+00:00",
+    "processed_at": "2026-08-14T10:00:00+00:00",
+    "status": "delivered",
+    "ai_summary": "The policy statement keeps the stance at neutral while revising the inflation projection upward on the back of vegetable prices. Two members dissented in favour of a cut, the first split vote this cycle.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-top-02.mp3"
+  },
+  {
+    "article_id": "n-acad-03",
+    "url": "https://www.microsoft.com/research/example-eval",
+    "title": "Rethinking evaluation for small language models",
+    "feed_source": "Microsoft Research",
+    "feed_category": "academic",
+    "summary": "",
+    "published_at": "2026-08-13T14:00:00+00:00",
+    "processed_at": "2026-08-14T07:00:00+00:00",
+    "status": "delivered"
+  },
+  {
+    "article_id": "n-ind-03",
+    "url": "https://techcrunch.com/example-funding",
+    "title": "AI infrastructure startup raises Series C",
+    "feed_source": "TechCrunch AI",
+    "feed_category": "industry",
+    "summary": "The round funds expansion of a low-latency inference network for enterprise customers.",
+    "published_at": "2026-08-13T11:00:00+00:00",
+    "processed_at": "2026-08-14T07:00:00+00:00",
+    "status": "delivered",
+    "ai_summary": "The Series C funds buildout of a low-latency inference network aimed at enterprises that cannot send traffic to a public API. Coverage notes the crowded competitive field and that the company has not disclosed utilization figures for its existing regions.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-ind-03.mp3"
+  },
+  {
     "article_id": "n-cloud-02",
     "url": "https://cloud.google.com/blog/example-firestore",
     "title": "Firestore adds vector search in preview",
@@ -126,6 +128,41 @@
     "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-cloud-02.mp3"
   },
   {
+    "article_id": "n-acad-04",
+    "url": "https://developers.googleblog.com/example-onnx",
+    "title": "Shipping ONNX models to the edge",
+    "feed_source": "Google Developers Blog",
+    "feed_category": "academic",
+    "summary": "A walkthrough of quantizing and deploying ONNX transformer models to mobile runtimes.",
+    "published_at": "2026-08-11T09:00:00+00:00",
+    "processed_at": "2026-08-12T07:00:00+00:00",
+    "status": "delivered",
+    "ai_summary": "A practical guide to getting transformer models onto phones: post-training quantization to int8, graph surgery to remove unsupported ops, and a comparison of ONNX Runtime Mobile against Core ML and TFLite on the same hardware. The tradeoff table at the end is the useful part.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-12/n-acad-04.mp3"
+  },
+  {
+    "article_id": "n-ind-04",
+    "url": "https://netflixtechblog.com/example-recsys",
+    "title": "Serving recommendations with sub-10ms latency",
+    "feed_source": "Netflix Tech Blog",
+    "feed_category": "industry",
+    "summary": "",
+    "published_at": "2026-08-12T10:00:00+00:00",
+    "processed_at": "2026-08-12T07:00:00+00:00",
+    "status": "delivered"
+  },
+  {
+    "article_id": "n-top-03",
+    "url": "https://timesofindia.indiatimes.com/city/example-metro-phase",
+    "title": "Metro phase three cleared, work to begin next quarter",
+    "feed_source": "TOI Top Stories",
+    "feed_category": "top_stories",
+    "summary": "Approval covers 32 km of new line across eleven stations.",
+    "published_at": "2026-08-12T04:20:00+00:00",
+    "processed_at": "2026-08-12T06:00:00+00:00",
+    "status": "delivered"
+  },
+  {
     "article_id": "n-cloud-03",
     "url": "https://www.cncf.io/blog/example-kubernetes",
     "title": "Kubernetes 1.34 highlights",
@@ -135,7 +172,7 @@
     "published_at": "2026-08-11T12:00:00+00:00",
     "processed_at": "2026-08-11T07:00:00+00:00",
     "status": "delivered",
-    "ai_summary": "The 1.34 release stabilizes in-place pod resizing — changing CPU and memory without a restart — and tightens sidecar lifecycle ordering so init containers and sidecars terminate predictably. Several long-deprecated beta APIs are removed in this release, so upgrade notes are worth reading.",
+    "ai_summary": "The 1.34 release stabilizes in-place pod resizing \u2014 changing CPU and memory without a restart \u2014 and tightens sidecar lifecycle ordering so init containers and sidecars terminate predictably. Several long-deprecated beta APIs are removed in this release, so upgrade notes are worth reading.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-11/n-cloud-03.mp3"
   }
 ]

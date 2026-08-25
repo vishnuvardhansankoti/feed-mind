@@ -4,6 +4,7 @@
   // written before the pipeline generated them have neither, so both degrade
   // to "not shown" exactly as they do on a news card.
   import ListenButton from "./ListenButton.svelte";
+  import BookmarkButton from "./BookmarkButton.svelte";
 
   let { paper } = $props();
 </script>
@@ -22,6 +23,7 @@
       {#if paper.audio_url}
         <ListenButton url={paper.audio_url} label={paper.title} />
       {/if}
+      <BookmarkButton type="paper" item={paper} />
     </div>
     {#if paper.summary}
       <p class="summary">{paper.summary}</p>

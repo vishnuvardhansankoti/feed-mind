@@ -4,6 +4,7 @@
   // single `articles` list handed in by App (newest first).
   import { NEWS_CATEGORIES } from "../lib/constants.js";
   import ArticleCard from "./ArticleCard.svelte";
+  import { isFollowed } from "../lib/follows.svelte.js";
 
   let { articles = [] } = $props();
 
@@ -14,8 +15,12 @@
     weekday: "short", month: "short", day: "numeric",
   });
 
-  // Articles in the selected category (input is already sorted newest-first).
-  let inCat = $derived(articles.filter((a) => a.feed_category === cat));
+  // Articles in the selected category, minus any source the user switched off
+  // (see lib/follows.svelte.js — everything is followed unless signed in and
+  // explicitly unfollowed, so the public feed is unchanged).
+  let inCat = $derived(
+    articles.filter((a) => a.feed_category === cat && isFollowed("news", a.feed_source)),
+  );
 
   // Group into calendar-day buckets, preserving newest-first order.
   let days = $derived.by(() => {

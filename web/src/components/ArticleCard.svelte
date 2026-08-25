@@ -4,6 +4,7 @@
   // feed-mind persisted them, and on the pinned `open-source` links, which have
   // no pipeline-generated content. Every one of them degrades to "not shown".
   import ListenButton from "./ListenButton.svelte";
+  import BookmarkButton from "./BookmarkButton.svelte";
 
   let { article } = $props();
 
@@ -35,6 +36,7 @@
     {#if article.audio_url}
       <ListenButton url={article.audio_url} label={article.title} />
     {/if}
+    <BookmarkButton type="news" item={article} />
   </div>
   {#if article.summary}
     <p class="summary">{article.summary}</p>
