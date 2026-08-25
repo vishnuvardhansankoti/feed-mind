@@ -40,6 +40,12 @@ RSS_FEEDS = [
     ("Google Cloud Blog", "https://cloudblog.withgoogle.com/rss", "cloud"),
     ("Azure Updates", "https://azure.microsoft.com/en-us/blog/feed/", "cloud"),
     ("Amazon ML Research", "https://aws.amazon.com/blogs/machine-learning/feed/", "cloud"),
+    # ---- News ---
+    (
+        "TOI Top Stories",
+        "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
+        "top_stories",
+    ),
 ]
 
 # ---------------------------------------------------------------------------

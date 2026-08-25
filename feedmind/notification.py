@@ -26,9 +26,38 @@ def _escape_md(text: str) -> str:
     return _MARKDOWNV2_ESCAPE_RE.sub(r"\\\1", text)
 
 
-def _category_emoji(category: str) -> str:
-    """Return a category badge emoji."""
-    return {"academic": "🎓", "industry": "🏢", "cloud": "☁️"}.get(category, "📰")
+# Header metadata per feed category: (badge emoji, display title).
+#
+# The title is spelled out rather than derived because `str.capitalize()` does
+# not survive the separators used in `config.RSS_FEEDS` category codes — they
+# are inconsistent by design (`open-source` hyphenates, `top_stories`
+# underscores), and capitalize() would emit "Open-source" and "Top_stories".
+# The underscore is then MarkdownV2-escaped, so it reaches Telegram as a
+# literal "Top\_stories".
+_CATEGORY_META = {
+    "academic": ("🎓", "Academic News"),
+    "industry": ("🏢", "Industry News"),
+    "cloud": ("☁️", "Cloud News"),
+    "open-source": ("💻", "Open Source"),
+    "top_stories": ("🗞️", "Top Stories"),
+}
+
+
+def _title_from_code(category: str) -> str:
+    """Fallback display title: 'top_stories' -> 'Top Stories'."""
+    return re.sub(r"[_\-]+", " ", category).strip().title() or "News"
+
+
+def _category_header(category: str) -> str:
+    """
+    Return the '<emoji> <Title>' header text for a feed category code.
+
+    A category with no entry in `_CATEGORY_META` still renders sanely, so
+    adding a feed to `config.RSS_FEEDS` under a new category does not require a
+    change here — it just gets the generic badge.
+    """
+    emoji, title = _CATEGORY_META.get(category, ("📰", _title_from_code(category)))
+    return f"{emoji} {_escape_md(title)}"
 
 
 def build_category_messages(category: str, items: list[tuple[Article, str]]) -> list[str]:
@@ -39,8 +68,8 @@ def build_category_messages(category: str, items: list[tuple[Article, str]]) -> 
     if not items:
         return []
 
-    emoji = _category_emoji(category)
-    header = f"*{emoji} {_escape_md(category.capitalize())} News*\n\n"
+    header_text = _category_header(category)
+    header = f"*{header_text}*\n\n"
 
     messages = []
     current_message = header
@@ -62,9 +91,7 @@ def build_category_messages(category: str, items: list[tuple[Article, str]]) -> 
 
         if len(current_message) + len(item_text) > config.TELEGRAM_MAX_MESSAGE_LENGTH:
             messages.append(current_message.strip())
-            current_message = (
-                f"*{emoji} {_escape_md(category.capitalize())} News \\(Cont\\.\\)*\n\n"
-            )
+            current_message = f"*{header_text} \\(Cont\\.\\)*\n\n"
 
         current_message += item_text
 

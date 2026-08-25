@@ -1,4 +1,11 @@
 from feedmind import config
+from feedmind.notification import _CATEGORY_META
+
+# Feed categories the pipeline knows how to render. This list is duplicated by
+# paper-prism's `constants.js::NEWS_CATEGORIES`, which keys its reader tabs off
+# the same strings — including the inconsistent separators, which must be
+# preserved exactly on both sides.
+KNOWN_CATEGORIES = ["academic", "industry", "cloud", "open-source", "top_stories"]
 
 
 def test_rss_feeds_structure():
@@ -10,8 +17,22 @@ def test_rss_feeds_structure():
         assert isinstance(name, str)
         assert isinstance(url, str)
         assert isinstance(category, str)
-        assert category in ["academic", "industry", "cloud"]
+        assert category in KNOWN_CATEGORIES
         assert url.startswith("http")
+
+
+def test_static_links_use_known_categories():
+    for _title, url, category, _msg in config.STATIC_LINKS:
+        assert category in KNOWN_CATEGORIES
+        assert url.startswith("http")
+
+
+def test_every_configured_category_has_telegram_header_metadata():
+    # Without an entry the header falls back to a generic badge and a
+    # title-cased code — legible, but not the wording anyone intended.
+    used = {c for _n, _u, c in config.RSS_FEEDS}
+    used |= {c for _t, _u, c, _m in config.STATIC_LINKS}
+    assert used <= set(_CATEGORY_META), f"no header metadata for: {used - set(_CATEGORY_META)}"
 
 
 def test_gemini_config():
