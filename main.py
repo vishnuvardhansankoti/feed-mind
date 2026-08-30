@@ -65,6 +65,7 @@ def feedmind(request):
     new_articles_found = 0
     articles_summarized = 0
     articles_delivered = 0
+    articles_stored_without_telegram = 0
     gemini_failures = 0
     telegram_failures = 0
     youtube_feeds_checked = 0
@@ -108,10 +109,17 @@ def feedmind(request):
 
     category_items = {"academic": [], "industry": [], "cloud": []}
 
+    # Articles from feeds with post_to_telegram=False. They skip the batched
+    # Telegram messages entirely and are written straight to Firestore for the
+    # paper-prism web reader — same shape as the YouTube ingest below.
+    firestore_only_items = []
+
     # ------------------------------------------------------------------
     # Step 3: Process feeds sequentially
     # ------------------------------------------------------------------
-    for feed_source, feed_url, feed_category in config.RSS_FEEDS:
+    for feed_index, (feed_source, feed_url, feed_category, post_to_telegram) in enumerate(
+        config.RSS_FEEDS
+    ):
         # Soft timeout guard — exit gracefully before the 5-minute hard limit
         elapsed = time.monotonic() - run_start
         if elapsed >= config.FUNCTION_SOFT_TIMEOUT_S:
@@ -120,9 +128,7 @@ def feedmind(request):
                     {
                         "message": "Soft timeout reached — stopping early",
                         "elapsed_seconds": round(elapsed, 1),
-                        "feeds_remaining": config.RSS_FEEDS.index(
-                            (feed_source, feed_url, feed_category)
-                        ),
+                        "feeds_remaining": len(config.RSS_FEEDS) - feed_index,
                     }
                 )
             )
@@ -165,6 +171,10 @@ def feedmind(request):
                 summary = summarize_with_sumy(article)
                 articles_summarized += 1
 
+            if not post_to_telegram:
+                firestore_only_items.append((article, summary))
+                continue
+
             # Collect for batching
             if article.feed_category not in category_items:
                 category_items[article.feed_category] = []
@@ -176,6 +186,7 @@ def feedmind(request):
                     "message": "Feed processed",
                     "feed_source": feed_source,
                     "feed_category": feed_category,
+                    "post_to_telegram": post_to_telegram,
                     "entries_found": len(articles),
                     "new_articles": feed_new,
                     "skipped_duplicates": feed_duplicates,
@@ -239,6 +250,18 @@ def feedmind(request):
                     articles_delivered += 1
 
     # ------------------------------------------------------------------
+    # Step 4a: Persist articles from feeds that opt out of Telegram
+    # ------------------------------------------------------------------
+    # There is no delivery to gate these on, so they are written directly. The
+    # web reader still surfaces them; only the Telegram digest skips them.
+    for article, summary in firestore_only_items:
+        if is_local_run:
+            print(f"--- WOULD SAVE (NO TELEGRAM) TO FIRESTORE: {article.article_id} ---")
+        else:
+            mark_as_delivered(db, article, summary)
+        articles_stored_without_telegram += 1
+
+    # ------------------------------------------------------------------
     # Step 4b: Ingest YouTube subscriptions -> Firestore (no Telegram)
     # ------------------------------------------------------------------
     # New videos from the last MAX_VIDEO_AGE_DAYS are written to the
@@ -293,6 +316,7 @@ def feedmind(request):
         "new_articles_found": new_articles_found,
         "articles_summarized": articles_summarized,
         "articles_delivered": articles_delivered,
+        "articles_stored_without_telegram": articles_stored_without_telegram,
         "gemini_failures": gemini_failures,
         "telegram_failures": telegram_failures,
         "youtube_feeds_checked": youtube_feeds_checked,
@@ -308,13 +332,13 @@ def feedmind(request):
     # Published last, after every article is safely in Firestore — the
     # consumer reads that collection, so announcing any earlier would race it.
     # Best-effort: a failure here is logged, never raised. See events.py.
+    # The consumer reads Firestore, so the count is everything this run wrote —
+    # including articles from feeds that opted out of Telegram.
+    articles_written = articles_delivered + articles_stored_without_telegram
     if is_local_run:
-        print(
-            f"--- WOULD PUBLISH CONTENT-READY EVENT: "
-            f"{articles_delivered} article(s) delivered ---"
-        )
+        print(f"--- WOULD PUBLISH CONTENT-READY EVENT: {articles_written} article(s) written ---")
     else:
-        publish_content_ready(articles_delivered, run_summary=summary_log)
+        publish_content_ready(articles_written, run_summary=summary_log)
 
     return (json.dumps(summary_log), 200, {"Content-Type": "application/json"})
 

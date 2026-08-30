@@ -9,42 +9,52 @@ against each source's actual RSS endpoint before first run.
 # ---------------------------------------------------------------------------
 # RSS Feed Definitions
 # ---------------------------------------------------------------------------
-# Each entry: (human_readable_name, rss_url, category)
-# category: one of "academic" | "industry" | "cloud"
+# Each entry: (human_readable_name, rss_url, category, post_to_telegram)
+# category: one of "academic" | "industry" | "cloud" | "top_stories"
+# post_to_telegram: when False the feed is still fetched, summarized and written
+#   to Firestore (so the paper-prism web reader keeps showing it), but its
+#   articles are left out of the batched Telegram messages.
 
 RSS_FEEDS = [
     # --- Academic / Research ---
-    # ("arXiv ML",           "https://rss.arxiv.org/rss/cs.LG",                                      "academic"),
-    # ("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic"),
-    # ("arXiv NLP", "https://rss.arxiv.org/rss/cs.CL",                                      "academic"),
-    ("Hugging Face Papers", "https://huggingface.co/blog/feed.xml", "academic"),
-    ("Google Research Blog", "https://research.google/blog/rss/", "academic"),
-    ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/", "academic"),
+    # ("arXiv ML",           "https://rss.arxiv.org/rss/cs.LG",                                      "academic", True),
+    # ("arXiv AI",           "https://rss.arxiv.org/rss/cs.AI",                                      "academic", True),
+    # ("arXiv NLP", "https://rss.arxiv.org/rss/cs.CL",                                      "academic", True),
+    ("Hugging Face Papers", "https://huggingface.co/blog/feed.xml", "academic", True),
+    ("Google Research Blog", "https://research.google/blog/rss/", "academic", True),
+    ("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/", "academic", True),
     (
         "Google Developers Blog",
         "https://developers.googleblog.com/feeds/posts/default/",
         "academic",
+        True,
     ),
-    ("NVIDIA Developer Blog", "https://developer.nvidia.com/blog/feed/", "industry"),
+    ("NVIDIA Developer Blog", "https://developer.nvidia.com/blog/feed/", "industry", True),
     # --- Industry News ---
-    ("OpenAI News", "https://openai.com/news/rss.xml", "industry"),
-    ("Google DeepMind", "https://deepmind.google/blog/rss.xml", "industry"),
-    ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/", "industry"),
-    ("ByteByteGo", "https://blog.bytebytego.com/feed", "industry"),
-    ("Daily AI", "https://dailyai.com/feed/", "industry"),
-    ("Meta Engineering", "https://engineering.fb.com/feed/", "industry"),
-    ("Netflix Tech Blog", "https://netflixtechblog.com/feed", "industry"),
+    ("OpenAI News", "https://openai.com/news/rss.xml", "industry", True),
+    ("Google DeepMind", "https://deepmind.google/blog/rss.xml", "industry", True),
+    (
+        "TechCrunch AI",
+        "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "industry",
+        True,
+    ),
+    ("ByteByteGo", "https://blog.bytebytego.com/feed", "industry", True),
+    ("Daily AI", "https://dailyai.com/feed/", "industry", True),
+    ("Meta Engineering", "https://engineering.fb.com/feed/", "industry", True),
+    ("Netflix Tech Blog", "https://netflixtechblog.com/feed", "industry", True),
     # --- Cloud Computing ---
-    ("CNCF Blog", "https://www.cncf.io/blog/feed/", "cloud"),
-    ("AWS News Blog", "https://aws.amazon.com/blogs/aws/feed/", "cloud"),
-    ("Google Cloud Blog", "https://cloudblog.withgoogle.com/rss", "cloud"),
-    ("Azure Updates", "https://azure.microsoft.com/en-us/blog/feed/", "cloud"),
-    ("Amazon ML Research", "https://aws.amazon.com/blogs/machine-learning/feed/", "cloud"),
+    ("CNCF Blog", "https://www.cncf.io/blog/feed/", "cloud", True),
+    ("AWS News Blog", "https://aws.amazon.com/blogs/aws/feed/", "cloud", True),
+    ("Google Cloud Blog", "https://cloudblog.withgoogle.com/rss", "cloud", True),
+    ("Azure Updates", "https://azure.microsoft.com/en-us/blog/feed/", "cloud", True),
+    ("Amazon ML Research", "https://aws.amazon.com/blogs/machine-learning/feed/", "cloud", True),
     # ---- News ---
     (
         "TOI Top Stories",
         "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
         "top_stories",
+        False,
     ),
 ]
 

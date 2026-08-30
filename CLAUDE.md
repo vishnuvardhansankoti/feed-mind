@@ -58,14 +58,19 @@ main.py (HTTP trigger)
               └── is_duplicate()      # deduplication.py — single Firestore .get()
               └── summarize()         # Gemini (1-sentence), or
                   summarize_with_sumy() # Sumy LSA extractive (offline fallback)
-              └── collect into category_items dict (not sent yet)
+              └── collect into category_items dict (not sent yet), or into
+                  firestore_only_items if the feed has post_to_telegram=False
   └── for each category in category_items:
         └── build_category_messages() # notification.py — chunks into ≤4000-char messages
         └── send_message() per chunk  # httpx POST to Telegram
         └── mark_as_delivered()       # Firestore write ONLY after successful delivery
+  └── for each article in firestore_only_items:
+        └── mark_as_delivered()       # written directly — no Telegram step to gate on
 ```
 
-**Key invariant:** Firestore is written to **only after** successful Telegram delivery. Failed articles are not marked and will be retried on the next daily run.
+**Key invariant:** for Telegram-bound articles, Firestore is written to **only after** successful delivery. Failed articles are not marked and will be retried on the next daily run.
+
+**Per-feed Telegram opt-out:** each entry in `RSS_FEEDS` carries a fourth element, `post_to_telegram`. It is `True` for every feed except `TOI Top Stories`. When `False`, the feed is still fetched, deduplicated, summarized and persisted to Firestore (so the paper-prism web reader keeps showing it) but its articles never appear in the batched Telegram messages.
 
 **Article identity:** `article_id` is SHA-256 of the article URL, used as the Firestore document ID in the `processed_articles` collection. Firestore documents include an `expires_at` field (90 days) for TTL-based auto-deletion.
 
@@ -100,7 +105,7 @@ Articles are batched by category. Each category produces one or more messages ch
 
 | Module | Responsibility |
 |--------|---------------|
-| `feedmind/config.py` | All constants: feed list, GCP project ID, Firestore names, model name, timeouts, feature flags, system prompt |
+| `feedmind/config.py` | All constants: feed list (`(name, url, category, post_to_telegram)` tuples), GCP project ID, Firestore names, model name, timeouts, feature flags, system prompt |
 | `feedmind/secrets.py` | Loads `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY` from GCP Secret Manager at startup |
 | `feedmind/ingestion.py` | Fetches/parses RSS via feedparser; produces `Article` dataclass; filters articles older than `MAX_ARTICLE_AGE_DAYS` |
 | `feedmind/deduplication.py` | Checks and writes to Firestore `processed_articles`; writes `expires_at` for TTL |
