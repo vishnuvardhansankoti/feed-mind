@@ -78,7 +78,7 @@ describe("paperTracks", () => {
 });
 
 describe("topSummaryTracks", () => {
-  it("takes the first three playable items per category, then per lens", () => {
+  it("takes the first three playable items of each news category", () => {
     const articles = [
       ...Array.from({ length: 5 }, (_, i) =>
         article({ title: `ac${i}`, feed_category: "academic" }),
@@ -87,17 +87,22 @@ describe("topSummaryTracks", () => {
         article({ title: `in${i}`, feed_category: "industry" }),
       ),
     ];
-    const tracks = topSummaryTracks({
-      articles,
-      latest: { AIML: { papers: [paper({ title: "ml0" }), paper({ title: "ml1" })] } },
-    });
 
-    expect(tracks.map((t) => t.title)).toEqual([
+    expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
       "ac0", "ac1", "ac2",
       "in0", "in1", "in2",
-      "ml0", "ml1",
     ]);
     expect(TOP_PER_CATEGORY).toBe(3);
+  });
+
+  it("excludes papers entirely — they have their own Listen All", () => {
+    // The digest is weekly, so the same papers would ride along in every daily
+    // listen. paperTracks still serves the Papers tab.
+    const tracks = topSummaryTracks({
+      articles: [article({ title: "news-1" })],
+      latest: { AIML: { papers: [paper({ title: "should-not-play" })] } },
+    });
+    expect(tracks.map((t) => t.title)).toEqual(["news-1"]);
   });
 
   it("counts playable items, not raw ones, when applying the cap", () => {
@@ -219,12 +224,12 @@ describe("topSummaryTracks", () => {
     expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual(["today"]);
   });
 
-  it("still caps papers at the latest run regardless of the news anchor", () => {
+  it("is empty when there is no news, even with papers available", () => {
     const tracks = topSummaryTracks({
       articles: [],
       latest: { NLP: { papers: [paper({ title: "p1" }), paper({ title: "p2" })] } },
     });
-    expect(tracks.map((t) => t.title)).toEqual(["p1", "p2"]);
+    expect(tracks).toEqual([]);
   });
 
   it("returns an empty queue when nothing anywhere has audio", () => {

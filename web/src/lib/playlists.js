@@ -58,14 +58,16 @@ function newestDay(items) {
 
 /**
  * The Top Summaries queue: the first `per` playable items of every news
- * category *from the newest ingest day only*, then of every paper lens from the
- * latest run only.
+ * category, from the newest ingest day only.
+ *
+ * News only — papers are deliberately excluded. The digest is weekly, so the
+ * same nine papers would ride along in every daily listen; the Papers tab has
+ * its own Listen All (see paperTracks) for when they are what you want.
  *
  * The day anchor is the whole point. `articles` is the entire 7-day window, so
  * filtering by category alone lets a category with fewer than `per` items today
  * reach back into previous days to fill its quota — the queue then reads out
- * archived material under a "today's top summaries" label. Papers never had
- * this problem because `latest` is already one run per lens.
+ * archived material under a "today's top summaries" label.
  *
  * The anchor is global rather than per-category, so nothing older than the most
  * recent batch can play. A category with nothing in that batch contributes
@@ -82,7 +84,6 @@ function newestDay(items) {
  */
 export function topSummaryTracks({
   articles = [],
-  latest = {},
   isFollowed = () => true,
   per = TOP_PER_CATEGORY,
 } = {}) {
@@ -106,11 +107,6 @@ export function topSummaryTracks({
       (a) => a.feed_category === c.code && (day === null || dayKey(a) === day),
     );
     tracks.push(...tracksFrom(inCat, c.label).slice(0, per));
-  }
-
-  for (const lens of LENSES) {
-    const papers = latest?.[lens.code]?.papers ?? [];
-    tracks.push(...tracksFrom(papers, lens.label).slice(0, per));
   }
 
   return tracks;

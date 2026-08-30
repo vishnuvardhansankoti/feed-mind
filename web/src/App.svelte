@@ -15,7 +15,7 @@
   import ListenAllButton from "./components/ListenAllButton.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
   import { paperTracks, topSummaryTracks } from "./lib/playlists.js";
-  import { playQueue } from "./lib/audio.svelte.js";
+  import { queue, playQueue, stopQueue } from "./lib/audio.svelte.js";
   import { isFollowed } from "./lib/follows.svelte.js";
   import { settingsUi } from "./lib/settingsUi.svelte.js";
   import { analyticsEnabled } from "./lib/analytics.js";
@@ -99,14 +99,22 @@
   let topLoading = $state(false);
   let topNote = $state("");
 
+  // Whether the queue now playing is this button's. Without it the button never
+  // showed a playing state, so pressing it again silently restarted the queue
+  // from the first track — indistinguishable from the playlist looping.
+  let topPlaying = $derived(queue.state !== "idle" && queue.source === "top");
+
   async function playTopSummaries() {
+    if (topPlaying) {
+      stopQueue();
+      return;
+    }
     topNote = "";
     topLoading = true;
     try {
       await loadNews();
       const tracks = topSummaryTracks({
         articles: news?.articles ?? [],
-        latest,
         isFollowed,
       });
       // playQueue no-ops on an empty list, which would leave the press with no
@@ -186,19 +194,28 @@
     </div>
     <div class="masthead-tools">
       <SearchBar root={getContentEl} revision={searchRevision} />
-      <!-- Deliberately not scoped to the current section: this queue spans the
-           news categories and the paper lenses together. -->
-      <button
-        type="button"
-        class="top-listen"
-        onclick={playTopSummaries}
-        disabled={topLoading}
-        aria-label="Listen to the top summaries from every category"
-      >
-        <span class="icon" aria-hidden="true">▶</span>
-        {topLoading ? "Preparing…" : "Listen Top Summaries"}
-      </button>
-      {#if topNote}<span class="top-note" role="status">{topNote}</span>{/if}
+      <!-- News only, in both senses: the queue is news, and the control appears
+           only on the News section. Elsewhere it would offer to play one
+           section's content from another's — and on Papers it would sit beside
+           that tab's own Listen All playing something different. A queue
+           already running keeps playing as you navigate away; the mini-player
+           still holds Stop and Skip. -->
+      {#if page === "news"}
+        <button
+          type="button"
+          class="top-listen"
+          class:playing={topPlaying}
+          onclick={playTopSummaries}
+          disabled={topLoading}
+          aria-label={topPlaying
+            ? "Stop playing the top news"
+            : "Listen to the top news from every category"}
+        >
+          <span class="icon" aria-hidden="true">{topPlaying ? "■" : "▶"}</span>
+          {topPlaying ? "Stop" : topLoading ? "Preparing…" : "Listen Top News"}
+        </button>
+        {#if topNote}<span class="top-note" role="status">{topNote}</span>{/if}
+      {/if}
       {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
       <AccountMenu />
     </div>
@@ -361,6 +378,11 @@
   }
   .top-listen:hover:not(:disabled) { border-color: var(--accent); }
   .top-listen:disabled { color: var(--muted); cursor: default; }
+  .top-listen.playing {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
   .top-listen .icon { font-size: 0.62rem; line-height: 1; }
   .top-note { font-size: 0.72rem; color: var(--muted); }
 

@@ -91,6 +91,60 @@ describe("playQueue", () => {
   });
 });
 
+describe("reaching the end", () => {
+  it("plays a long queue exactly once and stops", async () => {
+    const tracks = Array.from({ length: 12 }, (_, i) => track(`t${i}`));
+    playQueue(tracks, "top");
+    await settle();
+
+    const order = [];
+    for (let i = 0; i < 12; i++) {
+      order.push(currentTrack()?.title ?? null);
+      el.fireEnded();
+      await settle();
+    }
+
+    // Every track once, in order, and then silence.
+    expect(order).toEqual(tracks.map((t) => t.title));
+    expect(queue.state).toBe("idle");
+    expect(queue.tracks).toEqual([]);
+    expect(queue.index).toBe(-1);
+    expect(currentTrack()).toBe(null);
+  });
+
+  it("does not restart when a stray ended arrives after the queue finished", async () => {
+    playQueue([track("a")], "top");
+    await settle();
+    el.fireEnded();
+    await settle();
+    expect(queue.state).toBe("idle");
+
+    // A late event from the element that just stopped must not revive it.
+    el.fireEnded();
+    await settle();
+
+    expect(queue.state).toBe("idle");
+    expect(queue.tracks).toEqual([]);
+    expect(queue.problem).toBe("");
+  });
+
+  it("restarts cleanly when the same source is played again", async () => {
+    playQueue([track("a"), track("b")], "top");
+    await settle();
+    el.fireEnded();
+    await settle();
+    el.fireEnded();
+    await settle();
+    expect(queue.state).toBe("idle");
+
+    playQueue([track("a"), track("b")], "top");
+    await settle();
+
+    expect(queue.index).toBe(0);
+    expect(currentTrack().title).toBe("a");
+  });
+});
+
 describe("failure handling", () => {
   it("skips a track whose play() rejects and keeps going", async () => {
     let calls = 0;
