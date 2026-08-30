@@ -101,6 +101,22 @@ else
     echo "  then re-run this script." >&2
 fi
 
+# Reading the VAPID private key at runtime. Optional, unlike the LLM key: with
+# no secret the function still runs and simply does not send notifications, so
+# this warns rather than telling you to re-run.
+if gcloud secrets describe "$VAPID_PRIVATE_KEY_SECRET" --project="$PROJECT_ID" >/dev/null 2>&1; then
+    gcloud secrets add-iam-policy-binding "$VAPID_PRIVATE_KEY_SECRET" \
+        --project="$PROJECT_ID" \
+        --member="serviceAccount:${SERVICE_ACCOUNT}" \
+        --role="roles/secretmanager.secretAccessor" \
+        --quiet >/dev/null
+    echo "  granted secretAccessor on ${VAPID_PRIVATE_KEY_SECRET}"
+else
+    echo "  note: secret ${VAPID_PRIVATE_KEY_SECRET} does not exist -" >&2
+    echo "        push notifications stay off. To enable them, see the Web Push" >&2
+    echo "        section of deploy/config.sh, then re-run this script." >&2
+fi
+
 # Nothing extra is needed for Text-to-Speech: it authorizes on the caller's
 # credentials and the enabled API, with no per-identity role to grant.
 

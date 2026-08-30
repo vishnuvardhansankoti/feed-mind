@@ -65,6 +65,20 @@ fi
 
 say "Deploying ${FUNCTION_NAME} to ${PROJECT_ID}/${REGION}"
 
+# --set-secrets REPLACES the whole set on every deploy, so both secrets have to
+# be named in one flag — mounting the VAPID key on its own would silently
+# unmount LLM_API_KEY and break summarization.
+#
+# The VAPID secret is optional: naming a secret that does not exist fails the
+# deploy outright, so it is only added once it is there. Without it the function
+# runs normally and simply sends no notifications.
+SECRETS="LLM_API_KEY=${LLM_API_KEY_SECRET}:latest"
+if gcloud secrets describe "$VAPID_PRIVATE_KEY_SECRET" --project="$PROJECT_ID" >/dev/null 2>&1; then
+    SECRETS="${SECRETS},VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY_SECRET}:latest"
+else
+    echo "  note: ${VAPID_PRIVATE_KEY_SECRET} not found - deploying without push notifications"
+fi
+
 # --set-env-vars uses ^|^ as the delimiter so values containing commas (the
 # prompt, say) survive. --set-secrets mounts the API key as an env var that
 # webscraper/config.py picks up like any other.
@@ -83,8 +97,8 @@ gcloud functions deploy "$FUNCTION_NAME" \
     --timeout="$TIMEOUT" \
     --concurrency="$CONCURRENCY" \
     --max-instances="$MAX_INSTANCES" \
-    --set-env-vars="^|^FEEDMIND_TTS=cloud|FEEDMIND_VOICE=${TTS_VOICE}|FEEDMIND_RATE=${TTS_RATE}|FEEDMIND_MAX_RUNTIME=${MAX_RUNTIME}|FEEDMIND_TOPIC=projects/${PROJECT_ID}/topics/${TOPIC_NAME}|LLM_API=${LLM_API}|LLM_BASE_URL=${LLM_BASE_URL}|LLM_MODEL=${LLM_MODEL}|LLM_MAX_TOKENS=${LLM_MAX_TOKENS}|GRPC_VERBOSITY=ERROR" \
-    --set-secrets="LLM_API_KEY=${LLM_API_KEY_SECRET}:latest"
+    --set-env-vars="^|^FEEDMIND_TTS=cloud|FEEDMIND_VOICE=${TTS_VOICE}|FEEDMIND_RATE=${TTS_RATE}|FEEDMIND_MAX_RUNTIME=${MAX_RUNTIME}|FEEDMIND_TOPIC=projects/${PROJECT_ID}/topics/${TOPIC_NAME}|LLM_API=${LLM_API}|LLM_BASE_URL=${LLM_BASE_URL}|LLM_MODEL=${LLM_MODEL}|LLM_MAX_TOKENS=${LLM_MAX_TOKENS}|VAPID_SUBJECT=${VAPID_SUBJECT}|GRPC_VERBOSITY=ERROR" \
+    --set-secrets="$SECRETS"
 
 # ---------------------------------------------------------------------------
 # A gen2 function is a Cloud Run service, so "who may call it" is a run.invoker

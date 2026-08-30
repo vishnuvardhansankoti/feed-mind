@@ -59,6 +59,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from google.api_core import exceptions as gcp_exceptions  # noqa: E402
 from google.cloud import firestore, storage  # noqa: E402
 
+from feedmind_push import notify  # noqa: E402
 from webscraper import config as ws_config  # noqa: E402
 from webscraper.cloud_speech import synthesize_mp3  # noqa: E402
 from webscraper.condense import compression_note, extractive_filter  # noqa: E402
@@ -633,6 +634,13 @@ def main(argv=None):
     if succeeded == 0:
         # Nothing worked, so being called again would only repeat it.
         return EXIT_ALL_FAILED
+
+    # Announce the batch only once it is complete: a run stopped by
+    # --max-runtime will be called again, and notifying per slice would send one
+    # notification per invocation for a single day's content.
+    if not remaining:
+        notify(db, args.process_doc, succeeded, log, dry_run=args.dry_run)
+
     return EXIT_INCOMPLETE if remaining else EXIT_OK
 
 

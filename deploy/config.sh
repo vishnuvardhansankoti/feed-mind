@@ -129,6 +129,36 @@ LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-1200}"
 # new secret *version*, not a new secret.
 LLM_API_KEY_SECRET="${LLM_API_KEY_SECRET:-feedmind-llm-api-key}"
 
+# -- Web Push ----------------------------------------------------------------
+# feedmind_push.py notifies subscribers once a batch finishes. The private half
+# of the VAPID pair is a credential, so it lives in Secret Manager and is
+# mounted as VAPID_PRIVATE_KEY, exactly like the LLM key.
+#
+# The matching PUBLIC half is baked into the web bundle as
+# VITE_VAPID_PUBLIC_KEY (paper-prism/web/.env). The two must be from the same
+# pair: browsers stamp the public key into every subscription they create, so
+# changing one without the other silently rejects every push, and rotating the
+# pair invalidates every existing subscription.
+#
+# Generate a pair with:
+#
+#     node -e "const {generateKeyPairSync}=require('crypto');
+#       const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+#       console.log('PUBLIC :',Buffer.from(publicKey.export({type:'spki',format:'der'}).subarray(-65)).toString('base64url'));
+#       console.log('PRIVATE:',privateKey.export({format:'jwk'}).d)"
+#
+# then store the private half:
+#
+#     printf '%s' "$PRIVATE" | gcloud secrets create feedmind-vapid-private-key \
+#         --project="$PROJECT_ID" --data-file=-
+#
+# Absent, the function still runs: notify() logs and returns rather than
+# failing a batch whose audio is already uploaded.
+VAPID_PRIVATE_KEY_SECRET="${VAPID_PRIVATE_KEY_SECRET:-feedmind-vapid-private-key}"
+
+# Contact address the push services require from the sender, as mailto: or https:.
+VAPID_SUBJECT="${VAPID_SUBJECT:-mailto:shankotai@gmail.com}"
+
 # -- Speech ------------------------------------------------------------------
 # See webscraper/cloud_speech.py. `gcloud text-to-speech voices list` shows the
 # full catalogue; Neural2 and Studio voices cost more per character than Standard.

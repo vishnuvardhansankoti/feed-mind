@@ -16,3 +16,7 @@ spacy==3.8.15
 # The spaCy pipeline itself is not on PyPI, so it is installed from its release
 # URL. It must match the spacy version above - 3.8.0 targets spaCy 3.8.x.
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+
+# Web Push sender (feedmind_push.py). Absent locally is fine: notify()
+# logs and returns rather than failing the batch.
+pywebpush==2.0.3
