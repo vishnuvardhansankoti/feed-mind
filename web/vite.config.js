@@ -10,6 +10,12 @@ export default defineConfig({
     // pinned to a stale cached shell (important for a client-rendered SPA).
     VitePWA({
       registerType: "autoUpdate",
+      // injectManifest, not generateSW: push notifications need `push` and
+      // `notificationclick` handlers, and a generated worker cannot carry them.
+      // src/sw.js reproduces the precache + SPA-fallback behaviour by hand.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.js",
       // Static assets that live in public/ and must be precached alongside the
       // hashed build output (globPatterns handles dist/assets/*).
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "og.png", "robots.txt"],
@@ -34,10 +40,10 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      // injectManifest reads this instead of `workbox`; the SPA fallback moved
+      // into src/sw.js, which registers the NavigationRoute itself.
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"],
-        // SPA fallback: any uncached navigation resolves to the app shell.
-        navigateFallback: "/index.html",
       },
       // Only generate/register the service worker in production builds; a caching
       // SW during `npm run dev` causes stale-asset headaches.

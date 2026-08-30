@@ -166,6 +166,60 @@ export async function saveUnfollowed(uid, unfollowed) {
   return clean;
 }
 
+
+/**
+ * How many devices one account may receive notifications on.
+ *
+ * A list rather than a single subscription, because one person routinely has a
+ * phone and a laptop — storing one would make enabling notifications on the
+ * phone silently switch them off on the desktop, with nothing on either device
+ * saying so. Bounded so the document cannot grow without limit as browsers
+ * rotate endpoints.
+ */
+export const PUSH_DEVICE_LIMIT = 10;
+
+/**
+ * Register this device for push, replacing any entry with the same endpoint.
+ *
+ * Endpoint is the identity: browsers rotate them, and re-subscribing on a
+ * device that already had one must update rather than accumulate. At the limit
+ * the oldest is dropped — unlike bookmarks, which refuse, because the user did
+ * not deliberately choose these and an unreachable stale endpoint is worth less
+ * than the device in their hand.
+ */
+export async function savePushSubscription(uid, subscription) {
+  const clean = {
+    endpoint: str(subscription.endpoint),
+    p256dh: str(subscription.p256dh),
+    auth: str(subscription.auth),
+    updated_at: str(subscription.updated_at || new Date().toISOString()),
+  };
+  if (!clean.endpoint) return [];
+
+  const current = (await readPushSubscriptions(uid)).filter(
+    (s) => s.endpoint !== clean.endpoint,
+  );
+  const next = [clean, ...current].slice(0, PUSH_DEVICE_LIMIT);
+
+  if (isMock) mockWritePush(uid, next);
+  else await firestoreWritePush(uid, next);
+  return next;
+}
+
+/** Forget one device. */
+export async function clearPushSubscription(uid, endpoint) {
+  const next = (await readPushSubscriptions(uid)).filter((s) => s.endpoint !== endpoint);
+  if (isMock) mockWritePush(uid, next);
+  else await firestoreWritePush(uid, next);
+  return next;
+}
+
+/** Every device registered for this account. */
+export async function readPushSubscriptions(uid) {
+  const raw = isMock ? mockReadPush(uid) : await firestoreReadPush(uid);
+  return Array.isArray(raw) ? raw : [];
+}
+
 // --- backends --------------------------------------------------------------
 
 function write(uid, items) {
@@ -183,6 +237,41 @@ async function firestoreWriteUnfollowed(uid, unfollowed) {
   // merge:true, so writing preferences never clobbers `bookmarks` on the same
   // document — the mirror image of firestoreWrite().
   await setDoc(doc(await firestoreDb(), "users", uid), { unfollowed }, { merge: true });
+}
+
+async function firestoreReadPush(uid) {
+  const { doc, getDoc } = await import("firebase/firestore");
+  const snap = await getDoc(doc(await firestoreDb(), "users", uid));
+  return snap.exists() ? snap.data().push_subscriptions : null;
+}
+
+async function firestoreWritePush(uid, subs) {
+  const { doc, setDoc } = await import("firebase/firestore");
+  // merge:true, so this never clobbers `bookmarks` or `unfollowed` on the same
+  // document — same contract as the two writers above.
+  await setDoc(
+    doc(await firestoreDb(), "users", uid),
+    { push_subscriptions: subs },
+    { merge: true },
+  );
+}
+
+const mockPushKey = (uid) => `fm-push-subs-${uid}`;
+
+function mockReadPush(uid) {
+  try {
+    return JSON.parse(localStorage.getItem(mockPushKey(uid)) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function mockWritePush(uid, subs) {
+  try {
+    localStorage.setItem(mockPushKey(uid), JSON.stringify(subs));
+  } catch {
+    /* private mode — the toggle still works for the session */
+  }
 }
 
 const mockPrefsKey = (uid) => `fm-unfollowed-${uid}`;

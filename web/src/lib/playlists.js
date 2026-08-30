@@ -10,8 +10,23 @@
 
 import { NEWS_CATEGORIES, LENSES } from "./constants.js";
 
-/** How many playable items each category contributes to Top Summaries. */
-export const TOP_PER_CATEGORY = 3;
+/**
+ * Top News quotas.
+ *
+ * Most categories draw per *source*, so one prolific feed cannot crowd the
+ * others out of the queue — "Academic" is four different blogs, and the newest
+ * from each beats three from whichever posted most recently. At one per source
+ * the queue is a headline sweep: broad coverage, bounded by how many feeds
+ * published that day rather than by how much any one of them wrote.
+ *
+ * `top_stories` is the exception: it is a single feed today, so grouping by
+ * source there would just be a cap of one story. It draws a flat count from the
+ * category instead. When it grows real sub-sources, moving it out of
+ * FLAT_CATEGORIES is the whole change.
+ */
+export const TOP_PER_SOURCE = 1;
+export const TOP_PER_FLAT_CATEGORY = 3;
+export const FLAT_CATEGORIES = ["top_stories"];
 
 /**
  * Turn feed items (articles or papers) into playable tracks, dropping anything
@@ -57,27 +72,53 @@ function newestDay(items) {
 }
 
 /**
- * The Top Summaries queue: the first `per` playable items of every news
- * category, from the newest ingest day only.
+ * Up to `perSource` playable items from each distinct feed_source, in feed
+ * order.
+ *
+ * Feed order is preserved rather than regrouped source-by-source: the set of
+ * tracks is identical either way, and keeping the newest-first sequence matches
+ * how the same articles are laid out on screen.
+ */
+function perSourceTracks(items, context, perSource) {
+  const taken = new Map();
+  const out = [];
+  for (const a of items) {
+    if (!a.audio_url) continue;
+    const key = a.feed_source ?? "";
+    const n = taken.get(key) ?? 0;
+    if (n >= perSource) continue;
+    taken.set(key, n + 1);
+    out.push(...tracksFrom([a], context));
+  }
+  return out;
+}
+
+/**
+ * The Top News queue, drawn from the newest ingest day only.
+ *
+ * Two quotas, by category shape:
+ *   - most categories -> TOP_PER_SOURCE per distinct feed_source, so one busy
+ *     blog cannot fill "Academic" on its own; the category's length is then set
+ *     by how many of its feeds published, not by how much any one wrote
+ *   - FLAT_CATEGORIES (top_stories) -> TOP_PER_FLAT_CATEGORY from the category,
+ *     since it is one feed and per-source grouping would be a cap of one
  *
  * News only — papers are deliberately excluded. The digest is weekly, so the
  * same nine papers would ride along in every daily listen; the Papers tab has
  * its own Listen All (see paperTracks) for when they are what you want.
  *
  * The day anchor is the whole point. `articles` is the entire 7-day window, so
- * filtering by category alone lets a category with fewer than `per` items today
- * reach back into previous days to fill its quota — the queue then reads out
- * archived material under a "today's top summaries" label.
+ * filtering by category alone lets a category short of its quota today reach
+ * back into previous days to fill it — the queue then reads out archived
+ * material under a "top news" label.
  *
  * The anchor is global rather than per-category, so nothing older than the most
  * recent batch can play. A category with nothing in that batch contributes
  * nothing, rather than falling back to whenever it last published.
  *
- * Note the order of operations — items are filtered for audio *before* being
- * capped, so a category whose newest article has no audio still contributes
- * three spoken summaries rather than two. The alternative (cap, then drop the
- * silent ones) reads "first 3 items" more literally but delivers fewer clips
- * than the button promises.
+ * Items are filtered for audio *before* being capped, so a source whose newest
+ * article has no audio still contributes its full quota of spoken summaries
+ * rather than silently short-changing it.
  *
  * `open-source` contributes nothing: its only entry is the client-pinned
  * GitHub Trending link, which has no pipeline-generated audio at all.
@@ -85,7 +126,8 @@ function newestDay(items) {
 export function topSummaryTracks({
   articles = [],
   isFollowed = () => true,
-  per = TOP_PER_CATEGORY,
+  perSource = TOP_PER_SOURCE,
+  perFlatCategory = TOP_PER_FLAT_CATEGORY,
 } = {}) {
   const tracks = [];
 
@@ -106,7 +148,12 @@ export function topSummaryTracks({
       // anchor to; fall back to the whole list rather than an empty queue.
       (a) => a.feed_category === c.code && (day === null || dayKey(a) === day),
     );
-    tracks.push(...tracksFrom(inCat, c.label).slice(0, per));
+
+    if (FLAT_CATEGORIES.includes(c.code)) {
+      tracks.push(...tracksFrom(inCat, c.label).slice(0, perFlatCategory));
+    } else {
+      tracks.push(...perSourceTracks(inCat, c.label, perSource));
+    }
   }
 
   return tracks;

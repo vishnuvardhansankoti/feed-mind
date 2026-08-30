@@ -5,7 +5,14 @@
 // dropped, the cap counts playable items, open-source contributes nothing —
 // are pinned here rather than through a rendered feed.
 import { describe, it, expect } from "vitest";
-import { tracksFrom, paperTracks, topSummaryTracks, TOP_PER_CATEGORY } from "./playlists.js";
+import {
+  tracksFrom,
+  paperTracks,
+  topSummaryTracks,
+  TOP_PER_SOURCE,
+  TOP_PER_FLAT_CATEGORY,
+  FLAT_CATEGORIES,
+} from "./playlists.js";
 
 const TODAY = new Date("2026-08-25T09:00:00Z");
 const YESTERDAY = new Date("2026-08-24T09:00:00Z");
@@ -78,21 +85,47 @@ describe("paperTracks", () => {
 });
 
 describe("topSummaryTracks", () => {
-  it("takes the first three playable items of each news category", () => {
+  it("takes the newest one per source, so one busy feed cannot fill it", () => {
     const articles = [
-      ...Array.from({ length: 5 }, (_, i) =>
-        article({ title: `ac${i}`, feed_category: "academic" }),
+      ...Array.from({ length: 4 }, (_, i) =>
+        article({ title: `hf${i}`, feed_category: "academic", feed_source: "HF" }),
       ),
-      ...Array.from({ length: 5 }, (_, i) =>
-        article({ title: `in${i}`, feed_category: "industry" }),
+      ...Array.from({ length: 4 }, (_, i) =>
+        article({ title: `gr${i}`, feed_category: "academic", feed_source: "Google Research" }),
+      ),
+      ...Array.from({ length: 4 }, (_, i) =>
+        article({ title: `oa${i}`, feed_category: "industry", feed_source: "OpenAI" }),
       ),
     ];
 
     expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
-      "ac0", "ac1", "ac2",
-      "in0", "in1", "in2",
+      "hf0", "gr0", "oa0",
     ]);
-    expect(TOP_PER_CATEGORY).toBe(3);
+    expect(TOP_PER_SOURCE).toBe(1);
+  });
+
+  it("keeps feed order rather than regrouping by source", () => {
+    const articles = [
+      article({ title: "b1", feed_source: "B" }),
+      article({ title: "a1", feed_source: "A" }),
+      article({ title: "b2", feed_source: "B" }),
+      article({ title: "c1", feed_source: "C" }),
+    ];
+    expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
+      "b1", "a1", "c1",
+    ]);
+  });
+
+  it("gives top_stories a flat count, since it is a single feed", () => {
+    // Grouping by source there would be a cap of one; it has no sub-sources yet.
+    const articles = Array.from({ length: 5 }, (_, i) =>
+      article({ title: `ts${i}`, feed_category: "top_stories", feed_source: "TOI Top Stories" }),
+    );
+    expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
+      "ts0", "ts1", "ts2",
+    ]);
+    expect(TOP_PER_FLAT_CATEGORY).toBe(3);
+    expect(FLAT_CATEGORIES).toEqual(["top_stories"]);
   });
 
   it("excludes papers entirely — they have their own Listen All", () => {
@@ -106,17 +139,15 @@ describe("topSummaryTracks", () => {
   });
 
   it("counts playable items, not raw ones, when applying the cap", () => {
-    // A category whose newest article has no audio should still contribute
-    // three spoken summaries — otherwise the button under-delivers silently.
+    // A source whose newest article has no audio should still contribute its
+    // full quota — otherwise the button under-delivers silently.
     const articles = [
       article({ title: "silent", audio_url: "" }),
       article({ title: "a" }),
       article({ title: "b" }),
-      article({ title: "c" }),
-      article({ title: "d" }),
     ];
     const tracks = topSummaryTracks({ articles });
-    expect(tracks.map((t) => t.title)).toEqual(["a", "b", "c"]);
+    expect(tracks.map((t) => t.title)).toEqual(["a"]);
   });
 
   it("contributes nothing for open-source, which has no generated audio", () => {
@@ -187,8 +218,9 @@ describe("topSummaryTracks", () => {
         audio_url: "",
         processed_date: new Date("2026-08-29T12:00:00Z"),
       }),
-      article({ title: "real-1" }),
-      article({ title: "real-2" }),
+      // Distinct sources, so the per-source cap does not confound the anchor.
+      article({ title: "real-1", feed_source: "A" }),
+      article({ title: "real-2", feed_source: "B" }),
     ];
     expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
       "real-1",
@@ -210,8 +242,9 @@ describe("topSummaryTracks", () => {
     // With no usable dates there is no "latest" to anchor to; an empty queue
     // would be worse than an unanchored one.
     const articles = [
-      article({ title: "a", processed_date: null }),
-      article({ title: "b", processed_date: new Date("nonsense") }),
+      // Distinct sources, so the per-source cap does not confound the fallback.
+      article({ title: "a", processed_date: null, feed_source: "A" }),
+      article({ title: "b", processed_date: new Date("nonsense"), feed_source: "B" }),
     ];
     expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual(["a", "b"]);
   });

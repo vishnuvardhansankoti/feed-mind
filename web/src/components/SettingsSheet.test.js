@@ -46,7 +46,18 @@ describe("SettingsSheet", () => {
 
   it("shows every source as followed by default", () => {
     render(SettingsSheet, { articles, videos });
-    for (const box of screen.getAllByRole("checkbox")) expect(box).toBeChecked();
+    // By source name, not every checkbox on the sheet: the notifications toggle
+    // is also a checkbox and is correctly off until the user opts in.
+    for (const name of ["TechCrunch", "Google Developers", "Sam Witteveen AI", "Fahd Mirza"]) {
+      expect(screen.getByLabelText(name)).toBeChecked();
+    }
+  });
+
+  it("keeps the notifications toggle off until it is asked for", () => {
+    render(SettingsSheet, { articles, videos });
+    const box = screen.getByLabelText(/Notify me when new content is ready/);
+    expect(box).toBeInTheDocument();
+    expect(box).not.toBeChecked();
   });
 
   it("unfollows a source when its box is unchecked", async () => {

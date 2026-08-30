@@ -7,6 +7,8 @@
   // source appears in this list the first time it publishes anything.
   import { follows, isFollowed, toggleFollow, followAll } from "../lib/follows.svelte.js";
   import { closeSettings } from "../lib/settingsUi.svelte.js";
+  import { session } from "../lib/session.svelte.js";
+  import { enablePush, disablePush, isSubscribed, pushUnavailableReason } from "../lib/push.js";
 
   let { articles = [], videos = [] } = $props();
 
@@ -20,6 +22,51 @@
 
   let hiddenNews = $derived(newsSources.filter((s) => !isFollowed("news", s)).length);
   let hiddenVideos = $derived(videoChannels.filter((c) => !isFollowed("video", c)).length);
+
+  // --- notifications -------------------------------------------------------
+  // The toggle must run from the click itself: every browser rejects a
+  // permission prompt that is not tied to a user gesture, and Safari does so
+  // silently.
+  let notifyOn = $state(false);
+  let notifyBusy = $state(false);
+  let notifyError = $state("");
+
+  let blockedReason = $derived(pushUnavailableReason());
+
+  const REASONS = {
+    unsupported: "This browser can’t show notifications.",
+    "ios-needs-install": "On iPhone, add feed-mind to your Home Screen first — iOS only delivers notifications to installed apps.",
+    denied: "Notifications are blocked for this site. Re-allow them in your browser settings.",
+    unconfigured: "Notifications aren’t configured for this deployment yet.",
+    dismissed: "Permission wasn’t granted.",
+    "signed-out": "Sign in to turn notifications on.",
+  };
+
+  $effect(() => {
+    const uid = session.user?.uid;
+    if (!uid) return;
+    isSubscribed(uid).then((v) => (notifyOn = v));
+  });
+
+  async function toggleNotifications() {
+    const uid = session.user?.uid;
+    notifyError = "";
+    notifyBusy = true;
+    try {
+      if (notifyOn) {
+        await disablePush(uid);
+        notifyOn = false;
+      } else {
+        const reason = await enablePush(uid);
+        if (reason) notifyError = REASONS[reason] ?? "Couldn’t turn notifications on.";
+        else notifyOn = true;
+      }
+    } catch (e) {
+      notifyError = e?.message ?? String(e);
+    } finally {
+      notifyBusy = false;
+    }
+  }
 
   function onKeydown(e) {
     if (e.key === "Escape") closeSettings();
@@ -44,6 +91,27 @@
   {#if follows.error}
     <p class="err" role="alert">Couldn’t save that: {follows.error}</p>
   {/if}
+
+  <section class="notify">
+    <div class="head"><h3>Notifications</h3></div>
+    <p class="hint">
+      A single alert when each run finishes — news each morning, papers on Monday.
+    </p>
+    <label class="row">
+      <input
+        type="checkbox"
+        checked={notifyOn}
+        disabled={notifyBusy || (!notifyOn && !!blockedReason)}
+        onchange={toggleNotifications}
+      />
+      <span>{notifyBusy ? "Working…" : "Notify me when new content is ready"}</span>
+    </label>
+    {#if notifyError}
+      <p class="err" role="alert">{notifyError}</p>
+    {:else if blockedReason && !notifyOn}
+      <p class="hint sub">{REASONS[blockedReason]}</p>
+    {/if}
+  </section>
 
   <section>
     <div class="head">
@@ -120,6 +188,8 @@
   .close:hover { color: var(--text); }
 
   .hint { margin: 0.35rem 0 1rem; font-size: 0.78rem; color: var(--muted); }
+  .hint.sub { margin: 0.4rem 0 0; }
+  .notify { margin-bottom: 1.25rem; }
   .err { margin: 0 0 0.8rem; font-size: 0.78rem; color: var(--warn); }
 
   section { margin-bottom: 1.1rem; }
