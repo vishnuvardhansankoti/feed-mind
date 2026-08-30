@@ -12,6 +12,11 @@
   import AccountMenu from "./components/AccountMenu.svelte";
   import SavedView from "./components/SavedView.svelte";
   import SettingsSheet from "./components/SettingsSheet.svelte";
+  import ListenAllButton from "./components/ListenAllButton.svelte";
+  import MiniPlayer from "./components/MiniPlayer.svelte";
+  import { paperTracks, topSummaryTracks } from "./lib/playlists.js";
+  import { playQueue } from "./lib/audio.svelte.js";
+  import { isFollowed } from "./lib/follows.svelte.js";
   import { settingsUi } from "./lib/settingsUi.svelte.js";
   import { analyticsEnabled } from "./lib/analytics.js";
   import { openConsent } from "./lib/consentUi.svelte.js";
@@ -44,16 +49,26 @@
   let newsLoading = $state(false);
   let newsError = $state(null);
 
+  // The in-flight promise, not just a boolean: Listen Top Summaries awaits this
+  // to build its queue, and a caller arriving mid-fetch has to wait for the
+  // same load rather than being turned away with `news` still null.
+  let newsInflight = null;
+
   async function loadNews() {
-    if (news || newsLoading) return;
+    if (news) return;
+    if (newsInflight) return newsInflight;
     newsLoading = true;
-    try {
-      news = await getNews();
-    } catch (e) {
-      newsError = e?.message ?? String(e);
-    } finally {
-      newsLoading = false;
-    }
+    newsInflight = (async () => {
+      try {
+        news = await getNews();
+      } catch (e) {
+        newsError = e?.message ?? String(e);
+      } finally {
+        newsLoading = false;
+        newsInflight = null;
+      }
+    })();
+    return newsInflight;
   }
 
   // Videos are loaded lazily the first time the Videos section is opened.
@@ -73,8 +88,41 @@
     }
   }
 
+  // Papers: Listen All follows the visible tab, same rule as News.
+  let paperQueue = $derived(
+    tab === "latest" ? paperTracks(latest) : paperTracks(archive, { many: true }),
+  );
+
+  // Top Summaries spans sections, so it is the one control that isn't scoped to
+  // the tab you are on. News is lazy, so it may have to be fetched first — a
+  // user who lands on Papers and presses this has never triggered loadNews().
+  let topLoading = $state(false);
+  let topNote = $state("");
+
+  async function playTopSummaries() {
+    topNote = "";
+    topLoading = true;
+    try {
+      await loadNews();
+      const tracks = topSummaryTracks({
+        articles: news?.articles ?? [],
+        latest,
+        isFollowed,
+      });
+      // playQueue no-ops on an empty list, which would leave the press with no
+      // visible effect at all; say so instead.
+      if (!tracks.length) topNote = "No audio summaries available yet.";
+      else playQueue(tracks, "top");
+    } finally {
+      topLoading = false;
+    }
+  }
+
+  // UTC: run_date is a calendar date stamped at midnight UTC (the doc id is
+  // `runs/YYYY-MM-DD_<CAT>`), not an instant, so formatting it locally labels a
+  // run one day early for every reader behind UTC.
   const dateFmt = new Intl.DateTimeFormat(undefined, {
-    year: "numeric", month: "short", day: "numeric",
+    year: "numeric", month: "short", day: "numeric", timeZone: "UTC",
   });
   const fmt = (d) => (d ? dateFmt.format(d instanceof Date ? d : new Date(d)) : "");
 
@@ -138,6 +186,19 @@
     </div>
     <div class="masthead-tools">
       <SearchBar root={getContentEl} revision={searchRevision} />
+      <!-- Deliberately not scoped to the current section: this queue spans the
+           news categories and the paper lenses together. -->
+      <button
+        type="button"
+        class="top-listen"
+        onclick={playTopSummaries}
+        disabled={topLoading}
+        aria-label="Listen to the top summaries from every category"
+      >
+        <span class="icon" aria-hidden="true">▶</span>
+        {topLoading ? "Preparing…" : "Listen Top Summaries"}
+      </button>
+      {#if topNote}<span class="top-note" role="status">{topNote}</span>{/if}
       {#if page === "papers" && status}<FreshnessBadge {status} />{/if}
       <AccountMenu />
     </div>
@@ -190,13 +251,16 @@
     {/if}
   {:else}
 
-  <div class="tabs" role="tablist">
-    <button role="tab" aria-selected={tab === "latest"} class:active={tab === "latest"} onclick={() => (tab = "latest")}>
-      Latest
-    </button>
-    <button role="tab" aria-selected={tab === "archive"} class:active={tab === "archive"} onclick={() => (tab = "archive")}>
-      Archive
-    </button>
+  <div class="tabrow">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected={tab === "latest"} class:active={tab === "latest"} onclick={() => (tab = "latest")}>
+        Latest
+      </button>
+      <button role="tab" aria-selected={tab === "archive"} class:active={tab === "archive"} onclick={() => (tab = "archive")}>
+        Archive
+      </button>
+    </div>
+    <ListenAllButton tracks={paperQueue} id={`papers:${tab}`} label="Listen All" />
   </div>
 
   {#if loading}
@@ -247,6 +311,8 @@
   </footer>
 </div>
 
+<MiniPlayer />
+
 <ConsentBanner />
 
 {#if settingsUi.open && session.status === "in"}
@@ -279,6 +345,34 @@
   }
   .nav button.active { color: var(--text); border-bottom-color: var(--accent); }
 
+  .top-listen {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    color: var(--accent);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    white-space: nowrap;
+  }
+  .top-listen:hover:not(:disabled) { border-color: var(--accent); }
+  .top-listen:disabled { color: var(--muted); cursor: default; }
+  .top-listen .icon { font-size: 0.62rem; line-height: 1; }
+  .top-note { font-size: 0.72rem; color: var(--muted); }
+
+  .tabrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+  .tabrow .tabs { margin-bottom: 0; }
   .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; }
   .tabs button {
     font: inherit; font-size: 0.9rem; cursor: pointer;

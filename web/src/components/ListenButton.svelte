@@ -1,25 +1,15 @@
-<script module>
-  // Only one audio summary plays at a time across the whole app: a button about
-  // to play asks the previous one to stop. Module scope is shared by every
-  // ListenButton instance — news cards and paper cards alike — so no store is
-  // needed, and switching sections can't leave two clips overlapping.
-  let stopCurrent = null;
-
-  function claimPlayback(stop) {
-    if (stopCurrent && stopCurrent !== stop) stopCurrent();
-    stopCurrent = stop;
-  }
-
-  function releasePlayback(stop) {
-    if (stopCurrent === stop) stopCurrent = null;
-  }
-</script>
-
 <script>
   // Play button for a spoken summary hosted in Cloud Storage. Render it only
   // when `url` is non-empty — the caller decides, since an absent audio_url is
   // a normal state on docs written before the pipeline generated audio.
+  //
+  // Only one thing plays at a time across the whole app. That guard used to
+  // live in this file's `<script module>` block, back when a card was the only
+  // possible player; it now lives in lib/audio.svelte.js, which also arbitrates
+  // the queues behind "Listen All". Starting a card stops a running queue and
+  // vice versa — same slot, one owner.
   import { onDestroy } from "svelte";
+  import { claimPlayback, releasePlayback } from "../lib/audio.svelte.js";
 
   // `label` names the thing being read aloud; it only reaches screen readers.
   let { url, label = "" } = $props();

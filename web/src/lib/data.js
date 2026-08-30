@@ -30,8 +30,9 @@ export function getArchive() {
 }
 
 /** Most recent run_status doc, or null. */
-export function getStatus() {
-  return SOURCE === "firestore" ? firestoreStatus() : mockStatus();
+export async function getStatus() {
+  const doc = SOURCE === "firestore" ? await firestoreStatus() : await mockStatus();
+  return normalizeStatus(doc);
 }
 
 /**
@@ -243,6 +244,19 @@ function withPinnedLinks(docs) {
   return [...pinned, ...rest]
     .sort((a, b) => (b.processed_at ?? "").localeCompare(a.processed_at ?? ""))
     .map(normalizeArticle);
+}
+
+// The status doc was the one payload returned raw, which was fine while nothing
+// rendered its date: `run_date` arrives as a Firestore Timestamp in production
+// but as an ISO string from the fixtures, so anything formatting it would work
+// in dev and throw in prod. Coerce it the same way runs and articles are.
+function normalizeStatus(doc) {
+  if (!doc) return null;
+  return {
+    ...doc,
+    run_date: toDate(doc.run_date),
+    categories: doc.categories ?? {},
+  };
 }
 
 function normalizeRun(run) {

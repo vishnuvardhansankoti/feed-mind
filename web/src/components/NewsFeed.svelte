@@ -4,7 +4,9 @@
   // single `articles` list handed in by App (newest first).
   import { NEWS_CATEGORIES } from "../lib/constants.js";
   import ArticleCard from "./ArticleCard.svelte";
+  import ListenAllButton from "./ListenAllButton.svelte";
   import { isFollowed } from "../lib/follows.svelte.js";
+  import { tracksFrom } from "../lib/playlists.js";
 
   let { articles = [] } = $props();
 
@@ -40,6 +42,14 @@
 
   // Latest = just the newest day bucket; Archive = every bucket in the window.
   let shownDays = $derived(view === "latest" ? days.slice(0, 1) : days);
+
+  // Listen All plays exactly what is on screen: this category, this window,
+  // follow filters already applied, in display order. It is keyed by both tabs
+  // so switching either one gives the button a fresh queue identity rather than
+  // leaving it showing "Stop" for a queue built from the previous view.
+  let catLabel = $derived(NEWS_CATEGORIES.find((c) => c.code === cat)?.label ?? "");
+  let visible = $derived(shownDays.flatMap((g) => g.items));
+  let tracks = $derived(tracksFrom(visible, catLabel));
 </script>
 
 <div class="news">
@@ -52,12 +62,15 @@
     </button>
   </div>
 
-  <div class="cats" role="tablist" aria-label="News category">
-    {#each NEWS_CATEGORIES as c (c.code)}
-      <button role="tab" aria-selected={cat === c.code} class:active={cat === c.code} onclick={() => (cat = c.code)}>
-        {c.label}
-      </button>
-    {/each}
+  <div class="catrow">
+    <div class="cats" role="tablist" aria-label="News category">
+      {#each NEWS_CATEGORIES as c (c.code)}
+        <button role="tab" aria-selected={cat === c.code} class:active={cat === c.code} onclick={() => (cat = c.code)}>
+          {c.label}
+        </button>
+      {/each}
+    </div>
+    <ListenAllButton {tracks} id={`news:${cat}:${view}`} label="Listen All" />
   </div>
 
   {#if shownDays.length}
@@ -78,6 +91,13 @@
 
 <style>
   .news { display: flex; flex-direction: column; gap: 1rem; }
+  .catrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
   .subtabs, .cats { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .subtabs button, .cats button {
     font: inherit; cursor: pointer;
