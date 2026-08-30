@@ -40,9 +40,36 @@ export function paperTracks(byLens, { many = false } = {}) {
   });
 }
 
+/** The calendar day an article was ingested, matching NewsFeed's grouping. */
+function dayKey(article) {
+  const d = article?.processed_date;
+  return d instanceof Date && !isNaN(d) ? d.toDateString() : null;
+}
+
+/** The most recent ingest day among `items`, or null if none is parseable. */
+function newestDay(items) {
+  let best = null;
+  for (const a of items) {
+    const d = a?.processed_date;
+    if (d instanceof Date && !isNaN(d) && (!best || d > best)) best = d;
+  }
+  return best ? best.toDateString() : null;
+}
+
 /**
  * The Top Summaries queue: the first `per` playable items of every news
- * category, then of every paper lens.
+ * category *from the newest ingest day only*, then of every paper lens from the
+ * latest run only.
+ *
+ * The day anchor is the whole point. `articles` is the entire 7-day window, so
+ * filtering by category alone lets a category with fewer than `per` items today
+ * reach back into previous days to fill its quota — the queue then reads out
+ * archived material under a "today's top summaries" label. Papers never had
+ * this problem because `latest` is already one run per lens.
+ *
+ * The anchor is global rather than per-category, so nothing older than the most
+ * recent batch can play. A category with nothing in that batch contributes
+ * nothing, rather than falling back to whenever it last published.
  *
  * Note the order of operations — items are filtered for audio *before* being
  * capped, so a category whose newest article has no audio still contributes
@@ -61,9 +88,22 @@ export function topSummaryTracks({
 } = {}) {
   const tracks = [];
 
+  // Follows are applied before the anchor is chosen: a day the user has
+  // unfollowed into emptiness should not become the batch everyone is pinned to.
+  const followed = articles.filter((a) => a && isFollowed("news", a.feed_source));
+
+  // Anchor on the newest day that has something to *play*, not merely the
+  // newest day present. `withPinnedLinks` stamps the pinned GitHub Trending
+  // link with a fresh "now" every load, so the newest day is always today and
+  // often contains nothing but that link — which has no audio. Anchoring on it
+  // would empty the queue of news entirely on any day feed-mind did not run.
+  const day = newestDay(followed.filter((a) => a.audio_url));
+
   for (const c of NEWS_CATEGORIES) {
-    const inCat = articles.filter(
-      (a) => a?.feed_category === c.code && isFollowed("news", a?.feed_source),
+    const inCat = followed.filter(
+      // No parseable date anywhere means there is no notion of "latest" to
+      // anchor to; fall back to the whole list rather than an empty queue.
+      (a) => a.feed_category === c.code && (day === null || dayKey(a) === day),
     );
     tracks.push(...tracksFrom(inCat, c.label).slice(0, per));
   }
