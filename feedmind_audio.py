@@ -12,8 +12,11 @@ Two sources, selected with --process-doc:
 
 Both then follow the same tail:
 
-    text -> spaCy extractive filter -> LLM rewrite -> speech
+    text -> spaCy extractive filter -> LLM rewrite -> title prepended -> speech
          -> Cloud Storage -> Firestore (ai_summary, audio_url, audio_generated_at)
+
+The title is prepended for speech only (see speech_text); the summary stored in
+ai_summary stays free of it.
 
 Speech comes from one of two backends, chosen with --tts: pyttsx3 plus an
 ffmpeg transcode locally, or the Google Text-to-Speech API when deployed.
@@ -101,6 +104,11 @@ AUDIO_GENERATED_AT_FIELD = "audio_generated_at"
 
 # Written by an earlier version of this script; migrated into AI_SUMMARY_FIELD.
 LEGACY_SUMMARY_FIELD = "audio_summary"
+
+# Stand-in for a document with no usable title. It is a progress-log label, not
+# something to speak: speech_text() drops it rather than opening a clip by
+# announcing "untitled".
+UNTITLED = "(untitled)"
 
 EXIT_OK = 0
 EXIT_NO_ITEMS = 1
@@ -197,7 +205,7 @@ def collect_articles(db, args):
         items.append(
             Item(
                 item_id=article_id,
-                title=doc.get("title") or "(untitled)",
+                title=doc.get("title") or UNTITLED,
                 blob=f"{processed_date(doc) or day}/{article_id}.mp3",
                 record=record_article(snapshot, LEGACY_SUMMARY_FIELD in doc),
                 url=doc.get("url") or "",
@@ -278,7 +286,7 @@ def collect_papers(db, args):
             items.append(
                 Item(
                     item_id=arxiv_id,
-                    title=paper.get("title") or "(untitled)",
+                    title=paper.get("title") or UNTITLED,
                     blob=f"{PAPERS_PREFIX}/{day}/{name}/{arxiv_id}.mp3",
                     record=record_paper(db, snapshot.reference, arxiv_id),
                     text=(paper.get("abstract") or "").strip(),
@@ -329,6 +337,47 @@ def build_summary(text, settings, options, config):
         prompt=options.get("prompt") or ws_config.CONDENSE_PROMPT,
         max_input_chars=ws_config.max_input_chars_for(config),
     )
+
+
+# Punctuation that already ends a sentence, so the engine pauses on its own.
+SENTENCE_ENDINGS = ".!?"
+# Trailing punctuation that reads as a run-on when a new sentence follows it.
+DANGLING_PUNCTUATION = " \t:;,-–—"
+
+
+def speech_text(title, summary):
+    """What the clip actually says: the item's title, then its summary.
+
+    The summaries are 2–3 sentences with no lead-in — CONDENSE_PROMPT forbids
+    one — which is fine on a card next to its heading, but leaves a "Listen All"
+    queue as a run of anonymous clips with no way to tell what any of them is
+    about.
+
+    Spoken, never stored: process() still records the bare `summary`, so the
+    card's "AI summary" disclosure does not repeat the heading directly above
+    it.
+
+    Cloud TTS is given plain text rather than SSML (see cloud_speech.py), so the
+    pause between the two comes from punctuation alone — hence the terminator.
+    """
+    title = (title or "").strip()
+    summary = (summary or "").strip()
+
+    # UNTITLED is a log label; announcing "untitled" is worse than saying nothing.
+    if not title or title == UNTITLED:
+        return summary
+    if not summary:
+        return title
+
+    # "Scaling laws:" or "A study -" would run straight into the summary.
+    title = title.rstrip(DANGLING_PUNCTUATION)
+    if not title:
+        return summary
+    # A title already ending in "?" or "!" keeps it, rather than collecting a
+    # second terminator ("...at scale?." reads as a stumble).
+    if title[-1] not in SENTENCE_ENDINGS:
+        title += "."
+    return f"{title} {summary}"
 
 
 def source_text(item, args):
@@ -411,7 +460,9 @@ def process(item, context):
         raise PipelineError("the model returned an empty summary")
 
     with tempfile.TemporaryDirectory(prefix="feedmind-audio-") as tmp:
-        mp3 = synthesize(summary, Path(tmp), args, context["ffmpeg"])
+        # Spoken text carries the title; the stored summary below does not.
+        mp3 = synthesize(speech_text(item.title, summary), Path(tmp), args,
+                         context["ffmpeg"])
         size_kb = mp3.stat().st_size / 1024
 
         if args.dry_run:
