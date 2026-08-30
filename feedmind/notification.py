@@ -141,3 +141,16 @@ def send_message(
     finally:
         # Always sleep to respect rate limits, even on failure
         time.sleep(config.TELEGRAM_MESSAGE_DELAY_S)
+
+
+def send_plain_message(telegram_token: str, chat_id: str, text: str) -> bool:
+    """
+    Send `text` literally, escaping every MarkdownV2 metacharacter first.
+
+    `send_message` takes pre-formatted MarkdownV2 and trusts the caller to have
+    escaped it. Machine-generated bodies — run reports, exception strings —
+    contain arbitrary punctuation that Telegram rejects with a 400, so they go
+    through here instead. Used by the archive run report, where the message that
+    matters most is the one carrying an error.
+    """
+    return send_message(telegram_token, chat_id, _escape_md(text))

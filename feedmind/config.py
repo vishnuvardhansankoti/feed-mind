@@ -158,6 +158,12 @@ FIRESTORE_DATABASE = "feed-mind-db"  # Use "(default)" if you didn't name your d
 FIRESTORE_COLLECTION = "processed_articles"
 FIRESTORE_YOUTUBE_COLLECTION = "youtube_videos"
 
+# Written by the sibling paper-prism repo, not by this one — read-only here, and
+# only by the archiver. Each doc holds a `papers` array and carries a 45-day TTL
+# on `expire_at` (note: not `expires_at`, which is what this repo's own
+# collections use).
+FIRESTORE_RUNS_COLLECTION = "runs"
+
 # ---------------------------------------------------------------------------
 # Pub/Sub — telling downstream consumers a run has finished
 # ---------------------------------------------------------------------------
@@ -171,6 +177,40 @@ CONTENT_READY_TOPIC = "feedmind-content-ready"
 # Which of the consumer's two pipelines to run. The papers pipeline is fed by
 # paper-prism, not by this service.
 CONTENT_READY_PROCESS_DOC = "RSS_FEED"
+
+# ---------------------------------------------------------------------------
+# BigQuery archive
+# ---------------------------------------------------------------------------
+# The Firestore collections above are all on TTLs (90 days for this repo's, 45
+# for paper-prism's `runs`), so anything not copied out is deleted for good.
+# The `feedmind-archive` function copies every live document into BigQuery on
+# the 1st and 16th of each month. See docs/bigquery-archival-plan.md.
+BQ_DATASET = "feedmind_archive"
+BQ_LOCATION = "US"
+
+# --- Free-tier guardrails --------------------------------------------------
+# BigQuery's always-free tier is 1 TiB of query processing and 10 GiB of
+# storage per month. Batch loads are free; streaming inserts are not. The
+# archive sits far inside all of that, and these two limits are what make that
+# a guarantee rather than an expectation.
+
+# Refuse any query that would scan more than this. BigQuery rejects the job
+# *before* running it, so a runaway MERGE fails loudly in the Telegram report
+# instead of quietly billing. Sized for ~50x the current archive: normal growth
+# (roughly 200 MB/year, and the MERGE scans the whole target each run) will not
+# reach it for decades, so tripping this means a bug, not success.
+BQ_MAX_BYTES_BILLED = 10 * 1024**3  # 10 GiB
+
+# Report storage against the 10 GiB free tier, and start saying so out loud at
+# 80%. Storage is the only limit here that grows monotonically — queries and
+# loads reset monthly, bytes kept do not.
+BQ_FREE_STORAGE_BYTES = 10 * 1024**3
+BQ_STORAGE_WARN_BYTES = 8 * 1024**3
+
+# One line per run to Telegram. This is not decoration: with a 16-day cadence
+# against a 45-day TTL it is the only thing standing between a silently broken
+# run and permanent data loss.
+ENABLE_ARCHIVE_TELEGRAM_REPORT = True
 
 # ---------------------------------------------------------------------------
 # Runtime

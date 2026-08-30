@@ -34,6 +34,13 @@ def mark_as_delivered(db: firestore.Client, article: Article, summary: str = "")
     the one-sentence summary already generated for the Telegram message; it is
     persisted so the paper-prism web app can render it (docs written before this
     field existed simply lack it, and the reader degrades gracefully).
+
+    `snippet` is the article text already fetched for summarization. Nothing in
+    this pipeline reads it back — it is persisted so the eventual BigQuery
+    archive has real prose rather than titles and one-liners. A doc can only
+    ever be archived with what was written here, and the 90-day TTL means
+    anything not captured now is unrecoverable. See
+    docs/bigquery-archival-plan.md.
     """
     now = datetime.now(UTC)
     doc_ref = db.collection(config.FIRESTORE_COLLECTION).document(article.article_id)
@@ -42,6 +49,7 @@ def mark_as_delivered(db: firestore.Client, article: Article, summary: str = "")
             "article_id": article.article_id,
             "url": article.url,
             "title": article.title,
+            "snippet": article.snippet,
             "feed_source": article.feed_source,
             "feed_category": article.feed_category,
             "summary": summary,
