@@ -13,6 +13,11 @@
 
 set -euo pipefail
 
+# Run from this service's directory whatever the caller's cwd. Both function
+# deploys below pass `--source="."`, which must mean services/feed-mind/ and not
+# the monorepo root.
+cd "$(dirname "$0")"
+
 # ---------------------------------------------------------------------------
 # Configuration — update these before running
 # ---------------------------------------------------------------------------
@@ -33,7 +38,7 @@ SCHEDULER_TIMEZONE="America/Chicago"       # TODO: update to your timezone
 # Archive function — Firestore -> BigQuery. Deployed from the same source with a
 # different entry point. The 1st/16th cadence is a 16-day maximum gap, chosen
 # against paper-prism's 45-day `runs` TTL so a completely missed run still has
-# ~29 days of margin. See docs/bigquery-archival-plan.md.
+# ~29 days of margin. See docs/feed-mind/bigquery-archival-plan.md.
 ARCHIVE_FUNCTION_NAME="feedmind-archive"
 ARCHIVE_ENTRY_POINT="archive"
 ARCHIVE_TIMEOUT="900s"                     # full scan of every live doc; well clear of a hard kill
@@ -239,4 +244,4 @@ echo "⚠️  Two free-tier guards are NOT scripted (they need your billing acco
 echo "   1. Billing budget alert  — Billing > Budgets & alerts, \$1 with 50/90/100% triggers"
 echo "   2. BigQuery query quota  — IAM & Admin > Quotas > 'Query usage per day'"
 echo "   The archiver caps its own queries; these cap YOUR ad-hoc ones."
-echo "   See docs/bigquery-archival-plan.md section 7.1"
+echo "   See docs/feed-mind/bigquery-archival-plan.md section 7.1"
