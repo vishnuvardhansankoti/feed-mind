@@ -1,4 +1,4 @@
-# misc-scripts
+# services/summarizer
 
 Two command-line tools built on one library:
 
@@ -268,7 +268,7 @@ One topic carries both pipelines; the message says which.
 
 An empty message means the default: the latest RSS batch. Each producer publishes only after its own writes have landed — this function reads those collections, so announcing earlier would race it — and only when there is something new: FeedMind skips when no articles were delivered, paper-prism when no papers were written or the run wasn't writing to Firestore. Both swallow publish failures rather than failing a run that already did its work.
 
-The topic and both `pubsub.publisher` grants live in this repo's `deploy/setup.sh` — the topic belongs to whoever reads it — so run that before either producer's first publish.
+The topic and both `pubsub.publisher` grants live in this service's `deploy/setup.sh` — the topic belongs to whoever reads it — so run that before either producer's first publish.
 
 **Before the first deploy**, create the LLM API key secret — it is the one thing the scripts won't invent for you. Get a key from <https://ollama.com/settings/keys>, then:
 

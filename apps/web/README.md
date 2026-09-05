@@ -1,21 +1,22 @@
-# paper-prism — web (P3)
+# apps/web
 
 Lightweight **Svelte SPA** that reads **directly from Firestore** (Path A — no
 backend API). Three sections behind a hash router, each with Latest + Archive
 sub-tabs, plus a per-lens freshness badge from `run_status` and graceful
-missing-field / empty-window states throughout. See PRD §3.5 / §4.
+missing-field / empty-window states throughout. See `../../docs/paper-prism/paper-prism-prd.md` §3.5 / §4.
 
 | Section | Route | Collection | Written by |
 |---|---|---|---|
-| News | `#/` (landing) | `processed_articles` | sibling `feed-mind` repo |
-| Papers | `#/papers` | `runs`, `run_status` | this repo's `pipeline/` |
-| Videos | `#/videos` | `youtube_videos` | sibling `feed-mind` repo |
+| News | `#/` (landing) | `processed_articles` | `services/feed-mind` |
+| Papers | `#/papers` | `runs`, `run_status` | `services/paper-prism` |
+| Videos | `#/videos` | `youtube_videos` | `services/feed-mind` |
 
 Every optional field degrades to "control not rendered" rather than an error —
 paper `summary`/`abstract`/`ai_summary`/`audio_url`, article
 `summary`/`ai_summary`/`audio_url`. This
-matters because two of the three collections are written by another repo, so
-the reader routinely meets documents older than the field it wants.
+matters because two of the three collections are written by a different
+component, and `ai_summary`/`audio_url` by a third, so the reader routinely
+meets documents older than the field it wants.
 
 ## Run locally (mock data, no cloud)
 

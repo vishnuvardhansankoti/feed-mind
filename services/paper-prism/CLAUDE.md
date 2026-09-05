@@ -1,22 +1,26 @@
-# CLAUDE.md
+# services/paper-prism
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for working inside this service. The system-level view — the four
+deployables, the shared Firestore database, the Pub/Sub handoff and the
+cross-component schema contracts — is in the **root `CLAUDE.md`**; read that
+first if you are changing anything another component reads.
 
-## What this is
+## What this service is
 
-paper-prism is a **$0, zero-ops personalized weekly arXiv digest**. A scheduled batch job fetches the last 7 days of preprints across three research "lenses", ranks each against a personal interest profile using local ONNX embeddings, summarizes the top papers with Gemini, and writes results to Firestore. A Svelte SPA reads Firestore **directly from the browser** — there is no backend API and no request-path compute.
+The Python batch job behind the **Papers** section: a $0, zero-ops personalized
+weekly arXiv digest. It fetches the last 7 days of preprints across three
+research "lenses", ranks each against a personal interest profile using local
+ONNX embeddings, summarizes the top papers with Gemini, and writes results to
+Firestore. It has no request path — it is a Cloud Run Job that runs to
+completion on a schedule.
 
-Design source of truth: `docs/paper-prism-prd.md` (the code comments reference its sections, e.g. "PRD §3.2").
+Design source of truth: `../../docs/paper-prism/paper-prism-prd.md` (code
+comments reference its sections, e.g. "PRD §3.2").
 
-## Three components, one data contract
-
-The repo is three loosely-coupled parts joined only by the Firestore document schema in `pipeline/src/paper_prism/models.py`:
-
-- **`pipeline/`** — Python batch job (P1/P2). arXiv → ONNX embed → cosine top-k → Gemini summary → Firestore.
-- **`web/`** — Svelte 5 + Vite SPA (P3). Reads `runs` / `run_status` collections directly via the Firebase client SDK.
-- **`infra/`** — Terraform for the whole GCP stack (P4). `pipeline/deploy/*.sh` is a **parallel** imperative `gcloud` path that provisions the *same* resources — pick one as source of truth; running both double-creates.
-
-If you change the document shape in `models.py`, you must update the reader in `web/src/lib/data.js` (`normalizeRun` / query field names) in lockstep — they are only coupled by convention, not types.
+The reader for what this writes is `apps/web`; the document schema in
+`src/paper_prism/models.py` is the only thing joining them. Change the doc shape
+here and you must update `apps/web/src/lib/data.js` (`normalizeRun`, query field
+names) in the same commit — they are coupled by convention, not by types.
 
 ## Pipeline architecture
 
@@ -32,89 +36,62 @@ Entrypoint `pipeline/src/paper_prism/__main__.py` wires config → clients → `
 
 Everything is env-driven via `config.py` (`load_config()`); there are no CLI flags.
 
-## Web architecture
+## Deployment: two parallel paths
 
-`web/src/lib/data.js` is a data-source abstraction exposing `getLatest()`, `getArchive()`, `getStatus()`. `VITE_DATA_SOURCE` selects the backend:
-
-- `mock` (default) — bundled JSON fixtures under `web/public/fixtures/`, so the UI runs with zero cloud setup.
-- `firestore` — reads Firestore directly from the browser. The Firebase SDK is loaded via **dynamic import**, so `mock` builds don't ship it.
-
-Both backends return identical shapes. Firestore read access is public and governed by `firestore.rules` (public read, `write: if false` — the pipeline writes server-side via a service account that bypasses rules). The Latest/Archive queries need the composite index in `firestore.indexes.json` (mirrored in `infra/main.tf`).
-
-**Named database coupling:** `VITE_FIRESTORE_DATABASE` selects a non-default Firestore database and is passed to `getFirestore(app, id)` (unset → `(default)`). It **must match the pipeline's `FIRESTORE_DATABASE`** (default `feed-mind-db`) — the browser reads Firestore directly, so a mismatch silently reads an empty `(default)`. `VITE_*` values are inlined at build time, so changing the database requires a rebuild. Collections `runs`/`run_status` are never created explicitly; they appear on the pipeline's first write. On the gcloud path, `pipeline/deploy/01b-setup-firestore-db.sh` provisions the named database (create + TTL + `runs` index).
-
-**`firebase.json` must target the named database too.** The `firestore` block sets `"database": "feed-mind-db"`. Without it the Firebase CLI deploys rules/indexes to `(default)` — and will *create* an empty `(default)` database — while the app and pipeline use `feed-mind-db`, so `firestore.rules` (incl. the `processed_articles` public-read rule) silently never reaches the database the browser reads. There are **two build/deploy footguns to keep paired here:** (1) always ship a **firestore** build to production — a mock build has the fixtures inlined and never touches Firestore, so deploying that `dist/` serves placeholder data; (2) keep `firebase.json`'s `database` pinned so `firebase deploy` hits `feed-mind-db`, not `(default)`.
-
-**Env precedence & the prod build (subtle).** `.env` holds the firestore defaults + real (public) Firebase keys, but `.env.local` (gitignored) forces `VITE_DATA_SOURCE=mock` with *empty* keys for local `npm run dev`. Vite loads `.env.local` in **every** mode, above `.env` — so a plain `vite build` bakes **mock**. Production therefore builds with `vite build --mode prod` (the `build` script does this), which loads `.env.prod` (gitignored) *after* `.env.local`, flipping the source back to `firestore` and restoring the real keys. `.env.prod` **must** carry the real `VITE_FIREBASE_*` values, because `.env.local`'s empty ones would otherwise clobber `.env`. Net rule: `npm run build` = firestore/prod; `npm run dev` = mock; to force a mock QA build, prefix `VITE_DATA_SOURCE=mock` (a shell env var beats all `.env*` files).
-
-### News feed (second data source: the `feed-mind` repo)
-
-The web app is a two-section SPA behind a minimal hash router in `App.svelte`: **Papers** (`#/`, the arXiv digest above) and **News** (`#/news`). The News section reads a **different collection written by a different repo** — `processed_articles` in the *same* `feed-mind-db` database, produced by the sibling `feed-mind` RSS→Telegram pipeline (`../feed-mind`). paper-prism's pipeline does not write it.
-
-- **Schema coupling (cross-repo):** `getNews()` in `data.js` and `ArticleCard.svelte` depend on the doc shape written by `feed-mind/feedmind/deduplication.py::mark_as_delivered` (`title`, `url`, `feed_source`, `feed_category`, `summary`, `ai_summary`, `audio_url`, `processed_at`, `published_at`). This is the same convention-only coupling as `models.py ↔ data.js`, but it spans repos — change one side and the other silently breaks. Notably, `summary` was **added** to feed-mind for this feature; docs written before that lack it and the card degrades to no-summary.
-- **Audio + AI summary:** `ai_summary` (a longer LLM summary, shown behind an "AI summary" disclosure) and `audio_url` (a Cloud Storage object holding its spoken version, played by the card's Listen button) are written for every category **except `open-source`** — those are the client-pinned static links, which have no pipeline-generated content at all. Both fields are optional everywhere: `normalizeArticle` defaults them to `""` and the card hides the control, so pre-existing docs degrade rather than break. `publicAudioUrl` in `data.js` accepts either an `https://` URL or a `gs://` URI (rewritten to `storage.googleapis.com`) and rejects anything else, so the bucket **must be public-read** — the browser fetches the object directly with no signed URL and no backend.
-- **The same pair on papers:** `runs` docs carry `ai_summary` / `audio_url` (plus `audio_generated_at`) **per-paper inside the `papers` array**, not on the run doc — written by whatever generates the audio, *not* by `pipeline/src/paper_prism/models.py`, whose `Paper.to_dict()` still omits them. `normalizePaper` in `data.js` defaults them exactly as `normalizeArticle` does, and `PaperCard` renders an "AI summary" disclosure above the existing "Abstract" one. Runs written before the feature have neither field on any paper, so the Papers *Archive* view routinely mixes cards with and without the controls — that mix is the intended degraded state, not a bug. Both cards share `ListenButton.svelte`, whose module scope makes **one clip play at a time across the whole app**.
-- **Categories** come from `feed_category` ∈ `{academic, industry, cloud, open-source, top_stories}`, listed data-driven in `constants.js::NEWS_CATEGORIES` (rendered as tabs). Adding a category is one entry there — the tab strip, filtering and both views are derived from it — but the `code` **must match feed-mind's `RSS_FEEDS` category string exactly**, and those strings are not internally consistent (`open-source` hyphenates, `top_stories` underscores). The reader matches with `===`, so a "tidied" separator empties the tab silently, with no error on either side; `constants.test.js` pins both spellings. Order is tab order and `NEWS_CATEGORIES[0]` is the tab that opens by default, so append rather than prepend. `open-source` has **no RSS source** — its content is the evergreen `GitHub Trending` link, **pinned client-side** via `constants.js::STATIC_NEWS_LINKS`. `getNews()` (`withPinnedLinks`) stamps each pinned link with a fresh "now" timestamp so it always appears in today's *Latest*, and dedupes by `article_id`, so the pipeline must **not** also persist static links (feed-mind's `mark_as_delivered` loop deliberately skips `static_*` ids). Pinning in the reader guarantees the link shows every day regardless of whether feed-mind ran.
-- **Recency is `processed_at`, not `published_at`** (`published_at` is an inconsistent per-feed string; `processed_at` is a uniform UTC ISO string). One query — `where processed_at >= now-7d, orderBy processed_at desc, limit ~200` — backs both News views: **Latest** = newest day-group (derived client-side), **Archive** = the whole 7-day window grouped by day. Single-field inequality+orderBy needs **no composite index**.
-- **Rules:** `firestore.rules` adds `processed_articles` as public-read / `write: if false`. feed-mind writes via the Admin SDK (bypasses rules) and does **not** manage rules, so paper-prism solely owns them on `feed-mind-db`.
-- **Mock parity:** `web/public/fixtures/news.json` backs `VITE_DATA_SOURCE=mock`. The mock path deliberately skips the 7-day cutoff (a static fixture would otherwise age out and render empty).
-
-### Videos (third section, also from `feed-mind`)
-
-`#/videos` reads `youtube_videos` in `feed-mind-db`, written by `feed-mind/feedmind/deduplication.py::save_video` (`video_id`, `url`, `title`, `channel`, `thumbnail_url`, `published_at`, `processed_at`) — same convention-only, cross-repo coupling as `processed_articles`. One query backs both tabs (`VIDEO_WINDOW_DAYS` = 3, `VIDEO_MAX_ITEMS` = 200).
-
-**Latest is an ingest batch, not a time window — this is the whole design.** feed-mind writes a video once, on first sight, stamping `processed_at` with that run's `now`; the doc id is the video id, so re-runs never restamp. `lib/videos.js::latestBatch` anchors to the **newest `processed_at` present in the data** and keeps everything within `VIDEO_BATCH_TOLERANCE_HOURS` (6) of it. Any clock-relative rule (the two earlier ones: newest calendar day, then rolling 24h) makes the tab **shrink through the day** as videos age past the cutoff with no new run — the failure this design exists to prevent, pinned by tests in `videos.test.js` and `VideoFeed.test.js` that advance the clock and assert the count holds. For the same reason the Firestore query windows on `processed_at`, not `published_at`: a batch then ages out of the 3-day window all at once instead of one video at a time. Display order is still `published_at` desc (`byPublishedDesc` re-sorts, since `processed_at` is uniform within a batch), and Archive buckets by publish day.
-
-Videos with no parseable `processed_at` can't be placed in a batch, so Latest omits them and says so; Archive still lists them under a `—` header. Both `VideoFeed` and `VideoCard` must guard dates with `isDate`, never truthiness — an Invalid Date is truthy and `Intl.DateTimeFormat` throws on it, taking down the whole feed render.
-
-### Sign-in and per-user data (the one write path)
-
-Optional Google sign-in adds a personal layer on top of the public site. **It is purely additive: signed out, the app is exactly what it was** — same content, same queries, no gating. There is **no backend, no API and no cloud function**: Firebase Auth is hosted, and `firestore.rules` does the authorization server-side, so the "no request-path compute" contract is intact. Deploying it needs only a web build + `firebase deploy --only firestore:rules`.
-
-- **`users/{uid}` is the only collection the browser may write**, and the only one that isn't public. Everything for one user is on that single document: `bookmarks` (array) and `unfollowed` (map). `lib/prefs.js` owns it; both writes use `merge: true` so the two fields never clobber each other.
-- **The allowlist lives in `firestore.rules` and nowhere else.** Anyone with a Google account can *authenticate* — only listed, `email_verified` addresses can read or write anything. The client never carries a copy (that would ship real emails in a public bundle and create two lists that drift); it **probes** instead, reading its own doc and treating `permission-denied` as "not allowed" (`prefs.js::probeAccess`). Only `permission-denied` rejects — offline/transient errors fail *open*, because signing someone out over a network blip is worse, and the rules still reject the writes anyway. **Adding a person = edit the rules and redeploy them.**
-- **Four session states, not two** (`lib/session.svelte.js`): `loading` / `out` / `in` / `rejected`. `rejected` exists because "signed in" and "allowed" are different questions — a non-allowlisted visitor is signed straight back out with an explanation rather than left in a logged-in UI whose every write fails.
-- **`lib/auth.js` mirrors `data.js`'s two-backend split** on the same `VITE_DATA_SOURCE`. This is not a convenience: `npm run dev` forces mock with *empty* Firebase keys, so without the fake user the entire signed-in half of the UI would be unreachable outside production, and component tests would need a real project. `firebase/auth` stays behind a dynamic import — **mock builds must never contain the auth SDK** (grep a mock `dist/` for `signInWithPopup` to check). `lib/firebase.js` owns the shared `initializeApp` *and* `firestoreDb()`, because `initializeApp` throws on a second call and a duplicated named-database choice silently reads an empty `(default)`.
-- **Bookmarks store a snapshot, not a reference** (`prefs.js::snapshotOf`). Every source collection is on a TTL (runs 45 days, articles/videos 90) and **papers aren't documents at all** — they live inside a run doc's `papers` array, so there is nothing to point at. A saved item therefore carries its own render payload, whitelisted per type (an abstract would bloat every doc) with every value coerced to a string (Firestore rejects `undefined`). The tradeoff: a snapshot never updates.
-- **`BOOKMARK_LIMIT` (5) and the single-document shape imply each other.** Rules can check `size()` on a list but cannot count documents in a subcollection, so the cap is only enforceable because the bookmarks are an array on `users/{uid}`. **Raising it means changing `constants.js` *and* `firestore.rules`.** At the cap a save is **refused, never evicted** — silently deleting something the user chose to keep is worse than refusing, so the star points at `#/saved` to free a slot.
-- **Follow/unfollow stores what's switched OFF** (`unfollowed`), not what's on. The source catalog isn't ours — it's `feed-mind/feedmind/config.py`, in another repo, and it grows. A stored "followed" list would silently hide every newly added feed from existing users, with no migration step available in a client-only app. Storing exclusions means absence = followed, so new sources appear automatically and an unloaded/failed/signed-out state shows everything. The settings sheet derives its catalog from the loaded documents for the same reason — a hardcoded copy would drift.
-- **The channel filter runs *before* `latestBatch()`** in `VideoFeed`. Filtering afterwards could empty Latest entirely while an older batch sat visible in Archive; upstream, unfollowing the channel that owns the newest batch correctly falls through to the next one.
-- **One-time console setup:** enable the Google provider, and add every serving domain under Authentication → Settings → Authorized domains, or the popup fails silently. `VITE_FIREBASE_AUTH_DOMAIN` is only needed for a *custom* auth domain — it defaults to `<projectId>.firebaseapp.com`.
-- **Not covered by tests:** the Firestore backends of `auth.js`/`prefs.js` and the rules themselves. The suite exercises the mock path only; there is no Firestore emulator configured, so "the rules accept five bookmarks and reject six" is verified by reading, not by running.
+`../../infra/terraform/` and `deploy/*.sh` provision the **same** resources by
+different means — pick one as source of truth; running both double-creates.
+This was true before the monorepo and is still unresolved.
 
 ## Common commands
 
-**Pipeline (local, runs against live arXiv):**
+Run from `services/paper-prism/`.
+
+**Local run** (against live arXiv):
 ```bash
-cd pipeline
-python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+uv sync --extra dev
 cp .env.example .env            # edit the three PROFILE_* paragraphs — these ARE the product
-PYTHONPATH=src .venv/bin/python -m paper_prism
+PYTHONPATH=src uv run python -m paper_prism
 ```
-No `GEMINI_API_KEY` → summaries written as `null` (pipeline still runs). `SINK=local` (default) → JSON under `./output/`. First run downloads ~90 MB of ONNX weights (cached by `huggingface_hub`).
+No `GEMINI_API_KEY` → summaries written as `null` (the run still completes).
+`SINK=local` (default) → JSON under `./output/`. First run downloads ~90 MB of
+ONNX weights (cached by `huggingface_hub`).
 
-**Web (local, mock data):**
+**Tests:**
 ```bash
-cd web
-npm install
-npm run dev            # http://localhost:5173
-npm run build          # -> dist/
+uv run --extra dev pytest        # pythonpath=src comes from pyproject.toml
 ```
 
-**Infra (Terraform):**
+**Lint** (config is the repo-root `ruff.toml`):
 ```bash
-cd infra
-cp terraform.tfvars.example terraform.tfvars   # fill in
-export TF_VAR_gemini_api_key=...
-terraform init && terraform validate && terraform apply
+uvx ruff check .
 ```
 
-**Deploy via gcloud scripts** (alternative to Terraform): `pipeline/deploy/00-config.sh` (sourced by the rest) → `01-setup.sh` (APIs, Firestore, TTL, SAs, secret) → `02-build-push.sh` → `03-deploy-job.sh` (needs `env.yaml`, copied from `env.yaml.example`) → `04-scheduler.sh`. All idempotent; require `PROJECT_ID` exported.
+**Deploy via gcloud scripts:** `deploy/00-config.sh` (sourced by the rest) →
+`01-setup.sh` (APIs, Firestore, TTL, SAs, secret) → `01b-setup-firestore-db.sh`
+→ `02-build-push.sh` → `03-deploy-job.sh` (needs `deploy/env.yaml`, copied from
+`env.yaml.example`) → `04-scheduler.sh`. All idempotent; all require
+`PROJECT_ID` exported. Each one `cd`s to its own directory, so they can be run
+from anywhere.
 
-**Web tests:** `cd web && npm test` (vitest; jsdom + `@testing-library/svelte` for components). The **pipeline has no test suite, and no linter is configured anywhere** — validate the pipeline by running it locally and inspecting `./output/`.
+**Deploy via Terraform:** see `../../infra/terraform/README.md`.
+
+## Dependencies
+
+`requirements.txt` is **generated** from `pyproject.toml` (`../../scripts/lock-all.sh`)
+and `uv.lock` is committed. The Dockerfile installs from `requirements.txt`.
+This is an independent uv project, not a workspace member — see the root
+`CLAUDE.md` for why the three services do not share a resolution.
 
 ## Conventions worth matching
 
-- The interest **profile paragraphs** (`PROFILE_AIML` / `PROFILE_NLP` / `PROFILE_CV`) drive all ranking quality. `config.py` warns loudly if the placeholder examples are used verbatim — real profiles must be authored deliberately.
-- Env config is the only knob surface: `WINDOW_DAYS`, `TOP_K`, `RETENTION_DAYS`, `ARXIV_*` tuning, `SINK`, `GEMINI_*`, `FIRESTORE_DATABASE`, `CONTENT_READY_TOPIC`. Add new tunables in `config.py`, wire them into `infra/run.tf` (`job_env`) and `pipeline/deploy/env.yaml.example` so all three deploy paths stay in sync. A tunable that also affects the web reader (like `FIRESTORE_DATABASE` ↔ `VITE_FIRESTORE_DATABASE`) must be mirrored in `web/.env*` too.
-- Markdown files are gitignored except `docs/paper-prism-prd.md` and this `CLAUDE.md` (see `.gitignore`) — other `.md` docs are kept local-only.
+- The interest **profile paragraphs** (`PROFILE_AIML` / `PROFILE_NLP` /
+  `PROFILE_CV`) drive all ranking quality. `config.py` warns loudly if the
+  placeholder examples are used verbatim — real profiles must be authored
+  deliberately.
+- Env config is the only knob surface: `WINDOW_DAYS`, `TOP_K`, `RETENTION_DAYS`,
+  `ARXIV_*`, `SINK`, `GEMINI_*`, `FIRESTORE_DATABASE`, `CONTENT_READY_TOPIC`.
+  Add new tunables in `config.py`, then wire them into
+  `../../infra/terraform/run.tf` (`job_env`) **and** `deploy/env.yaml.example`
+  so both deploy paths stay in sync. A tunable that also affects the web reader
+  (like `FIRESTORE_DATABASE` ↔ `VITE_FIRESTORE_DATABASE`) must be mirrored in
+  `apps/web/.env*` too.
