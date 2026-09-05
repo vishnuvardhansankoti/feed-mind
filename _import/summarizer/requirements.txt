@@ -1,0 +1,22 @@
+# Dependencies of the deployed Cloud Function. Versions are the ones the local
+# .venv was built and tested against.
+#
+# Deliberately absent: pyttsx3 and ffmpeg. The runtime has no speech engine and
+# no way to install one, which is why webscraper/cloud_speech.py exists and why
+# the function sets FEEDMIND_TTS=cloud.
+
+functions-framework==3.*
+
+google-cloud-firestore==2.28.1
+google-cloud-storage==3.13.1
+google-cloud-texttospeech==2.*
+
+spacy==3.8.15
+
+# The spaCy pipeline itself is not on PyPI, so it is installed from its release
+# URL. It must match the spacy version above - 3.8.0 targets spaCy 3.8.x.
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+
+# Web Push sender (feedmind_push.py). Absent locally is fine: notify()
+# logs and returns rather than failing the batch.
+pywebpush==2.0.3
