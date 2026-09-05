@@ -1,0 +1,47 @@
+name: Deploy summarizer (AI summaries + audio)
+
+# Manual only — never triggers automatically. Run it from the Actions tab
+# ("Run workflow"). Deploys feedmind-audio, the Pub/Sub-triggered gen2 function
+# that writes ai_summary/audio_url onto documents the other two services create.
+#
+# Wraps services/summarizer/deploy/deploy.sh so that script stays the single
+# source of truth for the function's configuration.
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "GCP region"
+        required: false
+        default: us-central1
+
+concurrency:
+  group: deploy-summarizer
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ inputs.region }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same GCP_SA_KEY as the paper-prism and web workflows. On top of the roles
+      # those need, this one requires cloudfunctions.developer, run.admin (a gen2
+      # function is a Cloud Run service), pubsub.editor and
+      # iam.serviceAccountUser to act as the runtime and Eventarc trigger SAs.
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # deploy.sh prompts before deleting a function that still has an HTTP
+      # trigger — a one-time migration that is long done. </dev/null makes that
+      # read fail closed (the script aborts) instead of hanging the job forever.
+      - name: Deploy Cloud Function
+        run: services/summarizer/deploy/deploy.sh </dev/null

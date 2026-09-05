@@ -1,0 +1,31 @@
+{
+  "id": "2026-08-13_AIML",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "AIML",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "Can Bayesian Optimization Efficiently Find a Strong Single Expert in Neural Thickets?",
+      "arxiv_id": "2608.10867",
+      "url": "http://arxiv.org/abs/2608.10867v1",
+      "score": 0.5052,
+      "summary": null
+    },
+    {
+      "rank": 2,
+      "title": "Matryoshka Language Model Suites",
+      "arxiv_id": "2608.09703",
+      "url": "http://arxiv.org/abs/2608.09703v1",
+      "score": 0.4851,
+      "summary": null
+    },
+    {
+      "rank": 3,
+      "title": "Renormalising Generative Models for Active Inference: Foundations, Derivations, and Verification",
+      "arxiv_id": "2608.09512",
+      "url": "http://arxiv.org/abs/2608.09512v1",
+      "score": 0.4761,
+      "summary": null
+    }
+  ]
+}

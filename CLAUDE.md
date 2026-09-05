@@ -1,174 +1,162 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) working in this repository.
 
-## What this project is
+This is the **system-level** file: what the components are, what they share, and
+what breaks when you change one without the others. Each component has its own
+`CLAUDE.md` with the detail — read the nearest one for the code you are touching:
 
-FeedMind is a serverless RSS-to-Telegram pipeline deployed as a GCP Cloud Function (Gen 2). It runs daily via Cloud Scheduler: fetches 13 RSS feeds, deduplicates against Firestore, summarizes new articles, and pushes **batched Telegram messages grouped by category** (Academic / Industry / Cloud). The whole stack fits within GCP free-tier limits.
+- `services/feed-mind/CLAUDE.md` — RSS → Telegram, and the BigQuery archive
+- `services/paper-prism/CLAUDE.md` — the weekly arXiv digest job
+- `services/summarizer/CLAUDE.md` — AI summaries and audio
+- `apps/web/CLAUDE.md` — the Svelte PWA that reads all of it
+
+## What this is
+
+A personal content pipeline: daily tech news to Telegram, a weekly personalized
+arXiv digest, AI summaries with audio for both, and one web app to read them.
+Four deployables, one GCP project (`feed-mind`), one Firestore database
+(`feed-mind-db`), all inside free-tier limits.
+
+It was three separate repos until they were merged here. Everything below used
+to be a **cross-repo** contract that no review could see both sides of; the
+whole point of the monorepo is that each one is now a single diff.
+
+## Layout
+
+```
+apps/web/              Svelte 5 + Vite PWA -> Firebase Hosting
+services/feed-mind/    CF gen2: feedmind (daily), feedmind-archive (1st & 16th)
+services/paper-prism/  Cloud Run Job: paper-prism-job (Mondays)
+services/summarizer/   CF gen2: feedmind-audio (Pub/Sub triggered)
+infra/terraform/       Terraform for the GCP stack
+infra/firebase/        firestore.rules, firestore.indexes.json
+firebase.json          MUST stay at the root — the CLI resolves paths from it
+docs/                  per-component docs + setup guides
+scripts/               test-all.sh, lock-all.sh, setup-wif.sh
+```
+
+## How the four components fit together
+
+```
+Cloud Scheduler ──daily──▶ feedmind ──────┐
+                                          ├──▶ Firestore (feed-mind-db) ──▶ apps/web
+Cloud Scheduler ──weekly─▶ paper-prism-job┘         ▲                        (reads
+                                                    │                     directly,
+        both publish {"process_doc": ...} to        │                    no backend)
+        the feedmind-content-ready topic            │
+                    │                               │
+                    ▼                               │
+              feedmind-audio ──── ai_summary, audio_url
+                    │
+                    └──▶ Cloud Storage (public bucket) ── MP3s
+
+feedmind-archive ──1st & 16th──▶ BigQuery (everything above, before it TTLs away)
+```
+
+## Contracts that span components
+
+Nothing below is checked by a compiler, a type, or a test. Each row is a place
+where changing one side silently breaks the other — the difference now is that
+both sides are in the same commit.
+
+| Contract | Written by | Read by | Change together |
+|---|---|---|---|
+| `processed_articles` doc shape | `services/feed-mind/feedmind/deduplication.py::mark_as_delivered` | `apps/web/src/lib/data.js::getNews`, `ArticleCard.svelte` | both files |
+| `youtube_videos` doc shape | `…/deduplication.py::save_video` | `apps/web/src/lib/data.js`, `VideoFeed.svelte` | both files |
+| `runs` / `run_status` doc shape | `services/paper-prism/src/paper_prism/models.py` | `apps/web/src/lib/data.js::normalizeRun` | both files |
+| `ai_summary`, `audio_url`, `audio_generated_at` | `services/summarizer` | `apps/web` cards | all three writers' docs are affected |
+| Category codes | `services/feed-mind/feedmind/config.py::RSS_FEEDS` | `apps/web/src/lib/constants.js::NEWS_CATEGORIES` | both — matched with `===` |
+| Pub/Sub message shape | both producers' `events.py` | `services/summarizer/main.py` | producer + consumer |
+| Firestore database id | `FIRESTORE_DATABASE` (job + function env) | `VITE_FIRESTORE_DATABASE` (web, build-time) | **three** places, plus `firebase.json` |
+
+Two of these deserve spelling out because the failure is silent:
+
+**Category codes are not internally consistent.** `open-source` hyphenates,
+`top_stories` underscores. `apps/web` matches them with `===`, so "tidying" a
+separator on either side empties a tab with no error anywhere.
+`constants.test.js` pins both spellings.
+
+**The database id must match in four places.** The browser reads Firestore
+directly, so a mismatch does not error — it silently reads an empty `(default)`
+database. `firebase.json` pins `"database": "feed-mind-db"` for the same reason:
+without it, `firebase deploy` writes rules to `(default)` *and creates* it.
+
+## The Pub/Sub topic is owned by its consumer
+
+`feedmind-content-ready` is created by `services/summarizer/deploy/setup.sh`,
+which also grants `roles/pubsub.publisher` to **both** producers' service
+accounts. Neither producer's deploy manages that binding. Run the summarizer's
+setup before either producer first publishes; until then their runs still
+succeed and log a permission error, because publishing is best-effort by design
+on both sides.
+
+## Retention: everything is on a clock
+
+| Data | Lifetime | Mechanism |
+|---|---|---|
+| `runs`, `run_status` | 45 days | Firestore TTL on `expire_at` |
+| `processed_articles`, `youtube_videos` | 90 days | Firestore TTL on `expires_at` |
+| BigQuery archive | forever | `feedmind-archive`, 1st & 16th |
+
+This is why `services/feed-mind`'s `snippet` field is written but never read
+back by any pipeline, and why the archive does a **full scan with no
+watermark**: paying ~10k reads against a 50k/day free tier is what makes the
+archive self-healing, so a missed run needs no recovery. See
+`docs/feed-mind/bigquery-archival-plan.md`.
 
 ## Commands
 
-**Install dependencies:**
 ```bash
-uv sync
+./scripts/test-all.sh     # every suite: feed-mind + paper-prism pytest, web vitest
+./scripts/lock-all.sh     # re-resolve all three Python services, regenerate requirements.txt
+uvx ruff check .          # repo-wide, config in ruff.toml
 ```
 
-**Run locally** (requires GCP Application Default Credentials):
+Per-component commands are in each component's own `CLAUDE.md`. Deploys are
+per-component too — there is no repo-wide deploy, and that is deliberate: the
+four deployables have independent schedules, runtimes and blast radii.
+
+## Python dependencies: three projects, not a workspace
+
+Each service has its own `pyproject.toml` and its own committed `uv.lock`. They
+are **not** uv workspace members. They pin conflicting versions of the same
+libraries on purpose — `services/feed-mind` holds
+`google-cloud-firestore==2.19.0` while `services/summarizer` needs `==2.28.1` —
+and they deploy as separate artifacts that never share an interpreter, so one
+shared resolution would force a version bump on somebody for no benefit.
+
+`requirements.txt` is a **generated** file in all three. Edit `pyproject.toml`
+and run `scripts/lock-all.sh`; Cloud Functions and the paper-prism Dockerfile
+install from the generated file.
+
+## Reaching pre-merge history
+
+All 59 commits from the three original repos are here, imported with
+`git subtree`. But **`git log --follow` does not traverse the import**: a
+subtree merge re-parents content under a prefix rather than recording a rename,
+so a path-limited log of `apps/web/...` stops at the relocate commit.
+
+`git blame` *does* traverse it correctly — it reaches the original commit at the
+original path — so line-level archaeology works normally. For a file's full
+commit list, go through the import merge's second parent:
+
 ```bash
-uv run functions-framework --target=feedmind --debug
-# then trigger with: curl -X POST http://localhost:8080
+PP=$(git log --grep="Add '_import/paper-prism/'" --format=%H)
+git log --oneline $PP^2 -- web/src/lib/data.js        # pre-merge path
 ```
 
-**Run tests:**
-```bash
-uv run pytest
-# single test:
-uv run pytest tests/test_config.py::test_rss_feeds_structure
-```
+The same works for the summarizer with `Add '_import/summarizer/'`.
 
-**Lint:**
-```bash
-uv run ruff check .
-uv run ruff format .
-```
+## Known duplication, deliberately not fixed here
 
-**Deploy to GCP:**
-```bash
-./deploy.sh   # updates requirements.txt, deploys function, creates/updates scheduler job
-```
-
-**Trigger a manual run in GCP:**
-```bash
-gcloud scheduler jobs run feedmind-daily-trigger --location=us-central1 --project=feed-mind
-```
-
-**Trigger the BigQuery archive on demand:**
-```bash
-gcloud scheduler jobs run feedmind-archive-biweekly --location=us-central1 --project=feed-mind
-```
-
-**Dry-run the archive locally** (reads Firestore via ADC, writes nothing):
-```bash
-uv run python main.py archive
-```
-
-## Architecture
-
-The pipeline is a single linear flow with no async or concurrency — articles for each feed are processed sequentially inside a 240-second soft timeout guard (5-minute hard Cloud Function limit). There is also an inner soft-timeout check per article to handle unexpectedly large feed backlogs.
-
-```
-main.py (HTTP trigger)
-  └── load_all_secrets()              # secrets.py — GCP Secret Manager
-  └── init_gemini() if ENABLE_GEMINI_SUMMARIES
-  └── nltk.download() if Sumy mode    # downloads punkt to /tmp/nltk_data
-  └── firestore.Client()              # shared across all feeds
-  └── for each feed in RSS_FEEDS:
-        └── fetch_feed()              # ingestion.py — feedparser, age-filtered
-        └── for each article:
-              └── is_duplicate()      # deduplication.py — single Firestore .get()
-              └── summarize()         # Gemini (1-sentence), or
-                  summarize_with_sumy() # Sumy LSA extractive (offline fallback)
-              └── collect into category_items dict (not sent yet), or into
-                  firestore_only_items if the feed has post_to_telegram=False
-  └── for each category in category_items:
-        └── build_category_messages() # notification.py — chunks into ≤4000-char messages
-        └── send_message() per chunk  # httpx POST to Telegram
-        └── mark_as_delivered()       # Firestore write ONLY after successful delivery
-  └── for each article in firestore_only_items:
-        └── mark_as_delivered()       # written directly — no Telegram step to gate on
-```
-
-**Key invariant:** for Telegram-bound articles, Firestore is written to **only after** successful delivery. Failed articles are not marked and will be retried on the next daily run.
-
-**Per-feed Telegram opt-out:** each entry in `RSS_FEEDS` carries a fourth element, `post_to_telegram`. It is `True` for every feed except `TOI Top Stories`. When `False`, the feed is still fetched, deduplicated, summarized and persisted to Firestore (so the paper-prism web reader keeps showing it) but its articles never appear in the batched Telegram messages.
-
-**Article identity:** `article_id` is SHA-256 of the article URL, used as the Firestore document ID in the `processed_articles` collection. Firestore documents include an `expires_at` field (90 days) for TTL-based auto-deletion.
-
-**`snippet` is written but never read back** by this pipeline — it exists so the planned BigQuery archive has real article text instead of titles and one-liners. The 90-day TTL makes anything not captured at write time unrecoverable, so don't drop it as an unused field. See `docs/bigquery-archival-plan.md`.
-
-## Summarization modes
-
-Controlled by `ENABLE_GEMINI_SUMMARIES` in `config.py` (currently `False`):
-
-| Mode | Flag | Behaviour |
-|------|------|-----------|
-| **Sumy** (default) | `False` | Extractive 1-sentence summary via Sumy LSA + NLTK. No API calls, fully offline. NLTK data downloaded to `/tmp/nltk_data` at startup. |
-| **Gemini** | `True` | Calls `gemini-3.5-flash-lite` for a ≤20-word generative sentence. Requires `GEMINI_API_KEY` secret. Respects `GEMINI_REQUEST_DELAY_S` between calls. |
-
-When Gemini is enabled and fails for an article, it falls back gracefully (`None` return) — the article is skipped and retried next run. Sumy falls back to `article.title` on failure.
-
-## Telegram message format
-
-Articles are batched by category. Each category produces one or more messages chunked at `TELEGRAM_MAX_MESSAGE_LENGTH` (4000 chars):
-
-```
-*🎓 Academic News*
-
-• *Title* — One-sentence summary.
-  🔗 Read More | 📰 arXiv ML
-
-• *Title 2* — Another summary.
-  🔗 Read More | 📰 Hugging Face Papers
-```
-
-`build_category_messages(category, items)` in `notification.py` handles chunking and continuation headers (`*(Cont.)*`).
-
-## The archive pipeline (second entry point)
-
-`main.py::archive` is a **separate Cloud Function** deployed from this same source (`feedmind-archive`, entry point `archive`), on its own Scheduler job `feedmind-archive-biweekly` at `0 4 1,16 * *`. It exists because every source collection is on a TTL — 90 days for this repo's, **45 days** for paper-prism's `runs` — so anything not copied out is deleted permanently.
-
-```
-archive (HTTP trigger)
-  └── load_all_secrets()               # best-effort; a failure only loses the report
-  └── firestore.Client() + bigquery.client()
-  └── ensure_dataset_and_tables()      # idempotent create, never alters
-  └── for each of 3 sources:
-        └── collection.stream()        # FULL scan — no watermark, by design
-        └── archival.*_row()           # → BigQuery row dicts
-        └── dedupe_by_key()
-        └── bigquery.archive_table()   # batch load → staging → MERGE → drop staging
-  └── send_plain_message()             # one-line run report to Telegram
-```
-
-**Four invariants that are easy to break by accident:**
-
-1. **Batch loads only.** `load_table_from_json` is free; `insert_rows_json` (streaming) costs $0.01/200 MB with no free tier. A twice-monthly job has no use for streaming latency.
-2. **MERGE, not append.** `ai_summary` is written to Firestore *asynchronously after* the doc exists, by `feed-mind-summarizer`. Appending would freeze a NULL for anything archived before its summary landed.
-3. **Full scan, no watermark.** ~10k reads against a 50k/day free tier. Paying those reads is what makes the archive self-healing: a missed or failed run needs no recovery, the next run just catches up.
-4. **Every MERGE carries `maximum_bytes_billed`** (`config.BQ_MAX_BYTES_BILLED`, 10 GiB). BigQuery refuses the job rather than billing for it. The cap is ~50x current size on purpose — a cap tight enough to trip on normal growth would convert a cost guard into data loss, since the archive would stop running. `require_partition_filter` is deliberately **not** set on these tables: the MERGE scans the whole target without a partition filter, so it would break the archiver.
-
-`archival.py` holds only pure dict→dict transforms (no GCP imports) so the reshaping is unit-testable; `bigquery.py` holds all client work. Adding a column means editing one `TableSpec` — schema, MERGE and table creation are all generated from it. Note `ensure_dataset_and_tables` creates but never *alters*, so a new column needs a manual schema update on an existing table; until then the value is still captured in that table's `raw` column.
-
-Full rationale, cost accounting and risks: `docs/bigquery-archival-plan.md`.
-
-## Module responsibilities
-
-| Module | Responsibility |
-|--------|---------------|
-| `feedmind/config.py` | All constants: feed list (`(name, url, category, post_to_telegram)` tuples), GCP project ID, Firestore names, model name, timeouts, feature flags, system prompt |
-| `feedmind/secrets.py` | Loads `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY` from GCP Secret Manager at startup |
-| `feedmind/ingestion.py` | Fetches/parses RSS via feedparser; produces `Article` dataclass; filters articles older than `MAX_ARTICLE_AGE_DAYS` |
-| `feedmind/deduplication.py` | Checks and writes to Firestore `processed_articles`; writes `expires_at` for TTL |
-| `feedmind/summarization.py` | `summarize()` for Gemini; `summarize_with_sumy()` for offline LSA extraction |
-| `feedmind/notification.py` | `build_category_messages()` to chunk and format; `send_message()` to POST via httpx; `send_plain_message()` for machine-generated text (escapes everything) |
-| `feedmind/archival.py` | Archive `TableSpec`s + pure Firestore-doc → BigQuery-row transforms. No GCP imports |
-| `feedmind/bigquery.py` | Dataset/table creation, staging loads and MERGE. All BigQuery client work |
-
-## Configuration before deploying
-
-Before first deploy, update these values in `feedmind/config.py` and `deploy.sh`:
-- `GCP_PROJECT_ID` — your GCP project ID (currently `"feed-mind"`)
-- `SCHEDULER_TIMEZONE` in `deploy.sh` — currently `"America/Chicago"`
-- `ENABLE_GEMINI_SUMMARIES` — set to `True` to use Gemini instead of Sumy
-- Validate the 13 RSS feed URLs in `config.RSS_FEEDS`
-
-Secrets must exist in GCP Secret Manager: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY`.
-
-## Local ADC requirement
-
-Local runs require Application Default Credentials with access to Secret Manager and Firestore:
-```bash
-gcloud auth application-default login
-```
-
-The `requirements.txt` at repo root is **generated** (by `deploy.sh` via `uv pip compile`) for GCP deployment — don't hand-edit it. The source of truth for dependencies is `pyproject.toml`.
+- **Two deploy paths for paper-prism.** `infra/terraform/` and
+  `services/paper-prism/deploy/*.sh` provision the *same* resources. Pick one as
+  source of truth — running both double-creates. This predates the monorepo.
+- **Two CI auth mechanisms.** `deploy-feed-mind.yml` uses Workload Identity
+  Federation; the other three use a service-account key. See
+  `.github/workflows/README.md`.
+- **No shared library.** The services each set up their own Firestore client and
+  their own Telegram/notification helpers. Extracting a `libs/` package is the
+  obvious next step and was kept out of the merge so that the move commits stay
+  readable under `git log --follow`.

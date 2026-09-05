@@ -1,0 +1,47 @@
+[
+  {
+    "video_id": "fonbmFSmuRk",
+    "url": "https://www.youtube.com/watch?v=fonbmFSmuRk",
+    "title": "Nemotron Lightning - NVIDIA's Super Fast Agent MoE",
+    "channel": "Sam Witteveen AI",
+    "thumbnail_url": "https://i.ytimg.com/vi/fonbmFSmuRk/hqdefault.jpg",
+    "published_at": "2026-08-16T14:05:00+00:00",
+    "processed_at": "2026-08-16T15:00:00+00:00"
+  },
+  {
+    "video_id": "9hDyXi5cbQw",
+    "url": "https://www.youtube.com/watch?v=9hDyXi5cbQw",
+    "title": "Switchyard - NVIDIA's Local Agent Router",
+    "channel": "Sam Witteveen AI",
+    "thumbnail_url": "https://i.ytimg.com/vi/9hDyXi5cbQw/hqdefault.jpg",
+    "published_at": "2026-08-16T09:30:00+00:00",
+    "processed_at": "2026-08-16T15:00:00+00:00"
+  },
+  {
+    "video_id": "dQw4w9WgXcQ",
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "title": "How I Automated My Entire Workflow with Agents",
+    "channel": "HyperAutomation Labs",
+    "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+    "published_at": "2026-08-15T18:20:00+00:00",
+    "processed_at": "2026-08-15T19:00:00+00:00"
+  },
+  {
+    "video_id": "aqz-KE-bpKQ",
+    "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "title": "The Business Case Study Everyone Is Talking About",
+    "channel": "Think School",
+    "thumbnail_url": "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg",
+    "published_at": "2026-08-15T07:00:00+00:00",
+    "processed_at": "2026-08-15T08:00:00+00:00"
+  },
+  {
+    "video_id": "M7lc1UVf-VE",
+    "url": "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+    "title": "This New AI Model Changes Everything",
+    "channel": "AI Revolution",
+    "thumbnail_url": "https://i.ytimg.com/vi/M7lc1UVf-VE/hqdefault.jpg",
+    "published_at": "2026-08-14T12:45:00+00:00",
+    "processed_at": "2026-08-14T13:00:00+00:00"
+  }
+]

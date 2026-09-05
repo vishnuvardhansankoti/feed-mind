@@ -1,36 +1,84 @@
-# Ignore Python cache
+# One ignore file for the whole monorepo. The rules are PATH-SCOPED on purpose:
+# the three repos this was merged from each had a blanket rule that was safe in
+# isolation and destructive here.
+#
+#   feed-mind ignored  *.json  -> would swallow firebase.json,
+#                                 firestore.indexes.json, package.json,
+#                                 package-lock.json and every web fixture
+#   paper-prism ignored *.md   -> would swallow feed-mind's and the
+#                                 summarizer's docs
+#
+# Both are replaced below by rules that name what is actually secret. If you add
+# a rule here, prefer a path (apps/web/dist/) over a glob (dist/).
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *.pyo
 .venv/
 venv/
-.env
-
-# Ignore local secrets — never commit these
-*.json
-*.key
-*.pem
-service-account*.json
-
-# Ignore IDE files
-.vscode/
-.idea/
-*.swp
-
-# Ignore OS files
-.DS_Store
-Thumbs.db
-
-
-.vscode/settings.json
-
-secrets.txt
-
-# uv specific
 .uv/
-uv.lock
-
-# Test and lint caches
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .coverage
+.coverage.*
+htmlcov/
+
+# --- Secrets and local config ---
+# NEVER reintroduce a bare `*.json` here; see the header.
+.env
+.env.*
+!.env.example
+env.yaml
+secrets.txt
+service-account*.json
+*-service-account*.json
+credentials.json
+*.key
+*.pem
+*.tfvars
+!*.tfvars.example
+
+# --- Web (apps/web) ---
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.vite/
+
+# --- Firebase ---
+.firebase/
+firebase-debug.log
+
+# --- Terraform (infra/terraform) ---
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+crash.log
+
+# --- Service run artifacts ---
+services/paper-prism/output/
+*.mp3
+*.wav
+*.m4a
+*.aiff
+*.log
+
+# --- Local-only notes ---
+# paper-prism kept these out of git with a blanket `*.md` + allowlist. Naming
+# them individually means a NEW doc is tracked by default rather than silently
+# ignored, which is the failure mode that rule had.
+docs/paper-prism/extended-prompt.md
+docs/paper-prism/filtering-evaluation-decision.md
+docs/paper-prism/initial_prompt.md
+docs/paper-prism/new-reqt.md
+docs/paper-prism/voice-bot-design.md
+
+# Claude Code local settings — machine-specific, never shared
+.claude/settings.local.json

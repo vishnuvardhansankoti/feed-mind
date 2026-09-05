@@ -1,0 +1,41 @@
+# What NOT to upload when deploying. Everything not listed here is sent to
+# Cloud Build, so keeping this tight keeps deploys fast.
+#
+# Note that .gcloudignore replaces gcloud's default use of .gitignore entirely -
+# so anything ignored by git that also should not be deployed has to be repeated
+# here.
+
+.git/
+.gitignore
+.claude/
+
+.venv/
+venv/
+env/
+
+__pycache__/
+*.py[cod]
+
+# The CLI-only entrypoint and its docs; the function imports the package
+# directly, and web-page-scraper.py is never called in the cloud.
+web-page-scraper.py
+README.md
+
+deploy/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Local audio output, if any got left lying around.
+*.mp3
+*.wav
+*.m4a
+*.aiff

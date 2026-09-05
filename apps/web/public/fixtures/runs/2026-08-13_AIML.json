@@ -1,0 +1,40 @@
+{
+  "id": "2026-08-13_AIML",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "AIML",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "Small-Scale Experiments: Are We There Yet?",
+      "arxiv_id": "2608.11859",
+      "url": "http://arxiv.org/abs/2608.11859v1",
+      "score": 0.5248,
+      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks.",
+      "abstract": "Sample abstract: Small-scale experiments remain the dominant evaluation protocol in much of the literature, yet their predictive value for production-scale systems is rarely quantified. We study the correlation between small- and large-scale outcomes across a suite of training runs, identify the regimes in which the ordering of methods is preserved, and characterize where it breaks down. Our results suggest concrete guidelines for when a small-scale result should be trusted.",
+      "ai_summary": "The paper measures how often small-scale results survive the jump to production scale, across a suite of training runs. Method ordering is preserved in some regimes and inverts in others; the authors give concrete guidelines for when a small-scale number should be trusted at all.",
+      "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/research-papers/2026-08-13/AIML/2608.11859.mp3",
+      "audio_generated_at": "2026-08-13T06:12:00+00:00"
+    },
+    {
+      "rank": 2,
+      "title": "DistillCache: KL-Guided Adaptive KV-Cache Eviction for Memory-Efficient LLM Inference",
+      "arxiv_id": "2608.08878",
+      "url": "http://arxiv.org/abs/2608.08878v1",
+      "score": 0.5154,
+      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings.",
+      "abstract": "Sample abstract: KV-cache memory dominates the footprint of long-context LLM inference. We propose an eviction policy that scores cached entries by their KL contribution to the output distribution rather than by attention mass alone, yielding a criterion that is cheap to compute and stable across layers. On long-context benchmarks the method retains quality at substantially reduced cache budgets.",
+      "ai_summary": "A scheduler that reorders gradient accumulation to keep optimizer state resident reduces peak memory without changing the update rule. Wall-clock gains hold on the reported hardware, though the approach assumes a fixed batch shape.",
+      "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/research-papers/2026-08-13/AIML/2608.08878.mp3",
+      "audio_generated_at": "2026-08-13T06:12:00+00:00"
+    },
+    {
+      "rank": 3,
+      "title": "Derivative Computation in PINNs: Automatic Differentiation, Finite Differences and Beyond",
+      "arxiv_id": "2608.11020",
+      "url": "http://arxiv.org/abs/2608.11020v1",
+      "score": 0.4949,
+      "summary": null,
+      "abstract": "Sample abstract: Physics-informed neural networks require derivatives of the network output with respect to its inputs. We compare automatic differentiation against finite-difference and spectral alternatives in terms of cost, accuracy, and conditioning, and show that the best choice depends on the stiffness of the underlying operator rather than on the architecture."
+    }
+  ]
+}

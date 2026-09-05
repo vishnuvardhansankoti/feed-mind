@@ -1,0 +1,32 @@
+[project]
+name = "feedmind-summarizer"
+version = "1.0.0"
+description = "Scrape, LLM-summarize and narrate FeedMind articles and paper-prism papers"
+# Deployed as a python311 Cloud Function (see deploy/config.sh RUNTIME).
+requires-python = ">=3.11"
+dependencies = [
+    "functions-framework==3.*",
+
+    "google-cloud-firestore==2.28.1",
+    "google-cloud-storage==3.13.1",
+    "google-cloud-texttospeech==2.*",
+
+    "spacy==3.8.15",
+    # The spaCy pipeline is not on PyPI, so it comes from its release URL. It
+    # must match the spacy version above — 3.8.0 targets spaCy 3.8.x.
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+
+    # Web Push sender (feedmind_push.py). Absent at runtime is survivable:
+    # notify() logs and returns rather than failing the batch.
+    "pywebpush==2.0.3",
+]
+
+# Deliberately absent: pyttsx3 and ffmpeg. The Cloud Function runtime has no
+# speech engine and no way to install one, which is why webscraper/cloud_speech.py
+# exists and why the function sets FEEDMIND_TTS=cloud. Install pyttsx3 by hand
+# for local `--speak` use of web-page-scraper.py.
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]

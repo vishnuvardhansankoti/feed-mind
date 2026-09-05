@@ -1,0 +1,43 @@
+# What NOT to upload when deploying. Everything not listed here is sent to
+# Cloud Build, so keeping this tight keeps deploys fast.
+#
+# gcloud reads this file from the --source directory, which for both functions
+# is this service directory. It is deliberately SELF-CONTAINED: the monorepo's
+# .gitignore lives two levels up, and a `#!include:.gitignore` pointing at a
+# file that is not here would fail the deploy outright.
+
+.gcloudignore
+.git
+.gitignore
+
+node_modules
+
+# Tests are not imported by either entry point; skipping them saves space.
+tests/
+
+# Python build residue and local envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local credentials — must never reach Cloud Build
+.env
+secrets.txt
+*.key
+*.pem
+service-account*.json
+credentials.json
+
+# uv's lockfile is the input to requirements.txt, which deploy.sh generates
+# just before this runs. The runtime installs from requirements.txt only.
+uv.lock
+
+# Editor / OS / tool caches
+.vscode/
+.idea/
+*.swp
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+.coverage

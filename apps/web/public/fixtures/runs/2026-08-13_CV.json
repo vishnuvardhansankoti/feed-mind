@@ -1,0 +1,40 @@
+{
+  "id": "2026-08-13_CV",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "CV",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "XYZFlow:Scaling Multi dimensional Shortcut Flows for Efficient Generative Modeling",
+      "arxiv_id": "2608.12276",
+      "url": "http://arxiv.org/abs/2608.12276v1",
+      "score": 0.5918,
+      "summary": "Sample: introduces a method that improves efficiency without loss of quality. The approach is validated against strong baselines on standard benchmarks.",
+      "abstract": "Sample abstract: Shortcut flow models trade sampling steps for a learned correction term. We generalize the formulation to multiple coupled dimensions, show that the resulting objective remains a valid flow-matching loss, and demonstrate that the approach scales to high-resolution generation with a fraction of the sampling cost of the diffusion baseline.",
+      "ai_summary": "The authors replace quadratic attention over image patches with a linear-time mixing operator, cutting the memory footprint enough to render at higher resolution on one accelerator. Sample quality is competitive with the diffusion baselines at matched compute.",
+      "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/research-papers/2026-08-13/CV/2608.12276.mp3",
+      "audio_generated_at": "2026-08-13T06:12:00+00:00"
+    },
+    {
+      "rank": 2,
+      "title": "In-Loop Model Adaptation with Coupled Latent-Noise Guidance for High-Fidelity Subject-Driven Text-to-Image Generation",
+      "arxiv_id": "2608.09244",
+      "url": "http://arxiv.org/abs/2608.09244v1",
+      "score": 0.5914,
+      "summary": "Sample: proposes a lightweight technique addressing a key bottleneck. Experiments show consistent gains across several settings.",
+      "abstract": "Sample abstract: Subject-driven generation typically fine-tunes the backbone per subject, which is slow and prone to drift. We instead adapt the model inside the sampling loop, guided by a coupling between the latent trajectory and the injected noise schedule. This preserves subject fidelity without catastrophic forgetting of the prior.",
+      "ai_summary": "A self-supervised pretext task built on temporal ordering yields features that transfer to detection and segmentation without labels. Gains concentrate on small objects, where the baseline was weakest.",
+      "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/research-papers/2026-08-13/CV/2608.09244.mp3",
+      "audio_generated_at": "2026-08-13T06:12:00+00:00"
+    },
+    {
+      "rank": 3,
+      "title": "TGRHuman: Text-Guided Realistic 3D Human Generation via Diffusion Renderer",
+      "arxiv_id": "2608.12175",
+      "url": "http://arxiv.org/abs/2608.12175v1",
+      "score": 0.5732,
+      "summary": null,
+      "abstract": "Sample abstract: We generate realistic 3D human avatars from text by pairing a diffusion prior with a differentiable renderer, supervising geometry and appearance jointly. A pose-aware regularizer suppresses the limb artifacts common to score-distillation pipelines."
+    }
+  ]
+}

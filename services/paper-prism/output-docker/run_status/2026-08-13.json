@@ -1,0 +1,18 @@
+{
+  "id": "2026-08-13",
+  "run_date": "2026-08-13T00:00:00Z",
+  "categories": {
+    "AIML": {
+      "status": "ok",
+      "paper_count": 3
+    },
+    "NLP": {
+      "status": "ok",
+      "paper_count": 3
+    },
+    "CV": {
+      "status": "ok",
+      "paper_count": 3
+    }
+  }
+}

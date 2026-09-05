@@ -1,0 +1,58 @@
+name: Deploy paper-prism (arXiv digest job)
+
+# Manual only — never triggers automatically. Run it from the Actions tab
+# ("Run workflow"). Builds the container with Cloud Build and (re)deploys the
+# Cloud Run Job, reusing services/paper-prism/deploy/*.sh so those scripts stay the single
+# source of truth.
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "GCP region (Cloud Run + Artifact Registry)"
+        required: false
+        default: us-central1
+      deploy_scheduler:
+        description: "Also (re)wire Cloud Scheduler (04-scheduler.sh)"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: deploy-paper-prism
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ inputs.region }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Authenticate to GCP. Store a service-account key JSON in the
+      # GCP_SA_KEY secret (see .github/workflows/README.md for required roles).
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # env.yaml holds the interest profiles (the product) and is gitignored,
+      # so reconstruct it from a secret before deploying the job.
+      - name: Write env.yaml from secret
+        run: |
+          printf '%s' "${{ secrets.PIPELINE_ENV_YAML }}" > services/paper-prism/deploy/env.yaml
+
+      - name: Build and push image (Cloud Build)
+        run: services/paper-prism/deploy/02-build-push.sh
+
+      - name: Deploy Cloud Run Job
+        run: services/paper-prism/deploy/03-deploy-job.sh
+
+      - name: Wire Cloud Scheduler
+        if: ${{ inputs.deploy_scheduler }}
+        run: services/paper-prism/deploy/04-scheduler.sh
