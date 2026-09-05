@@ -174,21 +174,22 @@ Look for `triggered by message …` (Eventarc delivered), then `spaCy … conden
 
 Both producers already carry the publishing code; they need redeploying to pick it up.
 
-**FeedMind** (`feedmind/events.py`, called at the end of `main.py`):
+**FeedMind** (`services/feed-mind/feedmind/events.py`, called at the end of its
+`main.py`):
 
 ```bash
-cd ../feed-mind
-./deploy.sh
+../feed-mind/deploy.sh          # deploy.sh cd's to its own directory
 ```
 
-Publishing is best-effort — a Pub/Sub failure is logged, never raised, because failing a run that already delivered to Telegram would re-deliver every article on the retry. Disable it with `ENABLE_CONTENT_READY_EVENTS = False` in `feedmind/config.py`.
+Publishing is best-effort — a Pub/Sub failure is logged, never raised, because failing a run that already delivered to Telegram would re-deliver every article on the retry. Disable it with `ENABLE_CONTENT_READY_EVENTS = False` in
+`services/feed-mind/feedmind/config.py`.
 
-**paper-prism** (`pipeline/src/paper_prism/events.py`, called from `__main__.py` after `pipeline.run()`). It has two deploy paths; use whichever this project treats as source of truth — running both double-creates:
+**paper-prism** (`services/paper-prism/src/paper_prism/events.py`, called from `__main__.py` after `pipeline.run()`). It has two deploy paths; use whichever this project treats as source of truth — running both double-creates:
 
 ```bash
-cd ../paper-prism/infra && terraform apply     # CONTENT_READY_TOPIC is in job_env
+cd ../../infra/terraform && terraform apply    # CONTENT_READY_TOPIC is in job_env
 # or the gcloud path:
-cd ../paper-prism/pipeline/deploy && ./02-build-push.sh && ./03-deploy-job.sh
+cd ../paper-prism/deploy && ./02-build-push.sh && ./03-deploy-job.sh
 ```
 
 The gcloud path reads `env.yaml`; make sure `CONTENT_READY_TOPIC` is set there (it is in `env.yaml.example`). Same best-effort contract, plus one extra guard: it never publishes from a local run, because `SINK=local` writes JSON to disk and there is no consumer to tell.
