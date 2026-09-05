@@ -130,6 +130,24 @@ shared resolution would force a version bump on somebody for no benefit.
 and run `scripts/lock-all.sh`; Cloud Functions and the paper-prism Dockerfile
 install from the generated file.
 
+## Reaching pre-merge history
+
+All 59 commits from the three original repos are here, imported with
+`git subtree`. But **`git log --follow` does not traverse the import**: a
+subtree merge re-parents content under a prefix rather than recording a rename,
+so a path-limited log of `apps/web/...` stops at the relocate commit.
+
+`git blame` *does* traverse it correctly — it reaches the original commit at the
+original path — so line-level archaeology works normally. For a file's full
+commit list, go through the import merge's second parent:
+
+```bash
+PP=$(git log --grep="Add '_import/paper-prism/'" --format=%H)
+git log --oneline $PP^2 -- web/src/lib/data.js        # pre-merge path
+```
+
+The same works for the summarizer with `Add '_import/summarizer/'`.
+
 ## Known duplication, deliberately not fixed here
 
 - **Two deploy paths for paper-prism.** `infra/terraform/` and
