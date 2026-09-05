@@ -16,6 +16,21 @@ from feedmind_core.models import Article
 
 logger = logging.getLogger(__name__)
 
+# httpx logs every request URL at INFO, and the Telegram send URL embeds the bot
+# token:
+#
+#     POST https://api.telegram.org/bot<TOKEN>/sendMessage "HTTP/1.1 200 OK"
+#
+# That is a credential in plaintext in Cloud Logging, readable by anyone with
+# logs.viewer. It stayed hidden while the services' root logger was accidentally
+# stuck at WARNING; fixing that surfaced it immediately.
+#
+# Silenced here rather than in each service's main.py because this module is the
+# one that puts the token in a URL — a new consumer of send_message() should not
+# have to know to do this. Warnings and errors still come through.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 # Characters that must be escaped in Telegram MarkdownV2
 # https://core.telegram.org/bots/api#markdownv2-style
 _MARKDOWNV2_ESCAPE_RE = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
