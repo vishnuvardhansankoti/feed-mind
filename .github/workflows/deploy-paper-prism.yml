@@ -1,8 +1,8 @@
-name: Deploy pipeline
+name: Deploy paper-prism (arXiv digest job)
 
 # Manual only — never triggers automatically. Run it from the Actions tab
 # ("Run workflow"). Builds the container with Cloud Build and (re)deploys the
-# Cloud Run Job, reusing pipeline/deploy/*.sh so those scripts stay the single
+# Cloud Run Job, reusing services/paper-prism/deploy/*.sh so those scripts stay the single
 # source of truth.
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
         default: false
 
 concurrency:
-  group: deploy-pipeline
+  group: deploy-paper-prism
   cancel-in-progress: false
 
 jobs:
@@ -45,14 +45,14 @@ jobs:
       # so reconstruct it from a secret before deploying the job.
       - name: Write env.yaml from secret
         run: |
-          printf '%s' "${{ secrets.PIPELINE_ENV_YAML }}" > pipeline/deploy/env.yaml
+          printf '%s' "${{ secrets.PIPELINE_ENV_YAML }}" > services/paper-prism/deploy/env.yaml
 
       - name: Build and push image (Cloud Build)
-        run: pipeline/deploy/02-build-push.sh
+        run: services/paper-prism/deploy/02-build-push.sh
 
       - name: Deploy Cloud Run Job
-        run: pipeline/deploy/03-deploy-job.sh
+        run: services/paper-prism/deploy/03-deploy-job.sh
 
       - name: Wire Cloud Scheduler
         if: ${{ inputs.deploy_scheduler }}
-        run: pipeline/deploy/04-scheduler.sh
+        run: services/paper-prism/deploy/04-scheduler.sh
