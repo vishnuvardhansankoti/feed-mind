@@ -21,17 +21,51 @@ run "services/paper-prism (pytest)"   services/paper-prism   uv run --quiet --ex
 run "apps/web (vitest)"               apps/web               npm test
 
 # No test suite: services/summarizer (exercised by ./deploy/publish.sh --dry-run)
-# and the five FeedMind service entry points, which are a config load plus one
-# runner call. Their import is smoke-tested here instead — that is what catches
-# a service whose dependency extras are missing something it uses.
-printf '\n\033[1m==> FeedMind service entry points (import smoke test)\033[0m\n'
-for s in ingest telegram-notifier archive; do
-    if ( cd "services/$s" && uv run --quiet python -c "import main" >/dev/null 2>&1 ); then
-        echo "  ok: $s"
+# and the FeedMind entry points, which are a config load plus a runner call.
+#
+# Instead each service is probed in ITS OWN venv — the one carrying only its
+# dependency extras — for every module its runtime can reach. `import main` on
+# its own is not enough and never was: the heavy imports in runner.py and
+# main.py are deliberately lazy, so a missing extra stays invisible until an
+# article is actually summarized. That is exactly how a module-level
+# `import google.generativeai` in summarization.py reached production and broke
+# the first run of feedmind-ingest, which installs no gemini extra.
+#
+# Anything added to a lazy import path must be added here too.
+probe() {  # probe <service> <python-source>
+    if ( cd "services/$1" && uv run --quiet python -c "$2" >/dev/null 2>&1 ); then
+        echo "  ok: $1"
     else
-        echo "  FAILED: services/$s does not import" >&2
+        echo "  FAILED: services/$1 — a runtime import is missing from its extras" >&2
+        ( cd "services/$1" && uv run --quiet python -c "$2" 2>&1 | tail -3 ) >&2
         fail=1
     fi
-done
+}
+
+printf '\n\033[1m==> FeedMind services (runtime import probe)\033[0m\n'
+
+probe ingest '
+import main
+# runner._summarize / _init_summarizer
+from feedmind_core.summarization import summarize_with_sumy, init_gemini
+# runner.run_rss_ingest / run_youtube_ingest
+from feedmind_core.ingestion import fetch_feed, fetch_youtube_feed
+# main._announce
+from feedmind_core import events
+from feedmind_core.store import is_duplicate, save_article, save_video
+'
+
+probe telegram-notifier '
+import main
+from feedmind_core.store import fetch_pending_telegram, mark_telegram_sent
+from feedmind_core.telegram import build_category_messages, send_message
+'
+
+probe archive '
+import main
+from feedmind_core import archival, bigquery
+from feedmind_core.telegram import send_plain_message
+'
+
 
 exit $fail

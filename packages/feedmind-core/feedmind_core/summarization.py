@@ -8,11 +8,12 @@ the feed group's `summarize:` setting:
   - summarize(): abstractive summarization via the Gemini API. Opt-in.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 import time
 
-import google.generativeai as genai
 from sumy.nlp.stemmers import Stemmer
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.parsers.plaintext import PlaintextParser
@@ -23,6 +24,15 @@ from feedmind_core import settings as config
 from feedmind_core.models import Article
 
 logger = logging.getLogger(__name__)
+
+# `google.generativeai` is imported inside the two Gemini functions, NOT here.
+#
+# A module-level import would make the whole module — including
+# summarize_with_sumy, which has nothing to do with Gemini — unimportable
+# without feedmind-core[gemini]. That is not hypothetical: it is what broke the
+# first deployed run of feedmind-ingest, which installs [feeds,sumy,events] and
+# summarizes offline. The annotations on init_gemini/summarize are strings via
+# `from __future__ import annotations`, so they cost no import either.
 
 # ---------------------------------------------------------------------------
 # Sumy helpers
@@ -55,8 +65,10 @@ def _truncate_to_words(text: str, max_words: int = _MAX_SUMMARY_WORDS) -> str:
     return " ".join(words[:max_words]) + "..."
 
 
-def init_gemini(api_key: str) -> genai.GenerativeModel:
+def init_gemini(api_key: str) -> "genai.GenerativeModel":  # noqa: F821
     """Configure the Gemini SDK and return a GenerativeModel instance."""
+    import google.generativeai as genai
+
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(
         model_name=config.GEMINI_MODEL,
@@ -70,7 +82,7 @@ def init_gemini(api_key: str) -> genai.GenerativeModel:
     return model
 
 
-def summarize(model: genai.GenerativeModel, article: Article) -> str | None:
+def summarize(model: "genai.GenerativeModel", article: Article) -> str | None:  # noqa: F821
     """
     Call the Gemini API to produce a one-sentence summary of the article.
 
