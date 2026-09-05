@@ -23,7 +23,7 @@ from feedmind_core.telegram import _CATEGORY_META
 KNOWN_CATEGORIES = {"academic", "industry", "cloud", "open-source", "top_stories"}
 
 SERVICES_DIR = Path(__file__).resolve().parents[3] / "services"
-FEED_CONFIGS = sorted(SERVICES_DIR.glob("*/feeds.yaml"))
+FEED_CONFIGS = sorted(SERVICES_DIR.glob("ingest/*.yaml"))
 NOTIFIER_CONFIG = SERVICES_DIR / "telegram-notifier" / "notifier.yaml"
 
 
@@ -33,7 +33,7 @@ def test_the_services_were_actually_found():
     Without this, every parametrized test below would vacuously pass and the
     suite would report green while checking no configuration at all.
     """
-    assert len(FEED_CONFIGS) >= 3, f"expected the ingest services under {SERVICES_DIR}"
+    assert len(FEED_CONFIGS) >= 3, f"expected the ingest feed groups under {SERVICES_DIR}/ingest"
 
 
 @pytest.mark.parametrize("path", FEED_CONFIGS, ids=lambda p: p.parent.name)
@@ -69,26 +69,25 @@ def test_every_category_has_telegram_header_metadata(path):
 
 
 def test_youtube_service_uses_youtube_feed_urls():
-    cfg = serviceconfig.load(SERVICES_DIR / "youtube-ingest" / "feeds.yaml")
+    cfg = serviceconfig.load(SERVICES_DIR / "ingest" / "youtube.yaml")
     assert cfg.kind == serviceconfig.KIND_YOUTUBE
     for feed in cfg.feeds:
         assert feed.url.startswith("https://www.youtube.com/feeds/videos.xml")
 
 
-def test_exactly_one_service_delivers_to_telegram():
-    """The doorbell has one ringer.
+def test_exactly_one_feed_group_delivers_to_telegram():
+    """Only the news group is the digest.
 
-    More than one ingest publishing to feedmind-telegram-ready is not broken —
-    the notifier queries Firestore, so it would simply run twice — but it would
-    mean two digests a day, which is a decision to make on purpose rather than
-    discover.
+    The service rings the doorbell once per run, so a second delivering group
+    would not mean a second digest — it would silently widen what the digest
+    contains, which should be a decision rather than a discovery.
     """
     delivering = [
         serviceconfig.load(p).service
         for p in FEED_CONFIGS
         if serviceconfig.load(p).deliver_telegram
     ]
-    assert delivering == ["feedmind-news-ingest"], delivering
+    assert delivering == ["news"], delivering
 
 
 def test_youtube_does_not_wake_the_summarizer():
@@ -97,7 +96,7 @@ def test_youtube_does_not_wake_the_summarizer():
     Neither reads youtube_videos, so a content_ready event from here would buy a
     cold start and nothing else.
     """
-    cfg = serviceconfig.load(SERVICES_DIR / "youtube-ingest" / "feeds.yaml")
+    cfg = serviceconfig.load(SERVICES_DIR / "ingest" / "youtube.yaml")
     assert cfg.content_ready is False
 
 

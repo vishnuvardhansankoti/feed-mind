@@ -2,7 +2,7 @@
 main.py — feedmind-telegram-notifier: send the digest to Telegram.
 
 Triggered by a Pub/Sub message on `feedmind-telegram-ready`, published by
-feedmind-news-ingest once its articles are safely in Firestore.
+feedmind-ingest once every feed group is safely in Firestore.
 
 **The message is a doorbell, not a payload.** It carries no articles, and this
 function does not read its body beyond logging it. The work is defined entirely

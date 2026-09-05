@@ -50,7 +50,7 @@ done
 
 echo "==> Pub/Sub topic ${TELEGRAM_TOPIC}"
 # The notifier's trigger. Created here rather than by the notifier's own deploy
-# because the PUBLISHER (news-ingest) may well be deployed first, and publishing
+# because the PUBLISHER (services/ingest) may well be deployed first, and publishing
 # to a topic that does not exist is one of the few failures the best-effort
 # publish path cannot paper over.
 #

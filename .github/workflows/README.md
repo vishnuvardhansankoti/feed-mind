@@ -5,13 +5,13 @@ Trigger them from the **Actions** tab → pick the workflow → **Run workflow**
 
 | Workflow | Deploys | Underlying scripts |
 |---|---|---|
-| `deploy-feedmind.yml` | any or all five FeedMind functions, plus their Scheduler jobs | `scripts/deploy-feedmind.sh` |
+| `deploy-feedmind.yml` | any or all three FeedMind functions, plus their Scheduler jobs | `scripts/deploy-feedmind.sh` |
 | `deploy-paper-prism.yml` | Cloud Build image → Cloud Run Job `paper-prism-job` | `services/paper-prism/deploy/02..04-*.sh` |
 | `deploy-summarizer.yml` | Cloud Function `feedmind-audio` (Pub/Sub) | `services/summarizer/deploy/deploy.sh` |
 | `deploy-web.yml` | `vite build` → Firebase Hosting | `firebase.json` (`apps/web/dist`) |
 
-`deploy-feedmind.yml` takes a `service` input — `all`, or one of `news-ingest`,
-`topstories-ingest`, `youtube-ingest`, `telegram-notifier`, `archive`. It lints
+`deploy-feedmind.yml` takes a `service` input — `all`, or one of `ingest`,
+`telegram-notifier`, `archive`. It lints
 and runs the core package's tests first, regenerates every `requirements.txt`
 from `pyproject.toml`, then stages each function with `feedmind_core` copied in
 beside `main.py` (Cloud Functions uploads only `--source`, and the shared

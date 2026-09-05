@@ -26,9 +26,10 @@ packages/feedmind-core/          the pipeline: feed URLs -> Firestore
     archival.py, bigquery.py     the archive's transforms and client work
   tests/                         the suite for all of the above
 
-services/news-ingest/            17 digest feeds, 08:00, publishes to Telegram
-services/topstories-ingest/      general news, web reader only
-services/youtube-ingest/         channel uploads -> youtube_videos
+services/ingest/                 08:00 daily; rings the doorbell when done
+  news.yaml                      17 digest feeds -> telegram_status=pending
+  topstories.yaml                general news, web reader only
+  youtube.yaml                   channel uploads -> youtube_videos
 services/telegram-notifier/      Pub/Sub-triggered digest sender
 services/archive/                Firestore -> BigQuery, 1st & 16th
 

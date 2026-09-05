@@ -38,7 +38,7 @@ from feedmind_core.store import (
 # are imported lazily, inside the functions that use them.
 #
 # This is not premature optimization — it is what makes the per-service
-# dependency extras work. youtube-ingest installs feedmind-core[feeds] and has
+# dependency extras work. A fetch-only service installs feedmind-core[feeds] and has
 # no pubsub; the notifier installs [telegram] and has no feedparser. A
 # top-level import here would make every service carry every extra, and the
 # ImportError would land at cold start rather than at deploy time.
@@ -97,7 +97,9 @@ def _summarize(mode, gemini_model, article) -> str | None:
     return summarize_with_sumy(article)
 
 
-def run_rss_ingest(cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False) -> dict:
+def run_rss_ingest(
+    cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False, announce: bool = True
+) -> dict:
     """
     Fetch every feed in `cfg`, store what is new, and announce it.
 
@@ -172,13 +174,18 @@ def run_rss_ingest(cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False) -
 
     counters["duration_seconds"] = round(time.monotonic() - run_start, 2)
 
-    _announce(cfg, counters, stored=counters["articles_stored"], dry_run=dry_run)
+    # `announce=False` lets a caller run several configs and ring the doorbell
+    # once at the end, instead of once per feed group. See services/ingest.
+    if announce:
+        announce_run(cfg, counters, stored=counters["articles_stored"], dry_run=dry_run)
 
     logger.info(json.dumps({"message": "Ingest complete", **counters}))
     return counters
 
 
-def run_youtube_ingest(cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False) -> dict:
+def run_youtube_ingest(
+    cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False, announce: bool = True
+) -> dict:
     """
     Fetch every channel feed in `cfg` and store new videos.
 
@@ -227,16 +234,21 @@ def run_youtube_ingest(cfg: serviceconfig.ServiceConfig, *, dry_run: bool = Fals
 
     counters["duration_seconds"] = round(time.monotonic() - run_start, 2)
 
-    _announce(cfg, counters, stored=counters["videos_stored"], dry_run=dry_run)
+    if announce:
+        announce_run(cfg, counters, stored=counters["videos_stored"], dry_run=dry_run)
 
     logger.info(json.dumps({"message": "YouTube ingest complete", **counters}))
     return counters
 
 
-def _announce(cfg: serviceconfig.ServiceConfig, counters: dict, *, stored: int,
-              dry_run: bool) -> None:
+def announce_run(cfg: serviceconfig.ServiceConfig, counters: dict, *, stored: int,
+                 dry_run: bool) -> None:
     """
     Publish the run's downstream notifications, both best-effort.
+
+    Public because a service that ingests several feed groups calls the runner
+    once per group with `announce=False`, then calls this once with the totals —
+    one doorbell per run, not one per group.
 
     Ordered after every write, never before: both consumers read Firestore, so
     announcing earlier would race them to documents that do not exist yet.

@@ -15,7 +15,7 @@ what breaks when you change one without the others. Each component has its own
 
 A personal content pipeline: daily tech news to Telegram, a weekly personalized
 arXiv digest, AI summaries with audio for both, and one web app to read them.
-Eight deployables, one GCP project (`feed-mind`), one Firestore database
+Six deployables, one GCP project (`feed-mind`), one Firestore database
 (`feed-mind-db`), all inside free-tier limits.
 
 It was three separate repos until they were merged here. Everything below used
@@ -27,9 +27,7 @@ whole point of the monorepo is that each one is now a single diff.
 ```
 apps/web/                    Svelte 5 + Vite PWA -> Firebase Hosting
 packages/feedmind-core/      shared: feed URLs -> Firestore (not deployed alone)
-services/news-ingest/        CF gen2, 08:00 — the only Telegram publisher
-services/topstories-ingest/  CF gen2, 08:00 — web reader only
-services/youtube-ingest/     CF gen2, 08:00 — youtube_videos
+services/ingest/             CF gen2, 08:00 — news + top stories + YouTube
 services/telegram-notifier/  CF gen2, Pub/Sub — sends the digest
 services/archive/            CF gen2, 1st & 16th — Firestore -> BigQuery
 services/paper-prism/        Cloud Run Job: paper-prism-job (Mondays)
@@ -42,29 +40,30 @@ scripts/                     test-all, lock-all, stage-service, deploy-feedmind,
                              setup-feedmind-infra, setup-wif
 ```
 
-The three ingest services all sit at 08:00, which is the slot the single
-combined function used — so the split changed no behaviour. They are separate
-Scheduler jobs now, so any of them can be moved by editing one line in
-`scripts/deploy-feedmind.sh`.
+`services/ingest` runs all three feed groups on one 08:00 schedule. The groups
+are separate YAML files rather than one list because they behave differently:
+only `news` goes to Telegram, only the RSS groups are summarized, and only they
+wake the AI-summary service.
 
 ## How the components fit together
 
 ```
-Scheduler ─08:00─▶ news-ingest ───────┐  also ─▶ feedmind-telegram-ready ─┐
-Scheduler ─08:00─▶ topstories-ingest ─┤                                   ▼
-Scheduler ─08:00─▶ youtube-ingest ────┤                          telegram-notifier
-Scheduler ─Mon ──▶ paper-prism-job ───┤                                   │
-                                      ▼                        queries telegram_status
-                        Firestore (feed-mind-db) ◀─────────────── == "pending", sends,
-                                      │  ▲                          flips to "sent"
-                                      │  │
-                    ┌─────────────────┘  └──── ai_summary, audio_url
-                    ▼                                    │
-                 apps/web                          feedmind-audio
-            (reads directly,                             ▲
-             no backend)          feedmind-content-ready ─┘
-                                   ▲          ▲
-                          news/topstories   paper-prism
+                    ┌── news.yaml       -> telegram_status=pending
+Scheduler ─08:00─▶ ingest ─ topstories.yaml -> telegram_status=skipped
+                    └── youtube.yaml    -> youtube_videos
+                          │
+                          │ once, after all three groups
+                          ├──▶ feedmind-telegram-ready ──▶ telegram-notifier
+                          │                                      │
+                          ▼                          queries telegram_status
+            Firestore (feed-mind-db) ◀──────────────── == "pending", sends,
+                    │   ▲   ▲                             flips to "sent"
+                    │   │   └──── paper-prism-job (Mondays)
+                    │   └──────── ai_summary, audio_url
+                    ▼                     ▲
+                 apps/web            feedmind-audio
+            (reads directly,              ▲
+             no backend)   feedmind-content-ready ─┘
 
 archive ─1st & 16th─▶ BigQuery (everything above, before it TTLs away)
 ```
@@ -84,10 +83,10 @@ both sides are in the same commit.
 |---|---|---|---|
 | `processed_articles` doc shape | `packages/feedmind-core/feedmind_core/store.py::save_article` | `apps/web/src/lib/data.js::getNews`, `ArticleCard.svelte` | both files |
 | `youtube_videos` doc shape | `…/store.py::save_video` | `apps/web/src/lib/data.js`, `VideoFeed.svelte` | both files |
-| `telegram_status` on an article | ingest services (via `save_article`) | `services/telegram-notifier` | see below — this one is load-bearing |
+| `telegram_status` on an article | `services/ingest` (via `save_article`) | `services/telegram-notifier` | see below — this one is load-bearing |
 | `runs` / `run_status` doc shape | `services/paper-prism/src/paper_prism/models.py` | `apps/web/src/lib/data.js::normalizeRun` | both files |
 | `ai_summary`, `audio_url`, `audio_generated_at` | `services/summarizer` | `apps/web` cards | all three writers' docs are affected |
-| Category codes | each ingest service's `feeds.yaml` | `apps/web/src/lib/constants.js::NEWS_CATEGORIES` | both — matched with `===` |
+| Category codes | `services/ingest/*.yaml` | `apps/web/src/lib/constants.js::NEWS_CATEGORIES` | both — matched with `===` |
 | Pub/Sub message shape | both producers' `events.py` | `services/summarizer/main.py` | producer + consumer |
 | Firestore database id | `FIRESTORE_DATABASE` (job + function env) | `VITE_FIRESTORE_DATABASE` (web, build-time) | **three** places, plus `firebase.json` |
 
@@ -118,7 +117,7 @@ is explicit:
 
 | `telegram_status` | Meaning | Set by |
 |---|---|---|
-| `pending` | stored, awaiting delivery | an ingest with `deliver_telegram: true` |
+| `pending` | stored, awaiting delivery | a feed group with `deliver_telegram: true` |
 | `sent` | Telegram accepted it | the notifier, after all chunks succeed |
 | `skipped` | this feed never goes to Telegram | everything else — **the default** |
 
@@ -136,10 +135,16 @@ Three rules keep this safe, and all three are easy to break:
    duplicate entry, never a silent hole — a repeated entry is a nuisance, a
    dropped one is invisible.
 
-The cost is one extra Firestore write per article. `exactly_one_service_delivers_to_telegram`
-in the core package's tests pins the "one ringer" assumption; more than one
-publisher is not broken, but it means two digests a day, which should be a
-decision rather than a discovery.
+The cost is one extra Firestore write per article.
+
+A fourth rule lives in the deploy script rather than the code:
+**`feedmind-telegram-notifier` is deployed with `--max-instances=1` and a 600s
+ack deadline.** Eventarc's default 60s deadline is shorter than a digest run
+with a backlog (`telegram.py` sleeps 1s after every message), so Pub/Sub would
+redeliver mid-run; a second instance would find the batch still `pending` and
+send the whole digest again. Capping instances makes a redelivery queue behind
+the running run instead of racing it. Removing either guard reintroduces a
+concurrent duplicate digest.
 
 ## The Pub/Sub topic is owned by its consumer
 
@@ -153,8 +158,8 @@ on both sides.
 `feedmind-telegram-ready` is the exception, and deliberately so: it is created
 by `scripts/setup-feedmind-infra.sh`, on the **publisher's** side. Producer and
 consumer are both FeedMind services here, so there is no boundary to respect —
-and news-ingest is very likely deployed before the notifier exists, so waiting
-for the consumer to create it would mean the first digest goes nowhere.
+and `services/ingest` is very likely deployed before the notifier exists, so
+waiting for the consumer to create it would mean the first digest goes nowhere.
 
 ## Retention: everything is on a clock
 
@@ -178,8 +183,8 @@ archive self-healing, so a missed run needs no recovery. See
 uvx ruff check .                   # repo-wide, config in ruff.toml
 
 ./scripts/setup-feedmind-infra.sh  # once per project: APIs, SAs, IAM, the topic
-./scripts/deploy-feedmind.sh       # all five FeedMind functions + their Scheduler jobs
-./scripts/deploy-feedmind.sh news-ingest    # or just one
+./scripts/deploy-feedmind.sh       # all three FeedMind functions + their Scheduler jobs
+./scripts/deploy-feedmind.sh ingest         # or just one
 ```
 
 Per-component commands are in each component's own `CLAUDE.md`. Deploys are
@@ -194,11 +199,11 @@ Every service has its own `pyproject.toml` and committed `uv.lock`. They are
 and they deploy as separate artifacts that never share an interpreter, so one
 shared resolution would force a version bump on somebody for no benefit.
 
-The five FeedMind services share `feedmind-core` as an **editable path
+The three FeedMind services share `feedmind-core` as an **editable path
 dependency**, so an edit to the package is picked up by `uv run` in any service
 with no reinstall. Each pulls only the extras it uses (`feeds`, `sumy`,
-`gemini`, `telegram`, `events`, `archive`) — youtube-ingest ships 44 packages
-where news-ingest ships 64. That only works because `models.py` is
+`gemini`, `telegram`, `events`, `archive`) — the notifier ships 47 packages
+where the ingest ships 64. That only works because `models.py` is
 standard-library-only and `runner.py`'s heavy imports are lazy; see
 `packages/feedmind-core/CLAUDE.md`.
 

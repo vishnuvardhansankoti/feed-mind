@@ -13,8 +13,8 @@ three services:
 
 | Section | Route | Collection | Written by |
 |---|---|---|---|
-| News | `#/news` | `processed_articles` | `services/news-ingest`, `services/topstories-ingest` |
-| Videos | `#/videos` | `youtube_videos` | `services/youtube-ingest` |
+| News | `#/news` | `processed_articles` | `services/ingest` (news + topstories groups) |
+| Videos | `#/videos` | `youtube_videos` | `services/ingest` (youtube group) |
 | Papers | `#/` | `runs`, `run_status` | `services/paper-prism` |
 | (all three) | — | `ai_summary`, `audio_url` fields | `services/summarizer` |
 | Saved / prefs | `#/saved` | `users/{uid}` | this app — the only write path |
@@ -36,7 +36,7 @@ Both backends return identical shapes. Firestore read access is public and gover
 
 ### News feed (second data source: the FeedMind ingest services)
 
-The web app is a two-section SPA behind a minimal hash router in `App.svelte`: **Papers** (`#/`, the arXiv digest above) and **News** (`#/news`). The News section reads a **different collection written by a different service** — `processed_articles` in the *same* `feed-mind-db` database, produced by `services/news-ingest` and `services/topstories-ingest`. `services/paper-prism` does not write it.
+The web app is a two-section SPA behind a minimal hash router in `App.svelte`: **Papers** (`#/`, the arXiv digest above) and **News** (`#/news`). The News section reads a **different collection written by a different service** — `processed_articles` in the *same* `feed-mind-db` database, produced by `services/ingest`. `services/paper-prism` does not write it.
 
 - **Schema coupling:** `getNews()` in `data.js` and `ArticleCard.svelte` depend on the doc shape written by `packages/feedmind-core/feedmind_core/store.py::save_article` (`title`, `url`, `feed_source`, `feed_category`, `summary`, `ai_summary`, `audio_url`, `processed_at`, `published_at`). This is the same convention-only coupling as `models.py ↔ data.js`: still enforced by nothing, but now visible in a single diff. Notably, `summary` was **added** to feed-mind for this feature; docs written before that lack it and the card degrades to no-summary.
 - **Audio + AI summary:** `ai_summary` (a longer LLM summary, shown behind an "AI summary" disclosure) and `audio_url` (a Cloud Storage object holding its spoken version, played by the card's Listen button) are written for every category **except `open-source`** — those are the client-pinned static links, which have no pipeline-generated content at all. Both fields are optional everywhere: `normalizeArticle` defaults them to `""` and the card hides the control, so pre-existing docs degrade rather than break. `publicAudioUrl` in `data.js` accepts either an `https://` URL or a `gs://` URI (rewritten to `storage.googleapis.com`) and rejects anything else, so the bucket **must be public-read** — the browser fetches the object directly with no signed URL and no backend.
@@ -46,11 +46,11 @@ The web app is a two-section SPA behind a minimal hash router in `App.svelte`: *
 - **Rules:** `../../infra/firebase/firestore.rules` adds `processed_articles` as public-read / `write: if false`. feed-mind writes via the Admin SDK (bypasses rules) and does **not** manage rules, so this app solely owns them on `feed-mind-db`.
 - **Mock parity:** `public/fixtures/news.json` backs `VITE_DATA_SOURCE=mock`. The mock path deliberately skips the 7-day cutoff (a static fixture would otherwise age out and render empty).
 
-### Videos (third section, from `services/youtube-ingest`)
+### Videos (third section, from `services/ingest`)
 
 `#/videos` reads `youtube_videos` in `feed-mind-db`, written by `packages/feedmind-core/feedmind_core/store.py::save_video` (`video_id`, `url`, `title`, `channel`, `thumbnail_url`, `published_at`, `processed_at`) — same convention-only coupling as `processed_articles`. One query backs both tabs (`VIDEO_WINDOW_DAYS` = 3, `VIDEO_MAX_ITEMS` = 200).
 
-**Latest is an ingest batch, not a time window — this is the whole design.** `services/youtube-ingest` writes a video once, on first sight, stamping `processed_at` with that run's `now`; the doc id is the video id, so re-runs never restamp. `lib/videos.js::latestBatch` anchors to the **newest `processed_at` present in the data** and keeps everything within `VIDEO_BATCH_TOLERANCE_HOURS` (6) of it. Any clock-relative rule (the two earlier ones: newest calendar day, then rolling 24h) makes the tab **shrink through the day** as videos age past the cutoff with no new run — the failure this design exists to prevent, pinned by tests in `videos.test.js` and `VideoFeed.test.js` that advance the clock and assert the count holds. For the same reason the Firestore query windows on `processed_at`, not `published_at`: a batch then ages out of the 3-day window all at once instead of one video at a time. Display order is still `published_at` desc (`byPublishedDesc` re-sorts, since `processed_at` is uniform within a batch), and Archive buckets by publish day.
+**Latest is an ingest batch, not a time window — this is the whole design.** `services/ingest` writes a video once, on first sight, stamping `processed_at` with that run's `now`; the doc id is the video id, so re-runs never restamp. `lib/videos.js::latestBatch` anchors to the **newest `processed_at` present in the data** and keeps everything within `VIDEO_BATCH_TOLERANCE_HOURS` (6) of it. Any clock-relative rule (the two earlier ones: newest calendar day, then rolling 24h) makes the tab **shrink through the day** as videos age past the cutoff with no new run — the failure this design exists to prevent, pinned by tests in `videos.test.js` and `VideoFeed.test.js` that advance the clock and assert the count holds. For the same reason the Firestore query windows on `processed_at`, not `published_at`: a batch then ages out of the 3-day window all at once instead of one video at a time. Display order is still `published_at` desc (`byPublishedDesc` re-sorts, since `processed_at` is uniform within a batch), and Archive buckets by publish day.
 
 Videos with no parseable `processed_at` can't be placed in a batch, so Latest omits them and says so; Archive still lists them under a `—` header. Both `VideoFeed` and `VideoCard` must guard dates with `isDate`, never truthiness — an Invalid Date is truthy and `Intl.DateTimeFormat` throws on it, taking down the whole feed render.
 

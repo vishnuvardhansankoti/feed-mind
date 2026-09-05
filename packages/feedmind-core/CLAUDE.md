@@ -33,7 +33,7 @@ code change — which is the whole reason this package exists.
 **1. `models.py` must not import anything outside the standard library, and
 lazy imports in `runner.py` must stay lazy.** Both exist to make the per-service
 dependency extras work. The notifier installs `feedmind-core[telegram]` and has
-no feedparser; youtube-ingest installs `[feeds]` and has no pubsub. A top-level
+no feedparser; a fetch-only service could install `[feeds]` and have no pubsub. A top-level
 `from feedmind_core.ingestion import Article` in `store.py` or `telegram.py`
 puts feedparser back in everybody's image, and the ImportError lands at cold
 start rather than at deploy time. `scripts/test-all.sh` smoke-tests every

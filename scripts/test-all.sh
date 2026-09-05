@@ -25,7 +25,7 @@ run "apps/web (vitest)"               apps/web               npm test
 # runner call. Their import is smoke-tested here instead — that is what catches
 # a service whose dependency extras are missing something it uses.
 printf '\n\033[1m==> FeedMind service entry points (import smoke test)\033[0m\n'
-for s in news-ingest topstories-ingest youtube-ingest telegram-notifier archive; do
+for s in ingest telegram-notifier archive; do
     if ( cd "services/$s" && uv run --quiet python -c "import main" >/dev/null 2>&1 ); then
         echo "  ok: $s"
     else

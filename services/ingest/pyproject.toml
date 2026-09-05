@@ -1,11 +1,11 @@
 [project]
-name = "feedmind-youtube-ingest"
+name = "feedmind-ingest"
 version = "1.0.0"
-description = "YouTube uploads ingest for the web reader's Videos tab"
+description = "Daily ingest of news, top stories and YouTube into Firestore"
 # The python312 Cloud Functions runtime, matching feedmind-core.
 requires-python = ">=3.12"
 dependencies = [
-    "feedmind-core[feeds]",
+    "feedmind-core[feeds,sumy,events]",
     "functions-framework==3.8.1",
 ]
 

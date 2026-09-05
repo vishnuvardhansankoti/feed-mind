@@ -1,18 +1,8 @@
-# feedmind-news-ingest — the daily digest feeds.
-#
-# This file plus the Cloud Scheduler cron IS the service; main.py beside it is
-# a dozen lines that hand this to feedmind_core.runner.
-#
-# The only ingest service with deliver_telegram: true. Articles it stores are
-# marked telegram_status=pending, and it rings the notifier's doorbell when the
-# run finishes.
-#
-# `category` must match apps/web/src/lib/constants.js::NEWS_CATEGORIES exactly —
-# the reader matches with ===, and the separators are inconsistent by design
-# (open-source hyphenates, top_stories underscores). Changing one without the
-# other empties a tab with no error on either side.
+# One of three feed groups ingested by feedmind-ingest. This group's articles
+# are the digest: they are stored with telegram_status=pending, and the service
+# rings the notifier's doorbell once at the end of the run if any landed.
 
-service: feedmind-news-ingest
+service: news
 kind: rss
 summarize: sumy
 deliver_telegram: true

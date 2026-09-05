@@ -13,7 +13,7 @@ service, validated on load, and changing it cannot affect anything else.
 
 Schema (see any service's feeds.yaml for a worked example):
 
-    service: feedmind-news-ingest   # informational; appears in logs
+    service: news                   # informational; appears in logs
     kind: rss                       # rss | youtube
     summarize: sumy                 # sumy | gemini | none
     deliver_telegram: true          # mark articles PENDING and ring the doorbell

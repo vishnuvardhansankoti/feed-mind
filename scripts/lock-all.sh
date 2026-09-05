@@ -26,7 +26,7 @@ printf '\n\033[1m==> packages/feedmind-core\033[0m\n'
 # package is not pip-installed in the deployed function at all — the deploy
 # staging step copies the source in beside main.py — and a `file:///Users/...`
 # line in requirements.txt would fail the Cloud Build every time.
-for s in news-ingest topstories-ingest youtube-ingest telegram-notifier archive; do
+for s in ingest telegram-notifier archive; do
     printf '\n\033[1m==> services/%s\033[0m\n' "$s"
     ( cd "services/$s" \
       && uv lock \

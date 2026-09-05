@@ -1,19 +1,8 @@
-# feedmind-youtube-ingest — YouTube channel uploads for the web reader's Videos tab.
-#
-# Videos are never summarized and never sent to Telegram, so both flags are off
-# and `summarize: none` skips the NLTK download entirely — that is most of this
-# function's cold start, and it would buy nothing here.
-#
-# content_ready is false: the summarizer has an RSS_FEED pipeline and a
-# RESEARCH_PAPERS one, and neither reads youtube_videos. Waking it would cost a
-# cold start to find nothing to do.
-#
-# Note the web reader's "Latest" is an ingest BATCH, not a time window: it
-# anchors on the newest processed_at present. A video is written once, on first
-# sight, and re-runs never restamp it — so changing this service's schedule
-# changes which videos group together, not how long they stay visible.
+# One of three feed groups ingested by feedmind-ingest. Videos are never
+# summarized and never sent to Telegram, so `summarize: none` skips the NLTK
+# download entirely — that is most of the cold start, and it would buy nothing.
 
-service: feedmind-youtube-ingest
+service: youtube
 kind: youtube
 summarize: none
 deliver_telegram: false

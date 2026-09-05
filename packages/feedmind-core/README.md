@@ -11,7 +11,7 @@ of them by being copied into the deploy directory — see
 Two files. A `feeds.yaml`:
 
 ```yaml
-service: feedmind-news-ingest
+service: news
 kind: rss                 # rss | youtube
 summarize: sumy           # sumy | gemini | none
 deliver_telegram: true    # mark articles pending, then ring the notifier
@@ -32,7 +32,7 @@ from feedmind_core import runner, serviceconfig
 CONFIG = serviceconfig.load_beside(__file__)
 
 @functions_framework.http
-def news_ingest(request):
+def ingest(request):
     return json.dumps(runner.run_rss_ingest(CONFIG)), 200
 ```
 
