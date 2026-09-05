@@ -24,11 +24,6 @@ def test_telegram_config():
     assert isinstance(config.TELEGRAM_MAX_MESSAGE_LENGTH, int)
 
 
-def test_gemini_toggles():
-    assert isinstance(config.ENABLE_GEMINI_SUMMARIES, bool)
-    assert isinstance(config.GEMINI_REQUEST_DELAY_S, (int, float))
-
-
 
 def test_youtube_config():
     assert isinstance(config.MAX_VIDEO_AGE_DAYS, int)

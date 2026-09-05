@@ -2,7 +2,7 @@
 summarization.py — Article summarization backends.
 
 Two interchangeable implementations, selected at runtime by
-config.ENABLE_GEMINI_SUMMARIES:
+the feed group's `summarize:` setting:
   - summarize_with_sumy(): offline extractive summarization (sumy LSA + NLTK).
     The default. No API key, no network call, deterministic, cannot hallucinate.
   - summarize(): abstractive summarization via the Gemini API. Opt-in.

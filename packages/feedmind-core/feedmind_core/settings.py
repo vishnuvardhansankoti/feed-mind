@@ -28,7 +28,10 @@ SECRET_NAME_GEMINI_API_KEY = "GEMINI_API_KEY"
 # ---------------------------------------------------------------------------
 # Gemini
 # ---------------------------------------------------------------------------
-ENABLE_GEMINI_SUMMARIES = False
+# NOTE: which summarizer runs is per feed group — `summarize: sumy|gemini|none`
+# in the group's YAML — not a global flag. The old ENABLE_GEMINI_SUMMARIES
+# constant was removed when the services split; it had become a second source of
+# truth that nothing read.
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_TIMEOUT_SECONDS = 30
 GEMINI_REQUEST_DELAY_S = 4  # sleep between Gemini calls to respect free-tier RPM (~15/min)

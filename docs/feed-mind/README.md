@@ -34,7 +34,7 @@ services/telegram-notifier/      Pub/Sub-triggered digest sender
 services/archive/                Firestore -> BigQuery, 1st & 16th
 
 scripts/setup-feedmind-infra.sh  once per project: APIs, SAs, IAM, the topic
-scripts/deploy-feedmind.sh       deploy any or all five, plus Scheduler jobs
+scripts/deploy-feedmind.sh       deploy any or all three, plus Scheduler jobs
 scripts/stage-service.sh         bundles a service + feedmind_core for upload
 ```
 

@@ -7,6 +7,7 @@ what breaks when you change one without the others. Each component has its own
 `CLAUDE.md` with the detail — read the nearest one for the code you are touching:
 
 - `packages/feedmind-core/CLAUDE.md` — the pipeline the ingest services share
+- `docs/feed-mind/archived-gcp-resources.md` — legacy GCP resources still to delete
 - `services/paper-prism/CLAUDE.md` — the weekly arXiv digest job
 - `services/summarizer/CLAUDE.md` — AI summaries and audio
 - `apps/web/CLAUDE.md` — the Svelte PWA that reads all of it

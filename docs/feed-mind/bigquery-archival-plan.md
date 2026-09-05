@@ -84,11 +84,11 @@ Every table gets explicit typed columns *and* a `raw` JSON column holding the un
 
 ### 3.6 Second function in this repo
 
-Reuses `deploy.sh`, `feedmind-sa`, `config.py`, `secrets.py`, and `notification.py`. Uses the 2nd of 3 free Scheduler jobs.
+Reuses `scripts/deploy-feedmind.sh`, `feedmind-sa`, and the core package's `settings.py`, `secrets.py` and `telegram.py`. Uses the 2nd of 3 free Scheduler jobs.
 
 **Rejected:** GitHub Actions cron. Genuinely free, and WIF is already set up (`setup-wif.sh`) — but GitHub **silently disables scheduled workflows after 60 days without a commit**, and its cron is best-effort and frequently delayed. For a twice-monthly job protecting a 45-day TTL on a repo that may go quiet, that is a direct data-loss path.
 
-**Rejected:** folding it into the daily `feedmind` function. No new Scheduler job needed, but it runs inside the 300s hard limit and makes an archival bug capable of breaking the daily Telegram digest.
+**Rejected:** folding it into the daily ingest function. No new Scheduler job needed, but it runs inside the 300s hard limit and makes an archival bug capable of breaking the daily Telegram digest.
 
 ### 3.7 Telegram run report
 

@@ -138,7 +138,7 @@ From the GitHub UI: **Actions → Deploy FeedMind to GCP → Run workflow → Ru
 Or trigger Cloud Scheduler directly to test the function:
 
 ```bash
-gcloud scheduler jobs run feedmind-daily-trigger \
+gcloud scheduler jobs run feedmind-ingest-job \
   --location=us-central1 \
   --project=your-gcp-project-id
 ```

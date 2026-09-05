@@ -56,6 +56,11 @@ is invisible.
 
 ## Deploying
 
+**Delete the legacy resources first** — see
+[`archived-gcp-resources.md`](archived-gcp-resources.md). The old `feedmind`
+function and its `feedmind-daily-trigger` job also fire at 08:00, and leaving
+them enabled splits the day's articles across two partial digests.
+
 ```bash
 ./scripts/setup-feedmind-infra.sh    # once: APIs, SAs, IAM, the topic
 ./scripts/deploy-feedmind.sh         # all three, plus Scheduler jobs
