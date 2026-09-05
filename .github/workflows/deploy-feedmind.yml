@@ -1,0 +1,101 @@
+name: Deploy FeedMind functions
+
+# Manual only — never triggers automatically. Run it from the Actions tab
+# ("Run workflow") and pick which function to deploy.
+#
+# One workflow for all five because they differ only in name, trigger, timeout
+# and schedule; scripts/deploy-feedmind.sh owns those differences and stays the
+# single source of truth for them.
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Which function to deploy"
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - news-ingest
+          - topstories-ingest
+          - youtube-ingest
+          - telegram-notifier
+          - archive
+      region:
+        description: "GCP region"
+        required: false
+        default: us-central1
+
+permissions:
+  contents: read
+  id-token: write        # Workload Identity Federation
+
+concurrency:
+  group: deploy-feedmind
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.12
+      # ruff.toml is at the repo root and covers every service.
+      - name: Ruff
+        run: uvx ruff check .
+      # The services are thin wrappers; the suite that matters is the core
+      # package's, and it validates every service's feeds.yaml directly — so a
+      # typo in a feed URL fails here rather than at 08:00 in a cold start.
+      - name: Core package tests
+        working-directory: packages/feedmind-core
+        run: uv run --quiet pytest -q
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ inputs.region }}
+      SERVICE_ACCOUNT: ${{ secrets.FUNCTION_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keyless auth — no long-lived service account key is stored anywhere.
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: astral-sh/setup-uv@v3
+
+      # requirements.txt is generated from pyproject.toml, so regenerate it here
+      # rather than trusting whatever was committed. deploy-feedmind.sh then
+      # stages each function with feedmind_core copied in beside main.py.
+      - name: Regenerate requirements.txt
+        run: ./scripts/lock-all.sh
+
+      - name: Deploy
+        run: |
+          if [ "${{ inputs.service }}" = "all" ]; then
+            ./scripts/deploy-feedmind.sh
+          else
+            ./scripts/deploy-feedmind.sh "${{ inputs.service }}"
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### FeedMind deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Target** | \`${{ inputs.service }}\` |"
+            echo "| **Region** | \`${{ inputs.region }}\` |"
+            echo "| **Commit** | \`${{ github.sha }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

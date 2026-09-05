@@ -5,19 +5,25 @@ Trigger them from the **Actions** tab → pick the workflow → **Run workflow**
 
 | Workflow | Deploys | Underlying scripts |
 |---|---|---|
-| `deploy-feed-mind.yml` | Cloud Function `feedmind` (RSS → Telegram) | inline `gcloud functions deploy` |
+| `deploy-feedmind.yml` | any or all five FeedMind functions, plus their Scheduler jobs | `scripts/deploy-feedmind.sh` |
 | `deploy-paper-prism.yml` | Cloud Build image → Cloud Run Job `paper-prism-job` | `services/paper-prism/deploy/02..04-*.sh` |
 | `deploy-summarizer.yml` | Cloud Function `feedmind-audio` (Pub/Sub) | `services/summarizer/deploy/deploy.sh` |
 | `deploy-web.yml` | `vite build` → Firebase Hosting | `firebase.json` (`apps/web/dist`) |
 
-**Not covered by CI:** the `feedmind-archive` function and both Cloud Scheduler
-jobs. `deploy-feed-mind.yml` deploys only the daily function and re-points its
-existing scheduler job; the archive function and first-time scheduler creation
-come from running `services/feed-mind/deploy.sh` locally.
+`deploy-feedmind.yml` takes a `service` input — `all`, or one of `news-ingest`,
+`topstories-ingest`, `youtube-ingest`, `telegram-notifier`, `archive`. It lints
+and runs the core package's tests first, regenerates every `requirements.txt`
+from `pyproject.toml`, then stages each function with `feedmind_core` copied in
+beside `main.py` (Cloud Functions uploads only `--source`, and the shared
+package lives outside every service directory).
+
+**Not covered by CI:** project-level setup — APIs, service accounts, IAM and the
+`feedmind-telegram-ready` topic. Run `scripts/setup-feedmind-infra.sh` once,
+locally, before the first deploy.
 
 ## Two auth mechanisms, on purpose (for now)
 
-`deploy-feed-mind.yml` uses **Workload Identity Federation** — no long-lived key.
+`deploy-feedmind.yml` uses **Workload Identity Federation** — no long-lived key.
 The other three use a **service-account JSON key** in `GCP_SA_KEY`, inherited
 from paper-prism. Consolidating on WIF is worth doing, but was kept out of the
 monorepo merge so a deploy failure would have one possible cause instead of two.

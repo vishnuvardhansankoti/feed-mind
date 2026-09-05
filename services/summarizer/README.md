@@ -5,7 +5,7 @@ Two command-line tools built on one library:
 | | |
 |---|---|
 | **`web-page-scraper.py`** | Scrape a page, strip the ads and chrome, print the article. Optionally summarize it with an LLM and read it aloud. |
-| **`feedmind_audio.py`** | Take the newest [FeedMind](../feed-mind/) article out of Firestore, summarize it, and publish the audio to Cloud Storage. |
+| **`feedmind_audio.py`** | Take the newest [FeedMind](../news-ingest/) article out of Firestore, summarize it, and publish the audio to Cloud Storage. |
 | **`webscraper/`** | The package both scripts import. |
 
 The core extraction path is standard library only. spaCy, pyttsx3 and the Google Cloud clients are optional and imported lazily — the scraper still runs without any of them.

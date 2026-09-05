@@ -68,7 +68,7 @@ from webscraper.fetcher import fetch  # noqa: E402
 from webscraper.llm import summarize  # noqa: E402
 from webscraper.speech import speak  # noqa: E402
 
-# -- FeedMind's own settings; see feed-mind/feedmind/config.py ---------------
+# -- FeedMind's own settings; see packages/feedmind-core/feedmind_core/settings.py
 GCP_PROJECT_ID = "feed-mind"
 FIRESTORE_DATABASE = "feed-mind-db"
 ARTICLES_COLLECTION = "processed_articles"

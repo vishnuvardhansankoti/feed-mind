@@ -160,7 +160,7 @@ The `run_status` collection is **not** archived.
 
 ## 5. Companion change: persist `snippet` — **shipped**
 
-`mark_as_delivered` previously wrote `article_id, url, title, feed_source, feed_category, summary, published_at, processed_at, expires_at, status`. The `snippet` — up to 2,000 chars of actual article text, already fetched and already used for summarization — was **discarded**, leaving a corpus of titles, one-sentence summaries and URLs. No prose. (Papers were never affected: `abstract` is persisted upstream.)
+`mark_as_delivered` (now `feedmind_core.store.save_article`) previously wrote `article_id, url, title, feed_source, feed_category, summary, published_at, processed_at, expires_at, status`. The `snippet` — up to 2,000 chars of actual article text, already fetched and already used for summarization — was **discarded**, leaving a corpus of titles, one-sentence summaries and URLs. No prose. (Papers were never affected: `abstract` is persisted upstream.)
 
 `"snippet": article.snippet` now goes into the `doc_ref.set()` payload. Firestore cost is roughly 200 KB/day against a 1 GiB free tier.
 

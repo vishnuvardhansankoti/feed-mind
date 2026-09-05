@@ -14,7 +14,7 @@ new content, scrapes each article or paper, writes a longer LLM summary
 and uploads the MP3 to a public Cloud Storage bucket (`audio_url`).
 
 It is a **second writer to documents it does not own** — `processed_articles`
-and `youtube_videos` belong to `services/feed-mind`, `runs` to
+and `youtube_videos` belong to the FeedMind ingest services, `runs` to
 `services/paper-prism`. It only ever adds `ai_summary` / `audio_url` /
 `audio_generated_at`; it never creates or deletes a document.
 
@@ -87,7 +87,7 @@ gcloud functions logs read feedmind-audio --gen2 --region=us-central1 --limit=50
 
 `requirements.txt` is **generated** from `pyproject.toml`
 (`../../scripts/lock-all.sh`); `uv.lock` is committed. This is an independent uv
-project — it pins `google-cloud-firestore==2.28.1` where `services/feed-mind`
+project — it pins `google-cloud-firestore==2.28.1` where `packages/feedmind-core`
 pins `==2.19.0`, and nothing forces those to agree.
 
 ## No test suite

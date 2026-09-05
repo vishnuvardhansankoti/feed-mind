@@ -1,35 +1,43 @@
 # FeedMind
 
-A self-hosted, serverless RSS ingestion and AI-summarization pipeline running on GCP.
+The RSS side of this repo: daily tech news to Telegram, plus the Firestore →
+BigQuery archive. Runs on GCP inside free-tier limits.
 
-Ingests 11 RSS feeds (AI/ML research, industry news, cloud computing), summarizes new articles using **Gemini 3.5 Flash Lite** (or the offline **Sumy NLP** library), and pushes batched notifications to a private **Telegram bot** — once daily, at $0/month.
+> **Structure note.** This was one Cloud Function until it was split into a
+> shared package and five single-purpose functions. Setup, secrets and
+> operational detail below are still current; for how the pieces fit together
+> now, read [`architecture.md`](architecture.md) first.
 
----
-
-## Project Structure
+## Layout
 
 ```
-services/feed-mind/
-├── main.py             # Two Cloud Function entry points: feedmind (daily) and archive
-├── feedmind/           # Core application package
-│   ├── __init__.py
-│   ├── config.py       # Feed URLs, constants, system prompt, BigQuery settings
-│   ├── secrets.py      # GCP Secret Manager loader
-│   ├── ingestion.py    # RSS feed fetching & parsing (feedparser)
-│   ├── deduplication.py # Firestore dedup check & write
-│   ├── summarization.py # Gemini AI & Sumy offline NLP summarization
-│   ├── notification.py # Telegram batched message delivery
-│   ├── events.py       # Pub/Sub announcement when a run finishes
-│   ├── archival.py     # Firestore doc → BigQuery row shaping, table specs
-│   └── bigquery.py     # Dataset/table creation, batch load + MERGE
-├── docs/
-│   └── bigquery-archival-plan.md  # Full design & rationale for the archive
-├── tests/              # Unit tests
-│   ├── __init__.py
-│   └── test_config.py
-├── pyproject.toml      # Python dependencies & config
-└── deploy.sh           # One-shot GCP deployment script (both functions)
+packages/feedmind-core/          the pipeline: feed URLs -> Firestore
+  feedmind_core/
+    serviceconfig.py             feeds.yaml -> ServiceConfig
+    runner.py                    the ingest pipeline itself
+    models.py                    Article, Video (stdlib only)
+    ingestion.py                 feedparser wrappers
+    store.py                     Firestore reads/writes + the notifier queue
+    summarization.py             Gemini and offline Sumy
+    telegram.py                  message formatting + Bot API
+    events.py                    Pub/Sub announcements
+    secrets.py                   Secret Manager
+    settings.py                  shared constants (never feed lists)
+    archival.py, bigquery.py     the archive's transforms and client work
+  tests/                         the suite for all of the above
+
+services/news-ingest/            17 digest feeds, 08:00, publishes to Telegram
+services/topstories-ingest/      general news, web reader only
+services/youtube-ingest/         channel uploads -> youtube_videos
+services/telegram-notifier/      Pub/Sub-triggered digest sender
+services/archive/                Firestore -> BigQuery, 1st & 16th
+
+scripts/setup-feedmind-infra.sh  once per project: APIs, SAs, IAM, the topic
+scripts/deploy-feedmind.sh       deploy any or all five, plus Scheduler jobs
+scripts/stage-service.sh         bundles a service + feedmind_core for upload
 ```
+
+Each ingest service is a `feeds.yaml`, a cron, and a dozen-line `main.py`.
 
 ---
 
@@ -132,7 +140,7 @@ gcloud logging read \
 
 As its last step, FeedMind publishes to a Pub/Sub topic so downstream consumers
 know new articles have landed. Today there is one consumer —
-[`feed-mind-summarizer`](../feed-mind-summarizer), which turns those articles
+[`services/summarizer`](../../services/summarizer), which turns those articles
 into spoken summaries.
 
 ```
@@ -161,7 +169,7 @@ Two deliberate behaviours in `feedmind/events.py`:
 Publishing happens after every article is written to Firestore — the consumer
 reads that collection, so announcing any earlier would race it.
 
-| Setting | In `feedmind/config.py` |
+| Setting | In `feedmind_core/settings.py` (or a service's `feeds.yaml`) |
 |---|---|
 | `ENABLE_CONTENT_READY_EVENTS` | `True` — set `False` to stop announcing |
 | `CONTENT_READY_TOPIC` | `feedmind-content-ready` |
@@ -310,7 +318,7 @@ instead of guessing. Neither costs anything:
 
 ### Archive configuration
 
-In `feedmind/config.py`:
+In `packages/feedmind-core/feedmind_core/settings.py`:
 
 | Setting | Default | Notes |
 |---|---|---|

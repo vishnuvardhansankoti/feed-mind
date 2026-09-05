@@ -7,9 +7,9 @@ missing-field / empty-window states throughout. See `../../docs/paper-prism/pape
 
 | Section | Route | Collection | Written by |
 |---|---|---|---|
-| News | `#/` (landing) | `processed_articles` | `services/feed-mind` |
+| News | `#/` (landing) | `processed_articles` | `services/news-ingest`, `services/topstories-ingest` |
 | Papers | `#/papers` | `runs`, `run_status` | `services/paper-prism` |
-| Videos | `#/videos` | `youtube_videos` | `services/feed-mind` |
+| Videos | `#/videos` | `youtube_videos` | `services/youtube-ingest` |
 
 Every optional field degrades to "control not rendered" rather than an error —
 paper `summary`/`abstract`/`ai_summary`/`audio_url`, article
