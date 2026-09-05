@@ -1,0 +1,36 @@
+# feedmind-youtube-ingest — YouTube channel uploads for the web reader's Videos tab.
+#
+# Videos are never summarized and never sent to Telegram, so both flags are off
+# and `summarize: none` skips the NLTK download entirely — that is most of this
+# function's cold start, and it would buy nothing here.
+#
+# content_ready is false: the summarizer has an RSS_FEED pipeline and a
+# RESEARCH_PAPERS one, and neither reads youtube_videos. Waking it would cost a
+# cold start to find nothing to do.
+#
+# Note the web reader's "Latest" is an ingest BATCH, not a time window: it
+# anchors on the newest processed_at present. A video is written once, on first
+# sight, and re-runs never restamp it — so changing this service's schedule
+# changes which videos group together, not how long they stay visible.
+
+service: feedmind-youtube-ingest
+kind: youtube
+summarize: none
+deliver_telegram: false
+content_ready: false
+
+feeds:
+  - name: Aishwarya Srinivasan
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCzd4ZN716evEjtbJERBMTfg
+  - name: Vaibhav
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UClXAalunTPaX1YV185DWUeg
+  - name: HyperAutomation Labs
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCiax-xbEI0P6Y8C8VwZGMgQ
+  - name: Think School
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCKZozRVHRYsYHGEyNKuhhdA
+  - name: AI Revolution
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UC5l7RouTQ60oUjLjt1Nh-UQ
+  - name: Sam Witteveen AI
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UC55ODQSvARtgSyc8ThfiepQ
+  - name: Fahd Mirza
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCPix8N6PMRI4KzgyjuZeF0g

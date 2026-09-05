@@ -62,6 +62,12 @@ infra/terraform/*.tfstate
 infra/terraform/*.tfstate.*
 crash.log
 
+# --- Deploy staging ---
+# scripts/stage-service.sh assembles a service plus feedmind_core here, because
+# `gcloud functions deploy --source` uploads one directory and the shared
+# package lives outside it. Rebuilt from scratch on every deploy.
+services/*/.build/
+
 # --- Service run artifacts ---
 services/paper-prism/output/
 *.mp3

@@ -1,0 +1,21 @@
+# feedmind-topstories-ingest — general news for the web reader only.
+#
+# deliver_telegram is false: these articles are stored with
+# telegram_status=skipped, so the notifier never picks them up. This was the
+# `post_to_telegram: False` flag on the single TOI feed in the old combined
+# config; splitting it into its own service is what makes it schedulable
+# separately from the digest.
+#
+# content_ready is still true — the summarizer generates an AI summary and
+# audio for these, which the web reader shows.
+
+service: feedmind-topstories-ingest
+kind: rss
+summarize: sumy
+deliver_telegram: false
+content_ready: true
+
+feeds:
+  - name: TOI Top Stories
+    url: https://timesofindia.indiatimes.com/rssfeedstopstories.cms
+    category: top_stories

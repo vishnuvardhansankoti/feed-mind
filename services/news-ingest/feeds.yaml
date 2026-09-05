@@ -1,0 +1,77 @@
+# feedmind-news-ingest — the daily digest feeds.
+#
+# This file plus the Cloud Scheduler cron IS the service; main.py beside it is
+# a dozen lines that hand this to feedmind_core.runner.
+#
+# The only ingest service with deliver_telegram: true. Articles it stores are
+# marked telegram_status=pending, and it rings the notifier's doorbell when the
+# run finishes.
+#
+# `category` must match apps/web/src/lib/constants.js::NEWS_CATEGORIES exactly —
+# the reader matches with ===, and the separators are inconsistent by design
+# (open-source hyphenates, top_stories underscores). Changing one without the
+# other empties a tab with no error on either side.
+
+service: feedmind-news-ingest
+kind: rss
+summarize: sumy
+deliver_telegram: true
+content_ready: true
+
+feeds:
+  # --- Academic / Research ---
+  - name: Hugging Face Papers
+    url: https://huggingface.co/blog/feed.xml
+    category: academic
+  - name: Google Research Blog
+    url: https://research.google/blog/rss/
+    category: academic
+  - name: Microsoft Research
+    url: https://www.microsoft.com/en-us/research/feed/
+    category: academic
+  - name: Google Developers Blog
+    url: https://developers.googleblog.com/feeds/posts/default/
+    category: academic
+
+  # --- Industry ---
+  - name: NVIDIA Developer Blog
+    url: https://developer.nvidia.com/blog/feed/
+    category: industry
+  - name: OpenAI News
+    url: https://openai.com/news/rss.xml
+    category: industry
+  - name: Google DeepMind
+    url: https://deepmind.google/blog/rss.xml
+    category: industry
+  - name: TechCrunch AI
+    url: https://techcrunch.com/category/artificial-intelligence/feed/
+    category: industry
+  - name: ByteByteGo
+    url: https://blog.bytebytego.com/feed
+    category: industry
+  - name: Daily AI
+    url: https://dailyai.com/feed/
+    category: industry
+  - name: Meta Engineering
+    url: https://engineering.fb.com/feed/
+    category: industry
+  - name: Netflix Tech Blog
+    url: https://netflixtechblog.com/feed
+    category: industry
+
+  # --- Cloud ---
+  - name: CNCF Blog
+    url: https://www.cncf.io/blog/feed/
+    category: cloud
+  - name: AWS News Blog
+    url: https://aws.amazon.com/blogs/aws/feed/
+    category: cloud
+  - name: Google Cloud Blog
+    url: https://cloudblog.withgoogle.com/rss
+    category: cloud
+  - name: Azure Updates
+    url: https://azure.microsoft.com/en-us/blog/feed/
+    category: cloud
+  - name: Amazon ML Research
+    url: https://aws.amazon.com/blogs/machine-learning/feed/
+    category: cloud

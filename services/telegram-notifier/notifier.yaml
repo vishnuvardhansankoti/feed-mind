@@ -1,0 +1,30 @@
+# feedmind-telegram-notifier — what the digest looks like.
+#
+# This service holds no feed URLs. It never fetches anything; it reads whatever
+# the ingest services left marked telegram_status=pending in Firestore. So the
+# only configuration it needs is presentation.
+
+service: feedmind-telegram-notifier
+
+# Category order in the digest. Categories present in the pending set but
+# missing here are appended afterwards in whatever order they arrive, so a new
+# category renders sanely without an edit — it just lands at the bottom.
+category_order:
+  - academic
+  - industry
+  - cloud
+  - open-source
+  - top_stories
+
+# Evergreen links appended to every digest, with no RSS source behind them.
+#
+# These are NOT written to Firestore, and must not be: the web reader pins the
+# same links client-side (constants.js::STATIC_NEWS_LINKS) and dedupes by
+# article_id, so persisting them here would create a redundant document every
+# single day. They live in this service because they are purely a digest
+# concern — no ingest service knows about them.
+static_links:
+  - title: GitHub Trending
+    url: https://github.com/trending
+    category: open-source
+    message: Check out today's trending open-source repositories!

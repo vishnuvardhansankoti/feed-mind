@@ -13,12 +13,25 @@ run() {  # run <label> <dir> <command...>
     ( cd "$dir" && "$@" ) || { echo "  FAILED: $label" >&2; fail=1; }
 }
 
-run "services/feed-mind (pytest)"   services/feed-mind   uv run --extra dev pytest -q
-run "services/paper-prism (pytest)" services/paper-prism uv run --extra dev pytest -q
-run "apps/web (vitest)"             apps/web             npm test
+# The FeedMind services are thin wrappers around feedmind-core; the suite that
+# matters lives with the package, and it validates every service's feeds.yaml
+# directly (tests/test_service_configs.py) rather than mocking one up.
+run "packages/feedmind-core (pytest)" packages/feedmind-core uv run --quiet pytest -q
+run "services/paper-prism (pytest)"   services/paper-prism   uv run --quiet --extra dev pytest -q
+run "apps/web (vitest)"               apps/web               npm test
 
-# services/summarizer has no test suite. Its entry points are exercised by hand
-# with `./deploy/publish.sh RSS_FEED --limit 1 --force --dry-run`.
-printf '\n\033[1m==> services/summarizer: no test suite (see README)\033[0m\n'
+# No test suite: services/summarizer (exercised by ./deploy/publish.sh --dry-run)
+# and the five FeedMind service entry points, which are a config load plus one
+# runner call. Their import is smoke-tested here instead — that is what catches
+# a service whose dependency extras are missing something it uses.
+printf '\n\033[1m==> FeedMind service entry points (import smoke test)\033[0m\n'
+for s in news-ingest topstories-ingest youtube-ingest telegram-notifier archive; do
+    if ( cd "services/$s" && uv run --quiet python -c "import main" >/dev/null 2>&1 ); then
+        echo "  ok: $s"
+    else
+        echo "  FAILED: services/$s does not import" >&2
+        fail=1
+    fi
+done
 
 exit $fail
