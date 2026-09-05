@@ -1,0 +1,95 @@
+# --- Artifact Registry (holds the ONNX-slim pipeline image) ---
+resource "google_artifact_registry_repository" "repo" {
+  location      = var.region
+  repository_id = "paper-prism"
+  format        = "DOCKER"
+  description   = "paper-prism pipeline images"
+
+  depends_on = [google_project_service.enabled]
+}
+
+# --- Firestore (native mode) + the one composite index the UI needs ---
+# NOTE: var.firestore_database defaults to a named (non-default) database. If it
+# already exists (e.g. created manually or by pipeline/deploy/01b-setup-firestore-db.sh),
+# import it before apply so Terraform manages rather than recreates it:
+#   terraform import google_firestore_database.db projects/PROJECT/databases/feed-mind-db
+resource "google_firestore_database" "db" {
+  name        = var.firestore_database
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+
+  depends_on = [google_project_service.enabled]
+}
+
+resource "google_firestore_index" "runs_category_date" {
+  collection = "runs"
+  database   = google_firestore_database.db.name
+
+  fields {
+    field_path = "category"
+    order      = "ASCENDING"
+  }
+  fields {
+    field_path = "run_date"
+    order      = "DESCENDING"
+  }
+}
+
+# --- TTL: auto-delete records once expire_at (run_date + retention_days) passes.
+#     The pipeline writes expire_at on every doc; Firestore sweeps expired docs
+#     within ~24h of the timestamp. Applied to both collections. ---
+resource "google_firestore_field" "runs_ttl" {
+  database   = google_firestore_database.db.name
+  collection = "runs"
+  field      = "expire_at"
+
+  ttl_config {}
+}
+
+resource "google_firestore_field" "run_status_ttl" {
+  database   = google_firestore_database.db.name
+  collection = "run_status"
+  field      = "expire_at"
+
+  ttl_config {}
+}
+
+# --- Service accounts (least privilege; PRD §5 / §9c) ---
+resource "google_service_account" "job" {
+  account_id   = "paper-prism-job"
+  display_name = "paper-prism pipeline job"
+}
+
+resource "google_service_account" "scheduler" {
+  account_id   = "paper-prism-scheduler"
+  display_name = "paper-prism scheduler invoker"
+}
+
+# Job SA may write Firestore, nothing else at project scope.
+resource "google_project_iam_member" "job_firestore" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.job.email}"
+}
+
+# --- Gemini secret + accessor bound to the job SA only ---
+resource "google_secret_manager_secret" "gemini" {
+  secret_id = "gemini-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.enabled]
+}
+
+resource "google_secret_manager_secret_version" "gemini" {
+  secret      = google_secret_manager_secret.gemini.id
+  secret_data = var.gemini_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "job_accessor" {
+  secret_id = google_secret_manager_secret.gemini.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.job.email}"
+}

@@ -1,0 +1,51 @@
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- secrets / local config (never commit) ---
+.env
+.env.local
+.env.prod
+*.tfvars
+!*.tfvars.example
+env.yaml
+*-service-account*.json
+service-account*.json
+
+# --- Python (pipeline) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+pipeline/output/
+
+# --- Node / Vite (web) ---
+node_modules/
+dist/
+.vite/
+
+# --- Terraform (infra) ---
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+
+# --- Firebase ---
+.firebase/
+firebase-debug.log
+
+# --- Markdown docs (kept local only; PRD + CLAUDE.md are the tracked exceptions) ---
+*.md
+!README.md
+!docs/README.md
+!web/readme.md
+!pipeline/README.md
+!pipeline/deploy/README.md
+!docs/paper-prism-prd.md
+!docs/architecture.md
+!CLAUDE.md
+!.github/workflows/README.md

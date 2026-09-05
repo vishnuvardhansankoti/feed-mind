@@ -1,0 +1,11 @@
+# --- core pipeline (no torch) ---
+requests>=2.31
+feedparser>=6.0            # arXiv Atom XML parsing
+numpy>=1.24
+onnxruntime>=1.17          # MiniLM inference, no torch
+tokenizers>=0.15           # HF fast tokenizer, no torch
+huggingface_hub>=0.20      # one-time model/tokenizer download
+python-dotenv>=1.0
+
+# --- optional: real Firestore write (SINK=firestore) ---
+# google-cloud-firestore>=2.13

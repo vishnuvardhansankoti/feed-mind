@@ -1,0 +1,9 @@
+.venv/
+.env
+output/
+deploy/
+__pycache__/
+**/__pycache__/
+*.pyc
+.git/
+README.md

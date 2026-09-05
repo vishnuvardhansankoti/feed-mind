@@ -1,0 +1,31 @@
+{
+  "id": "2026-08-13_NLP",
+  "run_date": "2026-08-13T00:00:00Z",
+  "category": "NLP",
+  "papers": [
+    {
+      "rank": 1,
+      "title": "Focus particles and scalar inferences across humans and language models",
+      "arxiv_id": "2608.08227",
+      "url": "http://arxiv.org/abs/2608.08227v1",
+      "score": 0.5354,
+      "summary": null
+    },
+    {
+      "rank": 2,
+      "title": "Beyond \"AI Language\": The case for the idiolectal nature of LLM output",
+      "arxiv_id": "2608.06589",
+      "url": "http://arxiv.org/abs/2608.06589v1",
+      "score": 0.5243,
+      "summary": null
+    },
+    {
+      "rank": 3,
+      "title": "Beyond Sequence Order: Syntax-Informed Positional Embeddings for Transformers",
+      "arxiv_id": "2608.06111",
+      "url": "http://arxiv.org/abs/2608.06111v1",
+      "score": 0.5042,
+      "summary": null
+    }
+  ]
+}
