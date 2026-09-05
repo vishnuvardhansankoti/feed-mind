@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
-
+from datetime import UTC, datetime
 
 # Lens definition: display category code -> the arXiv source categories it draws
 # from. Source sets are disjoint, so a paper's *primary* arXiv category maps it
@@ -28,8 +26,8 @@ class Paper:
     score: float
     # `summary` is the Gemini-generated blurb (null when that call failed);
     # `abstract` is the author's abstract straight from the arXiv feed.
-    summary: Optional[str] = None
-    abstract: Optional[str] = None
+    summary: str | None = None
+    abstract: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -67,7 +65,7 @@ class RunDocument:
     run_date: datetime
     papers: list[Paper] = field(default_factory=list)
     # Firestore TTL field: the doc is auto-deleted once this timestamp passes.
-    expire_at: Optional[datetime] = None
+    expire_at: datetime | None = None
 
     @property
     def doc_id(self) -> str:
@@ -93,7 +91,7 @@ class RunStatus:
     run_date: datetime
     categories: dict[str, dict] = field(default_factory=dict)
     # Firestore TTL field: the doc is auto-deleted once this timestamp passes.
-    expire_at: Optional[datetime] = None
+    expire_at: datetime | None = None
 
     @property
     def doc_id(self) -> str:
@@ -122,5 +120,5 @@ class RunStatus:
 
 def utc_run_date() -> datetime:
     """Run date truncated to midnight UTC (drives the deterministic doc IDs)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now.replace(hour=0, minute=0, second=0, microsecond=0)

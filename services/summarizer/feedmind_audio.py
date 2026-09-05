@@ -44,10 +44,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 
 # The speech engine forks while gRPC's poll engine is live, which makes gRPC
 # log an INFO-level complaint about inherited file descriptors. Harmless, but
@@ -56,10 +56,9 @@ os.environ.setdefault("GRPC_VERBOSITY", "ERROR")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from feedmind_push import notify  # noqa: E402
 from google.api_core import exceptions as gcp_exceptions  # noqa: E402
 from google.cloud import firestore, storage  # noqa: E402
-
-from feedmind_push import notify  # noqa: E402
 from webscraper import config as ws_config  # noqa: E402
 from webscraper.cloud_speech import synthesize_mp3  # noqa: E402
 from webscraper.condense import compression_note, extractive_filter  # noqa: E402

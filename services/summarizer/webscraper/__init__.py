@@ -26,13 +26,13 @@ Module map:
 
 from __future__ import annotations
 
+from .condense import extractive_filter
 from .config import (
     DEFAULT_PROMPT,
     load_config,
     resolve_provider,
     write_sample_config,
 )
-from .condense import extractive_filter
 from .errors import (
     CondenseError,
     ConfigError,

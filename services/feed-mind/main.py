@@ -12,8 +12,6 @@ import time
 from datetime import UTC, datetime
 
 import functions_framework
-from google.cloud import firestore
-
 from feedmind import archival, bigquery, config
 from feedmind.deduplication import (
     is_duplicate,
@@ -26,6 +24,7 @@ from feedmind.ingestion import fetch_feed, fetch_youtube_feed
 from feedmind.notification import build_category_messages, send_message, send_plain_message
 from feedmind.secrets import load_all_secrets
 from feedmind.summarization import init_gemini, summarize, summarize_with_sumy
+from google.cloud import firestore
 
 # ---------------------------------------------------------------------------
 # Logging — structured JSON for Cloud Logging

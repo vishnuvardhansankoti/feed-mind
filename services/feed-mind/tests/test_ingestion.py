@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 import feedparser
-
 from feedmind import ingestion
 from feedmind.ingestion import Video, fetch_youtube_feed
 

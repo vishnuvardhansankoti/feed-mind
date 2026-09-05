@@ -1,6 +1,6 @@
 """arXiv Atom-parsing helpers (no network)."""
 
-from datetime import timezone
+from datetime import UTC
 
 from paper_prism.arxiv_client import (
     _clean,
@@ -22,7 +22,7 @@ def test_clean_collapses_whitespace():
 def test_parse_dt_handles_rfc3339_z():
     dt = _parse_dt("2026-08-10T09:00:00Z")
     assert dt is not None
-    assert dt.tzinfo == timezone.utc
+    assert dt.tzinfo == UTC
     assert (dt.year, dt.month, dt.day, dt.hour) == (2026, 8, 10, 9)
 
 

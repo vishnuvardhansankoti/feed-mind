@@ -1,5 +1,4 @@
 import pytest
-
 from feedmind.ingestion import Article
 from feedmind.notification import (
     _category_header,

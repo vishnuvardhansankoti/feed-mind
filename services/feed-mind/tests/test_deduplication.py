@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
 from feedmind import config
 from feedmind.deduplication import is_duplicate, mark_as_delivered
 from feedmind.ingestion import Article

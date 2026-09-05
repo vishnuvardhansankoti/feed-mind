@@ -8,7 +8,6 @@ import sys
 import types
 
 import pytest
-
 from paper_prism import events
 from paper_prism.config import Config
 from paper_prism.models import RunStatus, utc_run_date

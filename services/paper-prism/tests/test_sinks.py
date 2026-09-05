@@ -1,13 +1,13 @@
 """LocalJsonSink round-trip + datetime serialization."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from paper_prism.models import Paper, RunDocument, RunStatus
 from paper_prism.sinks import LocalJsonSink, build_sink
 
-RUN_DATE = datetime(2026, 8, 13, tzinfo=timezone.utc)
-EXPIRE = datetime(2026, 9, 27, tzinfo=timezone.utc)
+RUN_DATE = datetime(2026, 8, 13, tzinfo=UTC)
+EXPIRE = datetime(2026, 9, 27, tzinfo=UTC)
 
 
 def test_build_sink_defaults_to_local(tmp_path):

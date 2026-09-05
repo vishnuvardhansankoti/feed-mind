@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import feedparser
 import requests
@@ -44,7 +44,7 @@ class ArxivClient:
         Results are sorted by submission date (newest first), so we stop paging
         once we cross the cutoff.
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+        cutoff = datetime.now(UTC) - timedelta(days=window_days)
         source_set = set(source_categories)
         query = " OR ".join(f"cat:{c}" for c in source_categories)
 

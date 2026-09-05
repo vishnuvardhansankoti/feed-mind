@@ -3,10 +3,9 @@
 Uses fakes for arXiv/embedder/summarizer/sink so no network or model is touched.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
-
 from paper_prism.config import Config
 from paper_prism.models import Candidate, utc_run_date
 from paper_prism.pipeline import Pipeline
@@ -37,7 +36,7 @@ def _candidate(idx, cat):
         arxiv_id=f"2508.0000{idx}",
         url=f"http://arxiv.org/abs/2508.0000{idx}",
         primary_category=cat,
-        submitted=datetime(2026, 8, 13, tzinfo=timezone.utc),
+        submitted=datetime(2026, 8, 13, tzinfo=UTC),
     )
 
 

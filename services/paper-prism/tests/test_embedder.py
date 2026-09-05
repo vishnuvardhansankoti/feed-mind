@@ -1,7 +1,6 @@
 """Ranking math — pure numpy, no model download required."""
 
 import numpy as np
-
 from paper_prism.embedder import _mean_pool_normalize, rank_top_k
 
 

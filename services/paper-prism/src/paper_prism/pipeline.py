@@ -10,8 +10,6 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-import numpy as np
-
 from .arxiv_client import ArxivClient
 from .config import Config
 from .embedder import Embedder, rank_top_k

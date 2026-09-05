@@ -1,6 +1,6 @@
 """Domain model + Firestore schema shaping (incl. the expire_at TTL field)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from paper_prism.models import (
     Candidate,
@@ -10,8 +10,8 @@ from paper_prism.models import (
     utc_run_date,
 )
 
-RUN_DATE = datetime(2026, 8, 13, tzinfo=timezone.utc)
-EXPIRE = datetime(2026, 9, 27, tzinfo=timezone.utc)  # +45d
+RUN_DATE = datetime(2026, 8, 13, tzinfo=UTC)
+EXPIRE = datetime(2026, 9, 27, tzinfo=UTC)  # +45d
 
 
 def test_run_document_doc_id_is_date_and_category():
@@ -69,5 +69,5 @@ def test_candidate_embed_text_joins_title_and_abstract():
 
 def test_utc_run_date_is_midnight_utc():
     d = utc_run_date()
-    assert d.tzinfo == timezone.utc
+    assert d.tzinfo == UTC
     assert (d.hour, d.minute, d.second, d.microsecond) == (0, 0, 0, 0)

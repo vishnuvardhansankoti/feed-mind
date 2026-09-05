@@ -5,9 +5,8 @@ is checked before it runs in production.
 """
 
 import pytest
-from google.api_core.exceptions import NotFound
-
 from feedmind import archival, bigquery, config
+from google.api_core.exceptions import NotFound
 
 SPECS = (archival.ARTICLES, archival.VIDEOS, archival.PAPERS)
 
