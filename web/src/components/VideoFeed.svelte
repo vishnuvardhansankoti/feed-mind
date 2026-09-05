@@ -88,7 +88,16 @@
 
 <style>
   .videos { display: flex; flex-direction: column; gap: 1rem; }
-  .subtabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+  /* Same sticky bar as the other sections: pins under App's masthead + section
+     nav (--stick-top), with zero-blur shadows extending its background over the
+     gaps above and below so cards passing underneath don't show through. */
+  .subtabs {
+    display: flex; gap: 0.4rem; flex-wrap: wrap;
+    position: sticky; top: var(--stick-top, 0px); z-index: 11;
+    background: var(--bg);
+    box-shadow: 0 -1.25rem 0 var(--bg), 0 0.6rem 0 var(--bg);
+  }
   .subtabs button {
     font: inherit; cursor: pointer;
     background: var(--surface); color: var(--muted);

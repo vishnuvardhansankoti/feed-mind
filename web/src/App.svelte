@@ -38,6 +38,16 @@
   const goto = (p) => { location.hash = HASH[p] ?? "#/"; };
 
   let tab = $state("latest");
+
+  // Everything above the content is sticky, in three stacked layers: masthead
+  // (search / Listen Top News / account) → section nav → the section's own tab
+  // bar. Each layer pins below the ones above it, so their heights are measured
+  // rather than hardcoded — both wrap to extra rows on narrow screens. `.wrap`
+  // publishes them as custom properties, which is how the bars inside
+  // NewsFeed/VideoFeed get their offset without prop-drilling.
+  let headH = $state(0);
+  let navH = $state(0);
+
   let loading = $state(true);
   let error = $state(null);
   let latest = $state({});
@@ -134,9 +144,25 @@
   });
   const fmt = (d) => (d ? dateFmt.format(d instanceof Date ? d : new Date(d)) : "");
 
+  // Pinned = the masthead has left its natural place at the top of the page.
+  // Watching a zero-height sentinel above it, rather than listening to scroll,
+  // keeps this off the scroll path entirely; the class it drives condenses the
+  // header (see .masthead.pinned) so three stacked sticky layers don't swallow
+  // the viewport on a phone.
+  let pinned = $state(false);
+  let sentinel;
+
   onMount(async () => {
     const onHash = () => { page = pageFromHash(); };
     window.addEventListener("hashchange", onHash);
+
+    // IntersectionObserver is absent in jsdom, so component tests must not
+    // depend on it existing.
+    const io =
+      typeof IntersectionObserver !== "undefined" && sentinel
+        ? new IntersectionObserver(([e]) => { pinned = !e.isIntersecting; })
+        : null;
+    io?.observe(sentinel);
 
     // Independent of the digest fetch below: sign-in is additive, so a failure
     // here must never keep the (public) content from rendering.
@@ -154,6 +180,7 @@
 
     return () => {
       window.removeEventListener("hashchange", onHash);
+      io?.disconnect();
       stopSession();
     };
   });
@@ -183,8 +210,9 @@
   );
 </script>
 
-<div class="wrap">
-  <header class="masthead">
+<div class="wrap" style="--head-h: {headH}px; --stick-top: {headH + navH}px">
+  <div class="sentinel" bind:this={sentinel} aria-hidden="true"></div>
+  <header class="masthead" class:pinned bind:clientHeight={headH}>
     <div class="brand">
       <span class="prism" aria-hidden="true"></span>
       <div>
@@ -221,7 +249,7 @@
     </div>
   </header>
 
-  <nav class="nav" aria-label="Sections">
+  <nav class="nav" aria-label="Sections" bind:clientHeight={navH}>
     <button aria-current={page === "news"} class:active={page === "news"} onclick={() => goto("news")}>
       News
     </button>
@@ -338,10 +366,28 @@
 
 <style>
   .wrap { max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+
+  /* Watched by the IntersectionObserver above; it must sit at the very top of
+     the page, outside the masthead, or it would scroll away with it. */
+  .sentinel { height: 0; }
+
   .masthead {
     display: flex; flex-wrap: wrap; gap: 1rem;
     align-items: center; justify-content: space-between; margin-bottom: 1.25rem;
+    position: sticky; top: 0; z-index: 13;
+    background: var(--bg);
+    /* Covers the .wrap padding above it, which the page scrolls through. */
+    box-shadow: 0 -1.5rem 0 var(--bg);
+    /* Deliberately not transitioned: --head-h is measured from this element and
+       every layer below pins against it, so an animated height would drag the
+       whole stack along for the ride. */
   }
+  /* Condensed once stuck: the tagline is orientation, not a control, and three
+     pinned layers is a lot of vertical space to give up on a small screen. */
+  .masthead.pinned { padding-bottom: 0.35rem; }
+  .masthead.pinned .tagline { display: none; }
+  .masthead.pinned h1 { font-size: 1.15rem; }
+  .masthead.pinned .prism { width: 26px; height: 26px; border-radius: 7px; }
   .brand { display: flex; align-items: center; gap: 0.9rem; }
   .masthead-tools { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
   .prism {
@@ -351,9 +397,19 @@
   h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; }
   .tagline { margin: 0; color: var(--muted); font-size: 0.85rem; }
 
+  /* Middle layer of the sticky stack: pins directly under the masthead, and
+     every section's tab bar pins under it in turn (top: var(--stick-top)).
+     The upward zero-blur shadow paints over the masthead's margin, which is
+     briefly exposed while the masthead is stuck and the nav is still catching
+     up. z-index sits under the account dropdown (20), settings sheet (40) and
+     mini player (40) so those still cover the bar when open — and under the
+     masthead's 13, so its shadow tucks behind the header once flush. */
   .nav {
     display: flex; gap: 0.4rem; margin-bottom: 1.25rem;
     border-bottom: 1px solid var(--border);
+    position: sticky; top: var(--head-h, 0px); z-index: 12;
+    background: var(--bg);
+    box-shadow: 0 -1.25rem 0 var(--bg);
   }
   .nav button {
     font: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer;
@@ -393,6 +449,12 @@
     gap: 0.75rem;
     flex-wrap: wrap;
     margin-bottom: 1.5rem;
+    position: sticky; top: var(--stick-top, 0px); z-index: 11;
+    /* Zero-blur shadows extend the bar's own background over the gap above
+       (the nav's margin) and a little below it, so cards scrolling underneath
+       never show through. Padding would have shifted the layout instead. */
+    background: var(--bg);
+    box-shadow: 0 -1.25rem 0 var(--bg), 0 0.6rem 0 var(--bg);
   }
   .tabrow .tabs { margin-bottom: 0; }
   .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; }
@@ -450,4 +512,14 @@
     background: none; border: none; color: var(--accent); text-decoration: none;
   }
   .cookie-link:hover { text-decoration: underline; }
+
+  /* Keep the pinned header to two rows on a phone: brand, then the tools on one
+     line of their own (they otherwise wrap the account button onto a third
+     pinned row). Must stay after the base rules — a media query adds no
+     specificity, so a later plain rule would win. */
+  @media (max-width: 700px) {
+    .masthead { gap: 0.6rem; }
+    .masthead-tools { flex: 1 1 100%; gap: 0.5rem; flex-wrap: nowrap; }
+    .top-listen { padding: 0.2rem 0.55rem; }
+  }
 </style>

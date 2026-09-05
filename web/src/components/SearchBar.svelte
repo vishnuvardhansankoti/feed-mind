@@ -170,6 +170,12 @@
     padding: 0.1rem 0;
   }
   .pp-search input::placeholder { color: var(--muted); }
+  /* The masthead is sticky, so on a phone this shares one row with the Listen
+     and account controls rather than wrapping them to another pinned line. */
+  @media (max-width: 700px) {
+    .pp-search { min-width: 0; }
+    .pp-search input { width: 6rem; max-width: none; }
+  }
   .count {
     font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums;
     white-space: nowrap; padding: 0 0.15rem;

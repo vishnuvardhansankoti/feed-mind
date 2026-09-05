@@ -53,16 +53,21 @@
 </script>
 
 <div class="news">
-  <div class="subtabs" role="tablist" aria-label="News window">
-    <button role="tab" aria-selected={view === "latest"} class:active={view === "latest"} onclick={() => (view = "latest")}>
-      Latest
-    </button>
-    <button role="tab" aria-selected={view === "archive"} class:active={view === "archive"} onclick={() => (view = "archive")}>
-      Archive · 7 days
-    </button>
-  </div>
+  <!-- Both tab strips live in one sticky bar so the window and category you're
+       browsing stay switchable however far down the feed you scroll. The three
+       children are placed by grid rather than nested rows, because Listen All
+       changes which strip it sits beside at the narrow breakpoint — one
+       component instance, two layouts. -->
+  <div class="controls">
+    <div class="subtabs" role="tablist" aria-label="News window">
+      <button role="tab" aria-selected={view === "latest"} class:active={view === "latest"} onclick={() => (view = "latest")}>
+        Latest
+      </button>
+      <button role="tab" aria-selected={view === "archive"} class:active={view === "archive"} onclick={() => (view = "archive")}>
+        Archive · 7 days
+      </button>
+    </div>
 
-  <div class="catrow">
     <div class="cats" role="tablist" aria-label="News category">
       {#each NEWS_CATEGORIES as c (c.code)}
         <button role="tab" aria-selected={cat === c.code} class:active={cat === c.code} onclick={() => (cat = c.code)}>
@@ -70,7 +75,10 @@
         </button>
       {/each}
     </div>
-    <ListenAllButton {tracks} id={`news:${cat}:${view}`} label="Listen All" />
+
+    <div class="listen">
+      <ListenAllButton {tracks} id={`news:${cat}:${view}`} label="Listen All" />
+    </div>
   </div>
 
   {#if shownDays.length}
@@ -91,13 +99,27 @@
 
 <style>
   .news { display: flex; flex-direction: column; gap: 1rem; }
-  .catrow {
-    display: flex;
+
+  /* Pins directly below App's sticky masthead + section nav, whose combined
+     height it reads from --stick-top (published on .wrap by App).
+     The zero-blur shadows extend this bar's background over the gap above (the
+     nav's margin) and a little below, so articles scrolling underneath never
+     show through; padding would have shifted the layout instead. */
+  .controls {
+    /* Wide layout: window tabs on their own row, then categories with Listen
+       All parked at the right end of the second row. */
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.7rem 0.75rem;
+    position: sticky; top: var(--stick-top, 0px); z-index: 11;
+    background: var(--bg);
+    box-shadow: 0 -1.25rem 0 var(--bg), 0 0.6rem 0 var(--bg);
   }
+  .subtabs { grid-column: 1 / -1; }
+  .cats { grid-column: 1; min-width: 0; }
+  .listen { grid-column: 2; justify-self: end; }
+
   .subtabs, .cats { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .subtabs button, .cats button {
     font: inherit; cursor: pointer;
@@ -112,6 +134,25 @@
   }
   .subtabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .cats button.active { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
+
+  /* On a phone the five category chips wrap to two rows and push Listen All
+     onto a third, which — pinned, under the masthead and nav — leaves almost no
+     room for articles. So the chips scroll sideways in one row instead, and
+     Listen All moves up beside the window tabs: sharing the row with the
+     scroller instead would cut its right-hand end off mid-chip, which reads as
+     the button sitting on top of "Open Source" and "Top Stories".
+     Scrolling here is safe for the pinning — the scroller is a descendant of
+     the sticky .controls, not an ancestor of it. */
+  @media (max-width: 700px) {
+    .subtabs { grid-column: 1; }
+    .listen { grid-row: 1; grid-column: 2; }
+    .cats {
+      grid-column: 1 / -1;
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    }
+    .cats::-webkit-scrollbar { display: none; }
+    .cats button { flex: 0 0 auto; }
+  }
 
   .day-group { display: flex; flex-direction: column; gap: 0.6rem; }
   .day-date {

@@ -81,13 +81,19 @@
 </div>
 
 <style>
-  .account { position: relative; display: flex; align-items: center; gap: 0.5rem; }
+  .account {
+    position: relative; display: flex; align-items: center; gap: 0.5rem;
+    flex: 0 0 auto;
+  }
 
   .signin {
     font: inherit; font-size: 0.85rem; cursor: pointer;
     padding: 0.4rem 0.9rem; border-radius: 999px;
     background: var(--surface); color: var(--text);
     border: 1px solid var(--border);
+    /* The masthead is a sticky, single-line row on a phone; without this the
+       label breaks after "Sign" and makes the pinned header a row taller. */
+    white-space: nowrap;
   }
   .signin:hover { border-color: var(--accent); color: var(--accent); }
 
