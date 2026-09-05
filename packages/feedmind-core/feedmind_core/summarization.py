@@ -65,7 +65,7 @@ def _truncate_to_words(text: str, max_words: int = _MAX_SUMMARY_WORDS) -> str:
     return " ".join(words[:max_words]) + "..."
 
 
-def init_gemini(api_key: str) -> "genai.GenerativeModel":  # noqa: F821
+def init_gemini(api_key: str) -> genai.GenerativeModel:  # noqa: F821
     """Configure the Gemini SDK and return a GenerativeModel instance."""
     import google.generativeai as genai
 
@@ -82,7 +82,7 @@ def init_gemini(api_key: str) -> "genai.GenerativeModel":  # noqa: F821
     return model
 
 
-def summarize(model: "genai.GenerativeModel", article: Article) -> str | None:  # noqa: F821
+def summarize(model: genai.GenerativeModel, article: Article) -> str | None:  # noqa: F821
     """
     Call the Gemini API to produce a one-sentence summary of the article.
 
