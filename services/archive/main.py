@@ -39,6 +39,17 @@ from feedmind_core.telegram import send_plain_message
 from google.cloud import firestore
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+# basicConfig above is a NO-OP whenever the root logger already has a handler,
+# which is the case under the deployed gunicorn stack but not under a plain
+# local import — so this reproduced only in the cloud. Root then stays at
+# WARNING and every logger.info() in the run is dropped; the only thing that
+# ever reached Cloud Logging was Flask's ERROR on an unhandled exception, which
+# is how a run could succeed and log absolutely nothing.
+#
+# Setting the level explicitly fixes it either way, and unlike basicConfig(
+# force=True) it keeps whatever handler the framework installed, so execution-id
+# correlation survives.
+logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger("feedmind-archive")
 
 # ---------------------------------------------------------------------------
