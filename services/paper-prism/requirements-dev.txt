@@ -1,3 +1,0 @@
-# Dev/test dependencies (not needed at runtime).
--r requirements.txt
-pytest>=8.0

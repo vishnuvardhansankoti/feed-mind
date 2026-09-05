@@ -1,0 +1,20 @@
+# Repo-wide lint/format config. Lifted out of services/feed-mind/pyproject.toml
+# when the monorepo was formed — paper-prism and the summarizer had no linter at
+# all, so their first pass produced a real diff (see the "Apply ruff" commit).
+target-version = "py311"   # the lowest runtime in the repo; feed-mind runs 3.12
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by the formatter)
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]

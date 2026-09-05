@@ -9,8 +9,12 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # 1. Dependencies (no compiler needed — all wheels are manylinux).
-COPY requirements.txt requirements-deploy.txt ./
-RUN pip install --no-cache-dir -r requirements-deploy.txt
+#    requirements.txt is GENERATED from pyproject.toml (`uv pip compile`, see
+#    scripts/lock-all.sh) and is the single dependency list — the former
+#    core/deploy split existed only so a SINK=local run could skip the
+#    Firestore client, which one lockfile makes not worth maintaining.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 2. Bake the MiniLM ONNX weights + tokenizer into the image so the scheduled
 #    job never depends on HuggingFace at runtime.

@@ -1,6 +1,0 @@
-# Image dependencies = core pipeline + Firestore client (SINK=firestore in prod).
--r requirements.txt
-google-cloud-firestore>=2.13
-
-# Announcing a finished run to downstream consumers (see events.py).
-google-cloud-pubsub>=2.21
