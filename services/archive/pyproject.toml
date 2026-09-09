@@ -1,0 +1,22 @@
+[project]
+name = "feedmind-archive"
+version = "1.0.0"
+description = "Firestore to BigQuery archiver"
+# The python312 Cloud Functions runtime, matching feedmind-core.
+requires-python = ">=3.12"
+dependencies = [
+    "feedmind-core[archive,telegram]",
+    "functions-framework==3.8.1",
+]
+
+# A local path dependency, so an edit to the core package is picked up by
+# `uv run` here with no reinstall. It is NOT how the core reaches the deployed
+# function — Cloud Functions only uploads --source, so deploy.sh copies the
+# package into the staging directory instead. That is also why lock-all.sh
+# exports requirements.txt with --no-emit-package feedmind-core: pip must not
+# try to resolve a path that will not exist in the build.
+[tool.uv.sources]
+feedmind-core = { path = "../../packages/feedmind-core", editable = true }
+
+[dependency-groups]
+dev = ["pytest>=8.0.0"]

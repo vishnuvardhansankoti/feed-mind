@@ -174,15 +174,15 @@ Look for `triggered by message …` (Eventarc delivered), then `spaCy … conden
 
 Both producers already carry the publishing code; they need redeploying to pick it up.
 
-**FeedMind** (`services/feed-mind/feedmind/events.py`, called at the end of its
-`main.py`):
+**FeedMind** (`packages/feedmind-core/feedmind_core/events.py`, called from the
+ingest runner):
 
 ```bash
-../feed-mind/deploy.sh          # deploy.sh cd's to its own directory
+../../scripts/deploy-feedmind.sh
 ```
 
 Publishing is best-effort — a Pub/Sub failure is logged, never raised, because failing a run that already delivered to Telegram would re-deliver every article on the retry. Disable it with `ENABLE_CONTENT_READY_EVENTS = False` in
-`services/feed-mind/feedmind/config.py`.
+`packages/feedmind-core/feedmind_core/settings.py`.
 
 **paper-prism** (`services/paper-prism/src/paper_prism/events.py`, called from `__main__.py` after `pipeline.run()`). It has two deploy paths; use whichever this project treats as source of truth — running both double-creates:
 
@@ -353,7 +353,7 @@ gcloud secrets delete feedmind-llm-api-key
 
 Deleting the function removes its Eventarc trigger and the push subscription with it.
 
-Stop both producers too, or they will keep publishing into a topic nobody reads: `ENABLE_CONTENT_READY_EVENTS = False` in FeedMind's `feedmind/config.py`, and `CONTENT_READY_TOPIC=""` in paper-prism's `job_env` / `env.yaml`.
+Stop both producers too, or they will keep publishing into a topic nobody reads: `ENABLE_CONTENT_READY_EVENTS = False` in `packages/feedmind-core/feedmind_core/settings.py` (or `content_ready: false` in each ingest service's `feeds.yaml`), and `CONTENT_READY_TOPIC=""` in paper-prism's `job_env` / `env.yaml`.
 
 This leaves the bucket and Firestore alone — they hold data, and they belong to FeedMind rather than to this deployment.
 
@@ -375,5 +375,5 @@ On the producer side, both follow the same shape:
 
 | Repo | Publishes from | Called by | Topic setting |
 |---|---|---|---|
-| `feed-mind` | `feedmind/events.py` | `main.py`, last step | `feedmind/config.py` |
+| FeedMind ingests | `feedmind_core/events.py` | `runner.py`, last step | `feeds.yaml` / `settings.py` |
 | `paper-prism` | `pipeline/src/paper_prism/events.py` | `__main__.py`, after `pipeline.run()` | `CONTENT_READY_TOPIC` env — `infra/run.tf` and `pipeline/deploy/env.yaml` |

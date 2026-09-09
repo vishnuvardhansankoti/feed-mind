@@ -78,7 +78,7 @@ idna==3.19
     #   anyio
     #   httpx
     #   requests
-numpy==2.5.2
+numpy==2.4.6
     # via
     #   paper-prism (pyproject.toml)
     #   onnxruntime

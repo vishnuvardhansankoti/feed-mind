@@ -1,0 +1,14 @@
+# One of three feed groups ingested by feedmind-ingest. Web reader only:
+# deliver_telegram is false, so these are stored with telegram_status=skipped
+# and the notifier never picks them up.
+
+service: topstories
+kind: rss
+summarize: sumy
+deliver_telegram: false
+content_ready: true
+
+feeds:
+  - name: TOI Top Stories
+    url: https://timesofindia.indiatimes.com/rssfeedstopstories.cms
+    category: top_stories

@@ -1,0 +1,62 @@
+[project]
+name = "feedmind-core"
+version = "1.0.0"
+description = "Shared FeedMind pipeline: feed URLs in, Firestore documents out"
+# Every consuming service deploys on the python312 runtime. This cannot drop to
+# 3.11 without also unpinning numpy, which sumy needs and which requires 3.12+.
+requires-python = ">=3.12"
+# Base = what every consumer needs: read/write Firestore, read secrets, parse a
+# service's feeds.yaml. Everything else is an extra, so a service only ships the
+# dependencies it actually uses — youtube-ingest has no reason to carry Gemini
+# or httpx, and the notifier has no reason to carry feedparser.
+dependencies = [
+    "google-cloud-firestore==2.19.0",
+    "google-cloud-secret-manager==2.20.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# RSS/Atom fetching. Every ingest service needs this.
+feeds = ["feedparser==6.0.11"]
+# The offline extractive summarizer. Kept apart from `feeds` because it is by
+# far the heaviest extra (numpy) and the slowest cold start (NLTK punkt is
+# downloaded at runtime) — youtube-ingest fetches feeds but summarizes nothing,
+# and has no reason to pay for either.
+sumy = [
+    "sumy>=0.11.0",
+    "nltk>=3.9.1",
+    "numpy>=2.5.1",
+]
+# Generative summaries. Off by default (settings.ENABLE_GEMINI_SUMMARIES).
+gemini = ["google-generativeai==0.8.3"]
+# Formatting and sending Telegram messages.
+telegram = ["httpx==0.27.2"]
+# Publishing content-ready / telegram-ready announcements.
+events = ["google-cloud-pubsub==2.31.1"]
+# The Firestore -> BigQuery archiver.
+archive = ["google-cloud-bigquery==3.27.0"]
+
+# The test suite imports every module, so its group carries every extra.
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+    "feedparser==6.0.11",
+    "sumy>=0.11.0",
+    "nltk>=3.9.1",
+    "numpy>=2.5.1",
+    "google-generativeai==0.8.3",
+    "httpx==0.27.2",
+    "google-cloud-pubsub==2.31.1",
+    "google-cloud-bigquery==3.27.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["feedmind_core"]

@@ -1,0 +1,25 @@
+# One of three feed groups ingested by feedmind-ingest. Videos are never
+# summarized and never sent to Telegram, so `summarize: none` skips the NLTK
+# download entirely — that is most of the cold start, and it would buy nothing.
+
+service: youtube
+kind: youtube
+summarize: none
+deliver_telegram: false
+content_ready: false
+
+feeds:
+  - name: Aishwarya Srinivasan
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCzd4ZN716evEjtbJERBMTfg
+  - name: Vaibhav
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UClXAalunTPaX1YV185DWUeg
+  - name: HyperAutomation Labs
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCiax-xbEI0P6Y8C8VwZGMgQ
+  - name: Think School
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCKZozRVHRYsYHGEyNKuhhdA
+  - name: AI Revolution
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UC5l7RouTQ60oUjLjt1Nh-UQ
+  - name: Sam Witteveen AI
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UC55ODQSvARtgSyc8ThfiepQ
+  - name: Fahd Mirza
+    url: https://www.youtube.com/feeds/videos.xml?channel_id=UCPix8N6PMRI4KzgyjuZeF0g
