@@ -33,7 +33,7 @@ def test_the_services_were_actually_found():
     Without this, every parametrized test below would vacuously pass and the
     suite would report green while checking no configuration at all.
     """
-    assert len(FEED_CONFIGS) >= 3, f"expected the ingest feed groups under {SERVICES_DIR}/ingest"
+    assert len(FEED_CONFIGS) >= 2, f"expected the ingest feed groups under {SERVICES_DIR}/ingest"
 
 
 @pytest.mark.parametrize("path", FEED_CONFIGS, ids=lambda p: p.parent.name)

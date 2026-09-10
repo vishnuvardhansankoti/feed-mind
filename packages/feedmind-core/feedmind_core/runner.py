@@ -98,7 +98,8 @@ def _summarize(mode, gemini_model, article) -> str | None:
 
 
 def run_rss_ingest(
-    cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False, announce: bool = True
+    cfg: serviceconfig.ServiceConfig, *, dry_run: bool = False, announce: bool = True,
+    extra_fields: dict | None = None,
 ) -> dict:
     """
     Fetch every feed in `cfg`, store what is new, and announce it.
@@ -106,6 +107,9 @@ def run_rss_ingest(
     Articles are stamped `telegram_status=PENDING` when `cfg.deliver_telegram`
     is set, `SKIPPED` otherwise — that field, not this function, is what the
     notifier acts on.
+
+    `extra_fields`, when given, is merged onto every stored document — see
+    `store.save_article`. None for every caller except services/india-news-ingest.
     """
     socket.setdefaulttimeout(config.FEED_FETCH_TIMEOUT_SECONDS)
     run_start = time.monotonic()
@@ -169,7 +173,9 @@ def run_rss_ingest(
             if dry_run:
                 print(f"--- WOULD STORE [{telegram_status}] {article.title[:70]}")
             else:
-                save_article(db, article, summary, telegram_status=telegram_status)
+                save_article(
+                    db, article, summary, telegram_status=telegram_status, extra=extra_fields
+                )
             counters["articles_stored"] += 1
 
     counters["duration_seconds"] = round(time.monotonic() - run_start, 2)

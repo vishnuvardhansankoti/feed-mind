@@ -99,6 +99,23 @@ def publish_telegram_ready(service: str, pending_articles: int) -> bool:
     return _publish(config.TELEGRAM_READY_TOPIC, payload, source=service)
 
 
+def publish_news_ingested(service: str, articles_stored: int) -> bool:
+    """
+    Ring the news curator's doorbell: there are freshly-ingested articles.
+
+    Same shape and reasoning as publish_telegram_ready — no articles in the
+    message. The curator queries Firestore for curation_status == "pending"
+    itself, so a dropped message costs a delay, not an event it never sees.
+    """
+    payload = {
+        "trigger": "news_ingested",
+        "source": service,
+        "articles_stored": articles_stored,
+        "published_at": datetime.now(UTC).isoformat(),
+    }
+    return _publish(config.NEWS_INGESTED_TOPIC, payload, source=service)
+
+
 def _publish(topic_name: str, payload: dict, **attributes: str) -> bool:
     """Publish one JSON message, swallowing any failure. Returns success."""
     topic = f"projects/{config.GCP_PROJECT_ID}/topics/{topic_name}"

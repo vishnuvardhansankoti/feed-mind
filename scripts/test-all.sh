@@ -18,6 +18,7 @@ run() {  # run <label> <dir> <command...>
 # directly (tests/test_service_configs.py) rather than mocking one up.
 run "packages/feedmind-core (pytest)" packages/feedmind-core uv run --quiet pytest -q
 run "services/paper-prism (pytest)"   services/paper-prism   uv run --quiet --extra dev pytest -q
+run "services/news-curator (pytest)"  services/news-curator  uv run --quiet --extra dev pytest -q
 run "apps/web (vitest)"               apps/web               npm test
 
 # No test suite: services/summarizer (exercised by ./deploy/publish.sh --dry-run)
@@ -65,6 +66,15 @@ probe archive '
 import main
 from feedmind_core import archival, bigquery
 from feedmind_core.telegram import send_plain_message
+'
+
+probe india-news-ingest '
+import main
+# runner.run_rss_ingest (summarize: none, so summarization.py is never touched)
+from feedmind_core.ingestion import fetch_feed
+# main._announce
+from feedmind_core import events
+from feedmind_core.store import is_duplicate, save_article
 '
 
 

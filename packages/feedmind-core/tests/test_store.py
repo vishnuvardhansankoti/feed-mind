@@ -100,6 +100,17 @@ def test_existing_fields_are_unchanged(db):
     assert isinstance(payload["processed_at"], str)
 
 
+def test_extra_fields_are_merged_onto_the_write(db):
+    """services/india-news-ingest stamps curation_status this way — see store.py."""
+    save_article(db, _article(), "summary", extra={"curation_status": "pending"})
+    assert _written(db)["curation_status"] == "pending"
+
+
+def test_extra_defaults_to_nothing_added(db):
+    save_article(db, _article(), "summary")
+    assert "curation_status" not in _written(db)
+
+
 def test_is_duplicate_reflects_document_existence():
     assert is_duplicate(FakeClient(existing_ids={"abc123"}), _article()) is True
     assert is_duplicate(FakeClient(), _article()) is False

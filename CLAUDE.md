@@ -8,6 +8,8 @@ what breaks when you change one without the others. Each component has its own
 
 - `packages/feedmind-core/CLAUDE.md` — the pipeline the ingest services share
 - `docs/feed-mind/archived-gcp-resources.md` — legacy GCP resources still to delete
+- `services/india-news-ingest/CLAUDE.md` — five Indian publications' front pages
+- `services/news-curator/CLAUDE.md` — embed/classify/cluster/rank into `stories`
 - `services/paper-prism/CLAUDE.md` — the weekly arXiv digest job
 - `services/summarizer/CLAUDE.md` — AI summaries and audio
 - `apps/web/CLAUDE.md` — the Svelte PWA that reads all of it
@@ -15,9 +17,10 @@ what breaks when you change one without the others. Each component has its own
 ## What this is
 
 A personal content pipeline: daily tech news to Telegram, a weekly personalized
-arXiv digest, AI summaries with audio for both, and one web app to read them.
-Six deployables, one GCP project (`feed-mind`), one Firestore database
-(`feed-mind-db`), all inside free-tier limits.
+arXiv digest, a daily curated Indian-news digest, AI summaries with audio, and
+one web app to read all of it. Eight deployables, one GCP project
+(`feed-mind`), one Firestore database (`feed-mind-db`), all inside free-tier
+limits.
 
 It was three separate repos until they were merged here. Everything below used
 to be a **cross-repo** contract that no review could see both sides of; the
@@ -28,9 +31,11 @@ whole point of the monorepo is that each one is now a single diff.
 ```
 apps/web/                    Svelte 5 + Vite PWA -> Firebase Hosting
 packages/feedmind-core/      shared: feed URLs -> Firestore (not deployed alone)
-services/ingest/             CF gen2, 08:00 — news + top stories + YouTube
+services/ingest/             CF gen2, 08:00 — news + YouTube
 services/telegram-notifier/  CF gen2, Pub/Sub — sends the digest
 services/archive/            CF gen2, 1st & 16th — Firestore -> BigQuery
+services/india-news-ingest/  CF gen2, 17:30 CT — five Indian publications
+services/news-curator/       Cloud Run service, Pub/Sub push — dedup + rank
 services/paper-prism/        Cloud Run Job: paper-prism-job (Mondays)
 services/summarizer/         CF gen2: feedmind-audio (Pub/Sub triggered)
 infra/terraform/             Terraform for the GCP stack
@@ -41,10 +46,15 @@ scripts/                     test-all, lock-all, stage-service, deploy-feedmind,
                              setup-feedmind-infra, setup-wif
 ```
 
-`services/ingest` runs all three feed groups on one 08:00 schedule. The groups
-are separate YAML files rather than one list because they behave differently:
-only `news` goes to Telegram, only the RSS groups are summarized, and only they
-wake the AI-summary service.
+`services/ingest` runs both feed groups on one 08:00 schedule. The groups are
+separate YAML files rather than one list because they behave differently: only
+`news` goes to Telegram, and both are summarized and wake the AI-summary
+service. It used to carry a third group, `topstories.yaml` (one Times of India
+feed, unranked); that moved to `services/india-news-ingest` +
+`services/news-curator`, see `docs/feed-mind/news-curator-design.md`. Articles
+already stored with `feed_category=top_stories` keep their 90-day TTL and their
+web app tab — this was a live retirement, not a cutover, so old and new content
+coexist until the old rows expire.
 
 ## How the components fit together
 
@@ -74,6 +84,32 @@ function wrote Firestore only *after* Telegram accepted a message, so an outage
 cost the ingest too. Now the articles are stored first and the notifier is told
 afterwards — see the delivery contract below.
 
+### The India-news pipeline (partially built)
+
+```
+                          ┌── general.yaml    TOI + The Hindu
+Scheduler ─17:30 CT──▶ india-news-ingest
+                          └── business.yaml   BS + ET + Hindu BusinessLine
+                                    │  curation_status=pending
+                                    ▼
+                          feedmind-news-ingested (doorbell, no payload)
+                                    │
+                                    ▼
+                              news-curator        embed -> classify -> cluster -> rank
+                                    │              writes `stories`; flips curation_status
+                                    ▼              to "clustered"; marks top-5/category
+                        Firestore (feed-mind-db)   is_canonical
+```
+
+Only the two boxes above exist today (design doc build order §11, steps 1-2).
+**Not yet wired:** `stories.ai_summary` / `audio_url` stay `null` forever until
+`services/summarizer` is taught to select by `is_canonical` (step 3) and
+`feedmind-content-ready` gains `news-curator` as a third producer; there is no
+`apps/web` Stories view (step 4); `services/archive` does not carry `stories`
+yet (step 5). See `docs/feed-mind/news-curator-design.md` for the full design
+and `services/news-curator/CLAUDE.md` for what is actually implemented versus
+documented-but-deferred.
+
 ## Contracts that span components
 
 Nothing below is checked by a compiler, a type, or a test. Each row is a place
@@ -90,6 +126,8 @@ both sides are in the same commit.
 | Category codes | `services/ingest/*.yaml` | `apps/web/src/lib/constants.js::NEWS_CATEGORIES` | both — matched with `===` |
 | Pub/Sub message shape | both producers' `events.py` | `services/summarizer/main.py` | producer + consumer |
 | Firestore database id | `FIRESTORE_DATABASE` (job + function env) | `VITE_FIRESTORE_DATABASE` (web, build-time) | **three** places, plus `firebase.json` |
+| `curation_status` on an article | `services/india-news-ingest` (via `save_article`'s `extra` param) | `services/news-curator` | see `services/news-curator/CLAUDE.md` — `news-curator` re-declares the two string values by hand, since it does not depend on `feedmind-core` |
+| `feed_source` names in `services/india-news-ingest/business.yaml` | that file's `name:` fields | `services/news-curator/src/news_curator/anchors.py::BUSINESS_ELIGIBLE_SOURCES` | both — matched exactly, not with `===`, but just as byte-for-byte |
 
 Two of these deserve spelling out because the failure is silent:
 
@@ -162,6 +200,11 @@ consumer are both FeedMind services here, so there is no boundary to respect —
 and `services/ingest` is very likely deployed before the notifier exists, so
 waiting for the consumer to create it would mean the first digest goes nowhere.
 
+`feedmind-news-ingested` follows the same exception, for the same reason:
+`scripts/setup-feedmind-infra.sh` creates it, `services/india-news-ingest`
+publishes, and `services/news-curator` subscribes via Pub/Sub push (not
+Eventarc — see that service's CLAUDE.md §3.3 reasoning).
+
 ## Retention: everything is on a clock
 
 | Data | Lifetime | Mechanism |
@@ -183,14 +226,19 @@ archive self-healing, so a missed run needs no recovery. See
 ./scripts/lock-all.sh              # re-resolve every Python project, regenerate requirements.txt
 uvx ruff check .                   # repo-wide, config in ruff.toml
 
-./scripts/setup-feedmind-infra.sh  # once per project: APIs, SAs, IAM, the topic
-./scripts/deploy-feedmind.sh       # all three FeedMind functions + their Scheduler jobs
+./scripts/setup-feedmind-infra.sh  # once per project: APIs, SAs, IAM, both topics
+./scripts/deploy-feedmind.sh       # all four FeedMind functions + their Scheduler jobs
 ./scripts/deploy-feedmind.sh ingest         # or just one
 ```
 
+`services/news-curator` is not in `deploy-feedmind.sh` — it is a Cloud Run
+service with its own numbered `deploy/*.sh` scripts, following the
+`services/paper-prism` pattern rather than the Cloud Functions one. See
+`services/news-curator/CLAUDE.md`.
+
 Per-component commands are in each component's own `CLAUDE.md`. Deploys are
 per-component too — there is no repo-wide deploy, and that is deliberate: the
-four deployables have independent schedules, runtimes and blast radii.
+deployables have independent schedules, runtimes and blast radii.
 
 ## Python dependencies
 
@@ -200,13 +248,19 @@ Every service has its own `pyproject.toml` and committed `uv.lock`. They are
 and they deploy as separate artifacts that never share an interpreter, so one
 shared resolution would force a version bump on somebody for no benefit.
 
-The three FeedMind services share `feedmind-core` as an **editable path
+The four FeedMind services share `feedmind-core` as an **editable path
 dependency**, so an edit to the package is picked up by `uv run` in any service
 with no reinstall. Each pulls only the extras it uses (`feeds`, `sumy`,
 `gemini`, `telegram`, `events`, `archive`) — the notifier ships 47 packages
-where the ingest ships 64. That only works because `models.py` is
-standard-library-only and `runner.py`'s heavy imports are lazy; see
-`packages/feedmind-core/CLAUDE.md`.
+where the ingest ships 64, and `india-news-ingest` ships fewer still (`[feeds,
+events]` — no `sumy`/`gemini`, since it summarizes nothing at ingest time).
+That only works because `models.py` is standard-library-only and `runner.py`'s
+heavy imports are lazy; see `packages/feedmind-core/CLAUDE.md`.
+
+`services/news-curator` is **not** one of the four: like `services/paper-prism`,
+it is a standalone `uv` project with no `feedmind-core` dependency at all — see
+its own CLAUDE.md for why (no torch, a different Firestore pin, a copied
+`embedder.py`).
 
 **Cloud Functions uploads only `--source`**, so the path dependency cannot
 reach a deployed function through pip. `scripts/stage-service.sh` copies

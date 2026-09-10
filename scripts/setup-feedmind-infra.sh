@@ -16,6 +16,7 @@ REGION="${REGION:-us-central1}"
 SERVICE_ACCOUNT="feedmind-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 SCHEDULER_SA="feedmind-scheduler@${PROJECT_ID}.iam.gserviceaccount.com"
 TELEGRAM_TOPIC="${TELEGRAM_TOPIC:-feedmind-telegram-ready}"
+NEWS_INGESTED_TOPIC="${NEWS_INGESTED_TOPIC:-feedmind-news-ingested}"
 
 echo "==> Enabling APIs"
 gcloud services enable \
@@ -58,6 +59,14 @@ echo "==> Pub/Sub topic ${TELEGRAM_TOPIC}"
 # consumer in services/summarizer/deploy/setup.sh — that topic crosses a service
 # boundary this script does not own.
 gcloud pubsub topics create "$TELEGRAM_TOPIC" --project="$PROJECT_ID" 2>/dev/null \
+  || echo "  (exists)"
+
+echo "==> Pub/Sub topic ${NEWS_INGESTED_TOPIC}"
+# services/news-curator's trigger. Created here, on the publisher's side, for
+# the same reason as feedmind-telegram-ready above: services/india-news-ingest
+# and services/news-curator are both FeedMind services, and ingest is very
+# likely deployed before the curator exists.
+gcloud pubsub topics create "$NEWS_INGESTED_TOPIC" --project="$PROJECT_ID" 2>/dev/null \
   || echo "  (exists)"
 
 echo

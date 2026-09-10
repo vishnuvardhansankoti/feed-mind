@@ -88,3 +88,29 @@ def test_client_construction_failure_is_swallowed(monkeypatch):
     monkeypatch.setattr(events.pubsub_v1, "PublisherClient", explode)
 
     assert events.publish_content_ready(2) is False
+
+
+def test_publish_news_ingested(publisher):
+    assert events.publish_news_ingested("india-news-ingest", 223) is True
+    assert len(publisher.calls) == 1
+
+    topic, data, attributes = publisher.calls[0]
+    assert topic == (f"projects/{config.GCP_PROJECT_ID}/topics/{config.NEWS_INGESTED_TOPIC}")
+
+    payload = json.loads(data.decode("utf-8"))
+    assert payload["trigger"] == "news_ingested"
+    assert payload["source"] == "india-news-ingest"
+    assert payload["articles_stored"] == 223
+    assert payload["published_at"]
+
+    # No articles in the payload — the curator queries Firestore for its own
+    # pending backlog, same reasoning as the telegram doorbell.
+    assert "articles" not in payload
+    assert attributes["source"] == "india-news-ingest"
+
+
+def test_publish_news_ingested_failure_is_swallowed(monkeypatch):
+    fake = FakePublisher(error=RuntimeError("pubsub is unreachable"))
+    monkeypatch.setattr(events.pubsub_v1, "PublisherClient", lambda *a, **kw: fake)
+
+    assert events.publish_news_ingested("india-news-ingest", 5) is False
