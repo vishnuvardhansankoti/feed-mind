@@ -1,0 +1,27 @@
+# One of two feed groups ingested by india-news-ingest. Only articles from
+# these three outlets are eligible for the curator's detailed business
+# sub-taxonomy (markets/economy/companies/portfolio/personal_finance) — see
+# docs/feed-mind/news-curator-design.md §4.3. A cluster made only of
+# general.yaml articles keeps the coarse `business` code instead.
+#
+# Feed URLs verified by direct fetch on 2026-09-10: Business Standard 11 items
+# (design doc measured 5 on 2026-09-08 — the feed's size fluctuates through the
+# day; same URL), Economic Times 51 items, Hindu BusinessLine 60 items —
+# matching the doc's counts exactly for the latter two.
+
+service: business
+kind: rss
+summarize: none
+deliver_telegram: false
+content_ready: false
+
+feeds:
+  - name: Business Standard
+    url: https://www.business-standard.com/rss/home_page_top_stories.rss
+    category: business
+  - name: Economic Times
+    url: https://economictimes.indiatimes.com/rssfeedstopstories.cms
+    category: business
+  - name: Hindu BusinessLine
+    url: https://www.thehindubusinessline.com/feeder/default.rss
+    category: business

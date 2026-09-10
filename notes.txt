@@ -1,0 +1,1 @@
+gcloud scheduler jobs delete feedmind-daily-trigger --location=us-central1 --project=feed-mind

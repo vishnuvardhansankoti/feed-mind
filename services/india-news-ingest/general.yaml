@@ -1,0 +1,25 @@
+# One of two feed groups ingested by india-news-ingest. General front-page
+# coverage: TOI's top-stories feed and The Hindu's default feed. Both are
+# stored telegram_status=skipped (these never go to Telegram) and
+# curation_status=pending (services/news-curator picks them up from there —
+# see main.py). `category` here is a placeholder for the pre-curation record;
+# the real classification is the curator's coarse_category on the `stories`
+# collection, computed from title+description, not from this field.
+#
+# Feed URLs verified by direct fetch on 2026-09-10: TOI 46 items, The Hindu 60
+# items — matching the counts measured in
+# docs/feed-mind/news-curator-design.md §1.
+
+service: general
+kind: rss
+summarize: none
+deliver_telegram: false
+content_ready: false
+
+feeds:
+  - name: Times of India
+    url: https://timesofindia.indiatimes.com/rssfeedstopstories.cms
+    category: general
+  - name: The Hindu
+    url: https://www.thehindu.com/feeder/default.rss
+    category: general
