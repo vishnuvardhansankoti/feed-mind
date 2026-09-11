@@ -115,7 +115,6 @@ class Story:
     created_at: datetime
     expires_at: datetime
     business_category: str | None = None
-    is_canonical_selected: bool = False
     ai_summary: str | None = None
     audio_url: str | None = None
 

@@ -120,7 +120,12 @@ def run(config: Config, embedder: Embedder, articles: list[CuratedArticle], sink
 
             for position, (score, global_indices) in enumerate(scored, start=1):
                 members = [articles[i] for i in global_indices]
-                is_selected = position <= config.top_k_per_category
+                # Every cluster's canonical article gets a text summary now —
+                # only audio generation stays capped, and only against Cloud
+                # TTS's free-tier ceiling (see config.py's TOP_K_PER_CATEGORY
+                # and services/summarizer's collect_news_stories). Under
+                # FEEDMIND_TTS=local this cap doesn't apply either.
+                audio_eligible = position <= config.top_k_per_category
                 canonical = rank.pick_canonical(members)
 
                 business_category = None
@@ -157,18 +162,17 @@ def run(config: Config, embedder: Embedder, articles: list[CuratedArticle], sink
                     run_date=run_date,
                     created_at=created_at,
                     expires_at=expires_at,
-                    is_canonical_selected=is_selected,
                 )
                 sink.write_story(story)
                 summary.stories_written += 1
-                if is_selected:
-                    summary.canonical_selected += 1
+                summary.canonical_selected += 1
 
                 for article in members:
                     sink.mark_clustered(
                         article.article_id,
                         story.story_id,
-                        is_canonical=is_selected and article.article_id == canonical.article_id,
+                        is_canonical=article.article_id == canonical.article_id,
+                        audio_eligible=audio_eligible,
                     )
 
     summary.articles_uncategorized = sum(1 for label in coarse_labels if label == UNCATEGORIZED)

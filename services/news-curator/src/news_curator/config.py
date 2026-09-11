@@ -51,8 +51,12 @@ def load_config() -> Config:
         # Agglomerative clustering cutoff tau (design doc §4.4). The doc flags
         # this as the number most likely to need tuning against real output.
         cluster_distance_threshold=float(os.getenv("CLUSTER_DISTANCE_THRESHOLD", "0.22")),
-        # Clusters marked canonical per coarse category (design doc §4.6).
-        top_k_per_category=int(os.getenv("TOP_K_PER_CATEGORY", "5")),
+        # Every cluster's canonical article gets a text summary (design doc
+        # §4.6 update — see services/summarizer/CLAUDE.md's NEWS_STORIES
+        # section). This only caps audio_eligible per coarse category, which
+        # services/summarizer respects unless FEEDMIND_TTS=local, where the
+        # cap doesn't apply. Raised from 5 to 10 alongside that change.
+        top_k_per_category=int(os.getenv("TOP_K_PER_CATEGORY", "10")),
         # Owned by services/summarizer, not this service — see events.py and
         # the root CLAUDE.md's "The Pub/Sub topic is owned by its consumer".
         content_ready_topic=os.getenv("CONTENT_READY_TOPIC", "feedmind-content-ready").strip() or None,

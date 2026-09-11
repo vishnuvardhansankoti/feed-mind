@@ -37,14 +37,14 @@ from contextlib import redirect_stdout
 
 import functions_framework
 
-# `cloud` is the safe default absent an explicit choice — matches today's
-# voice regardless of which backend the deploy script actually configured via
-# FEEDMIND_TTS (see deploy/00-config.sh FEEDMIND_TTS_DEFAULT and
-# docs/feed-mind/tts-switch.md). Both backends are installed in the deployed
-# container; this setdefault only matters for an invocation that skips the
-# deploy scripts entirely (e.g. a bare `functions-framework` run locally). Set
-# before feedmind_audio builds its parser, whose --tts default reads this.
-os.environ.setdefault("FEEDMIND_TTS", "cloud")
+# `local` is the default absent an explicit choice — free, unlike Cloud TTS's
+# metered 1M-character/month tier (see deploy/00-config.sh FEEDMIND_TTS_DEFAULT
+# and docs/feed-mind/tts-switch.md). Both backends are installed in the
+# deployed container; this setdefault only matters for an invocation that
+# skips the deploy scripts entirely (e.g. a bare `functions-framework` run
+# locally). Set before feedmind_audio builds its parser, whose --tts default
+# reads this.
+os.environ.setdefault("FEEDMIND_TTS", "local")
 
 import feedmind_audio  # noqa: E402
 

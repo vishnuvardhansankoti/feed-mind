@@ -27,7 +27,7 @@ deletes a document.
 
 | | source | text | writes to |
 |---|---|---|---|
-| `RSS_FEED` (default) | latest-batch articles in `processed_articles` | scraped page | the article |
+| `RSS_FEED` (default) | latest-batch articles in `processed_articles` with no `curation_status` field | scraped page | the article |
 | `RESEARCH_PAPERS` | latest run per category in `runs` | stored abstract | the `papers` array entry |
 | `NEWS_STORIES` | every `processed_articles` doc with `is_canonical=true` | scraped page | **both** the article and its `stories` doc (`story_id` on the article says which) |
 
@@ -39,6 +39,39 @@ it. Its fallback text is `snippet` (the RSS description), not `summary` —
 `services/india-news-ingest` runs `summarize: none`, so `summary` is always
 empty for these articles. See `docs/feed-mind/news-curator-design.md` §6 rows
 2-4 and `services/news-curator/CLAUDE.md`.
+
+**`RSS_FEED` excludes anything with a `curation_status` field — a real
+incident, not a design choice made up front.** `collect_articles` originally
+took "every article sharing the latest `processed_at` date" literally, with
+no source filter; since india-news-ingest/us-news-ingest write to the same
+`processed_articles` collection on the same calendar day, their articles
+(hundreds on a busy day) got swept into the same batch as the tech-blog
+articles `RSS_FEED` actually exists to cover. Confirmed in production on
+2026-09-11: a 346-item batch (18 real tech-blog articles + 328 curated-news
+articles already headed to `NEWS_STORIES` anyway) burned through
+`MAX_RUNTIME` before reaching any of the 18, then failed to continue (see the
+`google-cloud-pubsub` note below) — so they were never summarized at all.
+`curation_status` is the one field only india/us-news-ingest ever write (see
+`services/news-curator/CLAUDE.md`'s "two-service contract" section), so its
+mere presence, not its value, is what `collect_articles` excludes on now.
+`--article-id` bypasses the exclusion, since naming one document is
+unambiguous regardless of which pipeline wrote it.
+
+**Text summarization and audio generation are decoupled here.** Every
+canonical article gets an `ai_summary` — `is_canonical` alone (not a count) is
+what news-curator now marks per cluster. Audio is still capped, but the cap
+depends on `--tts`: `collect_news_stories` resolves `Item.audio_eligible` to
+always `True` under `local` (no free-tier reason to cap it), and to
+news-curator's stored `audio_eligible` field (`TOP_K_PER_CATEGORY`, written by
+`mark_clustered`, default 10) under `cloud` — a missing field (articles
+written before it existed) also defaults to `True`. `process` only checks the
+already-resolved `Item.audio_eligible`; it has no `--tts` branch of its own.
+An item that isn't audio-eligible gets `ai_summary` written with no
+`audio_url`/`audio_generated_at` (`audio_fields` skips those when `audio_url`
+is `None`) and is marked `done` so it isn't rescraped and re-summarized every
+run; `process` reuses that stored `ai_summary` instead of
+rebuilding it if a later run (e.g. after switching to `local`) only needs to
+fill in the audio.
 
 ## Two entry points, one implementation
 
@@ -93,10 +126,13 @@ gcloud run services update feedmind-audio --region=us-central1 --project=feed-mi
     --update-env-vars=FEEDMIND_TTS=local   # or =cloud
 ```
 
-See `docs/feed-mind/tts-switch.md`. The deploy defaults to `cloud` — zero
-voice-quality change from before the migration; `local` is something you flip
-to by hand when approaching the free-tier cap, and back once the month rolls
-over.
+See `docs/feed-mind/tts-switch.md`. The deploy defaulted to `cloud` at
+cutover — zero voice-quality change from before the migration, `local` a
+manual flip when approaching the free-tier cap. **`local` is the default
+now** (2026-09): `local` was always free, but espeak-ng's formant synthesizer
+was a real quality downgrade from Cloud TTS, which is why it stayed opt-in.
+Piper (see below) closed that gap enough to make `local` the default without
+that trade-off.
 
 **`local` does NOT use pyttsx3 on the deployed container — a real bug found
 during cutover, not a design choice made up front.** The original plan was
@@ -109,16 +145,60 @@ the actual deployed service. Root cause, confirmed by instrumenting a real
 deployment: `functions-framework`'s CloudEvent dispatch always runs the
 handler on a spawned `ThreadPoolExecutor` thread, never the process's main
 thread, and pyttsx3's Linux/espeak driver is not safe to call off the main
-thread. `webscraper/speech.py::synthesize_wav` shells out to `espeak-ng`
-directly as a subprocess instead — a subprocess has no thread-affinity
-requirement, confirmed by calling it from an actual `ThreadPoolExecutor`
-worker thread in a test. `feedmind_audio.py::synthesize()` branches on
-`sys.platform`: Linux (the deployed container, always) uses the subprocess;
-macOS/Windows (the CLI's own `--tts local`, always invoked from one main
-thread, no problem there) still uses pyttsx3. **`pyttsx3` is consequently not
-a dependency of this deployed image at all** — see `pyproject.toml`'s comment.
+thread. `webscraper/speech.py::synthesize_wav` shells out to a subprocess
+instead — a subprocess has no thread-affinity requirement, confirmed by
+calling it from an actual `ThreadPoolExecutor` worker thread in a test.
+`feedmind_audio.py::synthesize()` branches on `sys.platform`: Linux (the
+deployed container, always) uses the subprocess; macOS/Windows (the CLI's own
+`--tts local`, always invoked from one main thread, no problem there) still
+uses pyttsx3. **`pyttsx3` is consequently not a dependency of this deployed
+image at all** — see `pyproject.toml`'s comment.
 
-**A second real bug, unrelated to TTS: Pub/Sub push subscriptions need an
+**Piper replaced espeak-ng as that subprocess (2026-09).** Same reasoning as
+above — the subprocess has no thread-affinity requirement regardless of which
+binary it runs — but a neural vocoder instead of espeak-ng's formant
+synthesizer, for meaningfully better voice quality at the same zero marginal
+cost (Piper is free/local like espeak-ng was; only Cloud TTS is metered).
+Three things don't carry over from the espeak-ng version of this:
+
+- **The voice is a model file, not a runtime-selectable name.** espeak-ng
+  shipped dozens of voices via one apt package, selectable by name (`-v
+  en-us`) with no extra install. Piper needs an actual `.onnx` + `.onnx.json`
+  model file per voice (tens of MB each), so this image bakes in exactly one
+  — `en_US-lessac-medium` — at build time (Dockerfile), the same way
+  `services/news-curator`'s Dockerfile bakes in its embedding model, so
+  synthesis never needs a network call. `PIPER_VOICE_MODEL`
+  (`webscraper/speech.py::PIPER_DEFAULT_MODEL`) overrides the path if a
+  different voice is baked in later; `--voice` overrides it per-run.
+- **`rate` (words per minute) is now a conversion, not a passthrough.** Piper
+  takes `--length_scale` (a duration multiplier: <1.0 faster, >1.0 slower, 1.0
+  = the model's own pace), so `synthesize_wav` divides `PIPER_NATIVE_WPM` by
+  the requested rate. That constant is a starting point, not a measurement
+  against this exact voice — if the mapped rate sounds off, `--length_scale`
+  is the real knob; retune `PIPER_NATIVE_WPM` by ear.
+- **eSpeak NG isn't fully gone, just repackaged.** `piper-tts` 1.8.0's own
+  phonemizer is still eSpeak-NG-based under the hood, bundled directly into
+  its ~34MB wheel — its only *declared* dependencies are `onnxruntime` and
+  `pathvalidate`, no separate `piper-phonemize` package. This swap replaces
+  the waveform synthesizer; the espeak-ng *apt package* is gone from the
+  Dockerfile, but its phoneme logic lives on inside a wheel now.
+
+**A third real bug, found the same day this shipped: 1Gi was not enough
+memory.** A real `--force` re-run of a 30-item batch OOM-killed the container
+mid-batch — Cloud Run's own log: `Memory limit of 1024 MiB exceeded with 1087
+MiB used`. onnxruntime loading Piper's voice model, on top of spaCy already
+resident, pushed past the 1Gi ceiling this container had run at since the
+gen2-Function era (`deploy/00-config.sh`'s comment had already flagged this
+as an open question — "kept at the same 1Gi/1 CPU... until watched under a
+real local-TTS run" — and this is that watching). `MEMORY` is now `2Gi`. The
+crash killed the whole request with no clean `stopping after Xs` log (that
+only fires from `MAX_RUNTIME`'s own between-items check, never from Cloud
+Run's hard kill), so items already written before the crash keep their new
+Piper audio; anything after it is stuck on whatever it had before — rerun
+those specific items (`--article-id`) rather than the whole batch, to avoid
+paying for the LLM call and scrape on the ones already converted.
+
+**A fourth real bug, unrelated to TTS: Pub/Sub push subscriptions need an
 explicit IAM grant that `gcloud pubsub subscriptions create
 --push-auth-service-account` does not reliably set up on its own.** Pub/Sub's
 service agent needs `roles/iam.serviceAccountTokenCreator` on the push SA to

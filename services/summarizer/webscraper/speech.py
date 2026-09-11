@@ -9,18 +9,31 @@ Two local (non-Cloud-TTS) mechanisms live here:
                        SAPI5 on Windows, espeak on Linux - which is what the
                        CLI's --speak uses to play audio out loud interactively.
 
-  synthesize_wav()     espeak-ng invoked directly as a subprocess, stdlib
-                       only. This is what feedmind_audio.py's deployed
-                       pipeline actually uses for FEEDMIND_TTS=local, *not*
-                       speak() - see its docstring for why: pyttsx3's Linux
-                       driver is not safe to call off the process's main
-                       thread, and the Cloud Run container always calls it
-                       from a functions-framework dispatch thread. A
-                       subprocess has no such thread-affinity requirement.
+  synthesize_wav()     Piper (https://github.com/rhasspy/piper) invoked
+                       directly as a subprocess. This is what
+                       feedmind_audio.py's deployed pipeline actually uses for
+                       FEEDMIND_TTS=local, *not* speak() - see its docstring
+                       for why: pyttsx3's Linux driver is not safe to call off
+                       the process's main thread, and the Cloud Run container
+                       always calls it from a functions-framework dispatch
+                       thread. A subprocess has no such thread-affinity
+                       requirement, and it is what espeak-ng (this function's
+                       previous backend) relied on too - see
+                       docs/feed-mind/tts-switch.md for why Piper replaced it
+                       (same reason: free, unlimited, no Cloud TTS metering -
+                       just a neural vocoder instead of espeak-ng's formant
+                       synthesizer, for meaningfully better voice quality at
+                       the same zero marginal cost). `piper-tts`'s own
+                       phonemizer is still eSpeak-NG-based under the hood,
+                       bundled directly into its own wheel (no separate
+                       `piper-phonemize` package as a declared dependency) -
+                       it is the *waveform* synthesizer being replaced, not
+                       every trace of eSpeak NG.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -29,7 +42,22 @@ from pathlib import Path
 
 from .errors import SpeechError
 
-ESPEAK_INSTALL_HINT = "espeak-ng is not on PATH - install it with: apt-get install espeak-ng"
+PIPER_INSTALL_HINT = "piper is not installed - run: uv pip install piper-tts"
+
+# Baked into the Cloud Run image at build time (see Dockerfile) so synthesis
+# never needs a network call. Overridable for local dev/testing against a
+# differently-placed or different-voice model without touching code.
+PIPER_VOICE_MODEL_ENV_VAR = "PIPER_VOICE_MODEL"
+PIPER_DEFAULT_MODEL = os.environ.get(
+    PIPER_VOICE_MODEL_ENV_VAR, "/app/voices/en_US-lessac-medium.onnx"
+)
+
+# Piper takes --length_scale (a duration multiplier: <1.0 faster, >1.0
+# slower, 1.0 = the model's own natural pace), not words-per-minute, so `rate`
+# is converted against this constant. Not measured against this exact voice
+# model - a starting point, not a spec. If the mapped rate sounds off,
+# --length_scale is the authoritative knob; tune PIPER_NATIVE_WPM by ear.
+PIPER_NATIVE_WPM = 165
 
 INSTALL_HINT = "pyttsx3 is not installed - run: uv pip install pyttsx3"
 
@@ -99,44 +127,48 @@ def clean_for_speech(text):
     return " ".join(lines)
 
 
-def require_espeak():
-    espeak = shutil.which("espeak-ng") or shutil.which("espeak")
-    if not espeak:
-        raise SpeechError(ESPEAK_INSTALL_HINT)
-    return espeak
+def require_piper():
+    piper = shutil.which("piper")
+    if not piper:
+        raise SpeechError(PIPER_INSTALL_HINT)
+    return piper
 
 
-def synthesize_wav(text, output, rate=None, voice=None, espeak=None):
-    """Speak `text` into a WAV at `output` via a direct espeak-ng subprocess.
+def synthesize_wav(text, output, rate=None, voice=None, piper=None):
+    """Speak `text` into a WAV at `output` via a direct `piper` subprocess.
 
-    `rate` is words per minute, passed straight through to espeak-ng's own
-    `-s` flag - no WPM-to-multiplier conversion needed here, unlike
-    cloud_speech.py's speaking_rate() (the Cloud TTS API wants a multiplier
-    instead of raw WPM). `voice` is an espeak-ng voice name (see
-    `espeak-ng --voices`); omitted, espeak-ng uses its own default.
+    `voice` is a path to a Piper `.onnx` model (its `.onnx.json` must sit
+    alongside it, same directory - Piper finds it automatically); omitted,
+    PIPER_DEFAULT_MODEL (baked into the image at build time) is used. `rate`
+    is words per minute, converted to Piper's `--length_scale` against
+    PIPER_NATIVE_WPM - see this module's docstring for why that's an
+    approximation, not a spec.
 
     A subprocess call has no thread-affinity requirement, unlike pyttsx3's
-    ctypes-driven engine in speak() - see this module's docstring.
+    ctypes-driven engine in speak() - see this module's docstring. Text goes
+    over stdin rather than argv, since Piper reads it that way and a long
+    article would risk the platform's argv length limit otherwise.
     """
     text = clean_for_speech(text)
     if not text:
         raise SpeechError("Nothing to speak.")
 
-    espeak = espeak or require_espeak()
+    piper = piper or require_piper()
+    model = voice or PIPER_DEFAULT_MODEL
+    if not Path(model).exists():
+        raise SpeechError(f"Piper voice model not found: {model}")
+
     path = Path(output).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    argv = [espeak, "-w", str(path)]
+    argv = [piper, "--model", str(model), "--output_file", str(path)]
     if rate is not None:
-        argv += ["-s", str(int(rate))]
-    if voice:
-        argv += ["-v", voice]
-    argv.append(text)
+        argv += ["--length_scale", f"{PIPER_NATIVE_WPM / float(rate):.3f}"]
 
-    result = subprocess.run(argv, capture_output=True, text=True)
+    result = subprocess.run(argv, input=text, capture_output=True, text=True)
     if result.returncode != 0 or not path.exists():
         detail = (result.stderr or "").strip()[:300]
-        raise SpeechError(f"espeak-ng failed: {detail}")
+        raise SpeechError(f"piper failed: {detail}")
     return path
 
 

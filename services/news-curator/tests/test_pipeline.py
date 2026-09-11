@@ -98,8 +98,8 @@ class FakeSink:
     def write_story(self, story) -> None:
         self.stories.append(story)
 
-    def mark_clustered(self, article_id, story_id, is_canonical) -> None:
-        self.clustered.append((article_id, story_id, is_canonical))
+    def mark_clustered(self, article_id, story_id, is_canonical, audio_eligible) -> None:
+        self.clustered.append((article_id, story_id, is_canonical, audio_eligible))
 
 
 @pytest.fixture
@@ -132,14 +132,18 @@ def test_cross_outlet_duplicates_merge_and_outrank_a_singleton(config):
     top = next(s for s in business_stories.values() if s.rank == 1)
     assert top.cluster_size == 2
     assert {a["url"] for a in top.related_articles} | {top.canonical["url"]} == {_A1.url, _A2.url}
-    # top_k_per_category=1: only rank 1 is canonical-selected.
-    assert top.is_canonical_selected is True
+
+    # Every cluster's canonical article is marked is_canonical (gets a text
+    # summary); top_k_per_category=1 only gates audio_eligible.
+    top_canonical = next(c for c in sink.clustered if c[1] == top.story_id and c[2])
+    assert top_canonical[3] is True  # rank 1 <= top_k_per_category=1
 
     runner_up = next(s for s in business_stories.values() if s.rank == 2)
     assert runner_up.cluster_size == 1
-    assert runner_up.is_canonical_selected is False
+    runner_up_canonical = next(c for c in sink.clustered if c[1] == runner_up.story_id and c[2])
+    assert runner_up_canonical[3] is False  # rank 2 > top_k_per_category=1
 
-    assert summary.canonical_selected == 2  # one per non-empty coarse category (business, sports)
+    assert summary.canonical_selected == 3  # every cluster's canonical article: business (2) + sports (1)
 
 
 def test_canonical_is_the_longest_description(config):
@@ -184,13 +188,23 @@ def test_mark_clustered_flags_only_the_selected_canonical(config):
     sink = FakeSink()
     run(config, FakeEmbedder(), [_A1, _A2, _A3], sink)
 
-    flags = dict((article_id, is_canonical) for article_id, _story_id, is_canonical in sink.clustered)
-    # {a1, a2} is rank 1 (selected): only a2 (the canonical pick) is True.
+    flags = {
+        article_id: is_canonical
+        for article_id, _story_id, is_canonical, _audio_eligible in sink.clustered
+    }
+    # {a1, a2}: only a2 (the canonical pick) is True.
     assert flags[_A1.article_id] is False
     assert flags[_A2.article_id] is True
-    # {a3} is rank 2, below top_k_per_category=1: never canonical even though
-    # it is its own cluster's only member.
-    assert flags[_A3.article_id] is False
+    # {a3} is its own cluster's only member, so it is that cluster's
+    # canonical pick too — is_canonical no longer depends on top_k_per_category.
+    assert flags[_A3.article_id] is True
+
+    audio_eligible = {
+        article_id: audio_eligible
+        for article_id, _story_id, _is_canonical, audio_eligible in sink.clustered
+    }
+    # {a3} is rank 2, below top_k_per_category=1: not eligible for audio.
+    assert audio_eligible[_A3.article_id] is False
 
 
 def test_story_id_encodes_country_category_run_date_and_rank(config):

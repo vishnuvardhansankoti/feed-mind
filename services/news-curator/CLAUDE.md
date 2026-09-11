@@ -151,6 +151,15 @@ that says "look now", exactly like `feedmind-news-ingested` and
 `feedmind-telegram-ready`. It writes `ai_summary` / `audio_url` onto **both**
 the article and its `stories` doc; see `services/summarizer/CLAUDE.md`.
 
+`is_canonical` is set for **every** cluster's representative article now —
+`TOP_K_PER_CATEGORY` (`config.py`, default 10) no longer gates it. It instead
+gates a second field, `audio_eligible`, also written by `mark_clustered`:
+`services/summarizer` gives every canonical article a text summary but only
+generates audio for `audio_eligible` ones when `FEEDMIND_TTS=cloud` (its
+free-tier reason for capping); under `local` the cap is ignored entirely. See
+`services/summarizer/CLAUDE.md`'s NEWS_STORIES section and
+`docs/feed-mind/tts-switch.md`.
+
 ## Commands
 
 Run from `services/news-curator/`.

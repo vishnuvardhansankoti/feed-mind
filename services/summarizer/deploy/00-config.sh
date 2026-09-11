@@ -50,21 +50,24 @@ export LLM_API_KEY_SECRET="${LLM_API_KEY_SECRET:-feedmind-llm-api-key}"
 export VAPID_PRIVATE_KEY_SECRET="${VAPID_PRIVATE_KEY_SECRET:-feedmind-vapid-private-key}"
 
 # -- Runtime env vars -----------------------------------------------------------
-# FEEDMIND_TTS defaults to `cloud` on the initial deploy — same voice as today,
-# zero behavior change on cutover day. Flip to `local` later with:
+# FEEDMIND_TTS defaults to `local` — free, unlike Cloud TTS's metered
+# 1M-character/month tier. Flip to `cloud` if Piper's voice quality isn't
+# good enough for some use, with:
 #     gcloud run services update "$SERVICE_NAME" --region="$REGION" \
-#         --project="$PROJECT_ID" --update-env-vars=FEEDMIND_TTS=local
+#         --project="$PROJECT_ID" --update-env-vars=FEEDMIND_TTS=cloud
 # See docs/feed-mind/tts-switch.md.
-export FEEDMIND_TTS_DEFAULT="${FEEDMIND_TTS_DEFAULT:-cloud}"
+export FEEDMIND_TTS_DEFAULT="${FEEDMIND_TTS_DEFAULT:-local}"
 
 # No FEEDMIND_VOICE is set, deliberately — "en-US-Neural2-F" is a Cloud TTS
-# voice *name*; pyttsx3/espeak-ng has no voice by that name, so forcing it
-# unconditionally onto both backends fails every item the moment FEEDMIND_TTS
-# flips to local ("No voice matches 'en-us-neural2-f'"). cloud_speech.py's own
-# DEFAULT_VOICE already is "en-US-Neural2-F", so omitting --voice entirely
-# gives Cloud TTS the exact same voice it always used, and lets pyttsx3 fall
-# back to its own default local voice. Found by testing the real deployed
-# service against real production data before wiring the real subscription.
+# voice *name*; Piper takes a model file path instead (and pyttsx3, the CLI's
+# own macOS/Windows backend, has no voice by that name either), so forcing it
+# unconditionally onto every backend fails every item the moment FEEDMIND_TTS
+# flips to local. cloud_speech.py's own DEFAULT_VOICE already is
+# "en-US-Neural2-F", so omitting --voice entirely gives Cloud TTS the exact
+# same voice it always used, and lets Piper/pyttsx3 fall back to their own
+# defaults (webscraper/speech.py::PIPER_DEFAULT_MODEL for Piper). Found by
+# testing the real deployed service against real production data before
+# wiring the real subscription.
 export TTS_RATE="${TTS_RATE:-200}"
 
 export LLM_API="${LLM_API:-openai}"
@@ -74,9 +77,11 @@ export LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-1200}"
 export VAPID_SUBJECT="${VAPID_SUBJECT:-mailto:shankotai@gmail.com}"
 
 # -- Resource + concurrency shape ------------------------------------------------
-# Both spaCy and pyttsx3/espeak-ng now live in one image; kept at the same
-# 1Gi/1 CPU the function used until watched under a real local-TTS run.
-export MEMORY="${MEMORY:-1Gi}"
+# 2Gi, raised from 1Gi (2026-09) after a real local-TTS run OOM-killed the
+# container mid-batch: "Memory limit of 1024 MiB exceeded with 1087 MiB used"
+# — Piper's onnxruntime model pushed it over, on top of spaCy already loaded.
+# Confirmed in production logs, not a guess; revisit if 2Gi is ever hit too.
+export MEMORY="${MEMORY:-2Gi}"
 export CPU="${CPU:-1}"
 
 # Unchanged from the function: 540s request timeout, 450s self-stop so a long

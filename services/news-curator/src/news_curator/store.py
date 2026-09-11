@@ -79,7 +79,9 @@ def fetch_pending_articles(db) -> list[CuratedArticle]:
 
 class Sink(Protocol):
     def write_story(self, story: Story) -> None: ...
-    def mark_clustered(self, article_id: str, story_id: str, is_canonical: bool) -> None: ...
+    def mark_clustered(
+        self, article_id: str, story_id: str, is_canonical: bool, audio_eligible: bool
+    ) -> None: ...
 
 
 class LocalJsonSink:
@@ -100,9 +102,12 @@ class LocalJsonSink:
             json.dump(story.to_dict(), fh, indent=2, ensure_ascii=False, default=_json_default)
         log.info("wrote %s (%d sources)", path, len(story.sources))
 
-    def mark_clustered(self, article_id: str, story_id: str, is_canonical: bool) -> None:
+    def mark_clustered(
+        self, article_id: str, story_id: str, is_canonical: bool, audio_eligible: bool
+    ) -> None:
         log.info(
-            "(local) would mark %s: story_id=%s is_canonical=%s", article_id, story_id, is_canonical
+            "(local) would mark %s: story_id=%s is_canonical=%s audio_eligible=%s",
+            article_id, story_id, is_canonical, audio_eligible,
         )
 
 
@@ -114,11 +119,14 @@ class FirestoreSink:
         self.db.collection(STORIES_COLLECTION).document(story.story_id).set(story.to_dict())
         log.info("Firestore: stories/%s (%d sources)", story.story_id, len(story.sources))
 
-    def mark_clustered(self, article_id: str, story_id: str, is_canonical: bool) -> None:
+    def mark_clustered(
+        self, article_id: str, story_id: str, is_canonical: bool, audio_eligible: bool
+    ) -> None:
         self.db.collection(PROCESSED_ARTICLES_COLLECTION).document(article_id).update(
             {
                 "story_id": story_id,
                 "is_canonical": is_canonical,
+                "audio_eligible": audio_eligible,
                 "curation_status": CURATION_CLUSTERED,
             }
         )

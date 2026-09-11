@@ -99,6 +99,17 @@ so the extra prose is discarded before it reaches the model.
 | Cluster first, top-10/category | ~100 | ~3M | ~$32/mo |
 | **Cluster first, top-5/category** | **~25** | **~750k** | **free tier** |
 
+**Update:** text summarization and audio generation were later decoupled.
+Every cluster's canonical article gets an LLM summary regardless of category
+rank — `is_canonical` no longer means "top-K", only "this cluster's
+representative". Only audio generation still respects a per-category cap
+(`TOP_K_PER_CATEGORY`, raised from 5 to 10), via a separate `audio_eligible`
+field, and only under `FEEDMIND_TTS=cloud` — the reason to cap was always
+Cloud TTS's free tier, not the LLM cost, and `FEEDMIND_TTS=local` (now the
+default; `services/summarizer/CLAUDE.md`'s "Cloud Run migration" section) has
+no such ceiling, so a `local` run generates audio for every canonical article.
+See `services/news-curator/CLAUDE.md` and `docs/feed-mind/tts-switch.md`.
+
 ### 3.2 Two feed groups, one service
 
 `general.yaml` (TOI + The Hindu) and `business.yaml` (BS + ET + BLine) are separate
@@ -260,12 +271,13 @@ discards `full_text` after summarization: the root `CLAUDE.md` records that
 `snippet` exists specifically so the BigQuery archive has real prose, and the
 90-day TTL makes anything not captured at write time unrecoverable.
 
-Two fields are added, both written by the curator:
+Three fields are added, all written by the curator:
 
 | Field | Meaning |
 |---|---|
 | `story_id` | the cluster this article belongs to |
-| `is_canonical` | selected for full summarization |
+| `is_canonical` | selected for full summarization — every cluster's representative article, see the §3.1 update below |
+| `audio_eligible` | within `TOP_K_PER_CATEGORY`, so also gets audio under `FEEDMIND_TTS=cloud`; ignored under `local` — added when text summarization and audio generation were decoupled, see the §3.1 update |
 
 ### 5.2 `stories` — new collection
 

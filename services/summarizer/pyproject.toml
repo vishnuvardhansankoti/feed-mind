@@ -13,6 +13,18 @@ dependencies = [
     "google-cloud-firestore==2.28.1",
     "google-cloud-storage==3.13.1",
     "google-cloud-texttospeech==2.*",
+    # Needed by main.py::republish to continue a batch that stopped early on
+    # MAX_RUNTIME — was missing entirely, so every republish attempt failed
+    # with an ImportError, caught and logged rather than raised. A batch that
+    # didn't finish in one invocation just silently stopped forever. See
+    # services/summarizer/CLAUDE.md's "RSS_FEED excludes..." incident note.
+    "google-cloud-pubsub==2.40.0",
+
+    # FEEDMIND_TTS=local's waveform synthesizer — replaces espeak-ng (see the
+    # comment below this dependency list for why it's not just a version
+    # bump). Installs the `piper` console script the Dockerfile's baked-in
+    # voice model is invoked through as a subprocess; see webscraper/speech.py.
+    "piper-tts>=1.2,<2",
 
     "spacy==3.8.15",
     # The spaCy pipeline is not on PyPI, so it comes from its release URL. It
@@ -26,13 +38,21 @@ dependencies = [
 
 # Deliberately absent: pyttsx3. FEEDMIND_TTS=local (see docs/feed-mind/
 # tts-switch.md) does not need it on the deployed container — the Cloud Run
-# path invokes espeak-ng directly as a subprocess (webscraper/speech.py::
+# path invokes `piper` directly as a subprocess (webscraper/speech.py::
 # synthesize_wav), because pyttsx3's Linux driver is not safe to call off the
 # process's main thread, and functions-framework's CloudEvent dispatch always
 # runs the handler on a spawned thread (confirmed by instrumenting a real
 # deployment — pyttsx3 silently produced no output there, no exception).
-# `espeak-ng` and `ffmpeg` are still installed via apt in the Dockerfile, for
-# that subprocess and the WAV->MP3 transcode respectively.
+# `ffmpeg` is still installed via apt in the Dockerfile, for the WAV->MP3
+# transcode; Piper's voice model is baked into the image separately (also in
+# the Dockerfile), not installed via apt or this dependency list.
+#
+# Piper replaced espeak-ng here (2026-09) as the waveform synthesizer for
+# meaningfully better voice quality at the same zero marginal cost — Cloud TTS
+# is still the only backend that costs anything, and only past its free tier.
+# piper-tts 1.8.0's only dependencies are onnxruntime and pathvalidate — no
+# separate piper-phonemize package; its phonemizer (still eSpeak-NG-based
+# under the hood) is bundled directly into its own ~34MB wheel.
 #
 # pyttsx3 remains the CLI's own local backend on macOS/Windows (feedmind_audio.py
 # only calls webscraper.speech.speak() there, never on Linux), where it has no

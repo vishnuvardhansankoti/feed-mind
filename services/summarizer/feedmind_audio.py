@@ -4,7 +4,10 @@
 Three sources, selected with --process-doc:
 
   RSS_FEED (default)   every article sharing the latest processed_at date in
-                       `processed_articles`. The page is scraped for its text.
+                       `processed_articles`, excluding anything with a
+                       `curation_status` field (india-news-ingest /
+                       us-news-ingest articles — NEWS_STORIES' job, below).
+                       The page is scraped for its text.
 
   RESEARCH_PAPERS      every paper in the latest run of each category in
                        `runs`. The stored abstract is the text, so nothing is
@@ -146,12 +149,22 @@ class Item:
     item_id: str
     title: str
     blob: str
-    record: Callable[[str, str], None]
+    record: Callable[[str, str | None], None]
     url: str = ""          # scraped when `text` is empty
     text: str = ""         # supplied directly (papers)
     fallback: str = ""     # used when the scrape fails
-    done: bool = False     # already has audio
+    done: bool = False     # already has audio (or, when not audio_eligible, a summary)
     note: str = ""         # extra label for the progress line
+    # NEWS_STORIES only: whether this item should get audio, already resolved
+    # against --tts by collect_news_stories — always True under local, capped
+    # to news_curator.config.TOP_K_PER_CATEGORY under cloud. RSS_FEED/
+    # RESEARCH_PAPERS have no such cap, so they default to True and are
+    # unaffected.
+    audio_eligible: bool = True
+    # NEWS_STORIES only: an ai_summary already on the doc, reused instead of
+    # re-scraping + re-summarizing when only the audio still needs generating
+    # (e.g. after audio_eligible items already had text-only runs).
+    existing_summary: str = ""
 
 
 # ----------------------------------------------------------------------
@@ -162,11 +175,15 @@ def open_firestore():
 
 
 def audio_fields(summary, audio_url):
-    return {
-        AI_SUMMARY_FIELD: summary,
-        AUDIO_URL_FIELD: audio_url,
-        AUDIO_GENERATED_AT_FIELD: datetime.now(UTC).isoformat(),
-    }
+    """Fields to write. `audio_url=None` means text-only — see NEWS_STORIES'
+    audio_eligible cap — so the audio fields are left untouched rather than
+    overwritten with a value that doesn't exist yet.
+    """
+    fields = {AI_SUMMARY_FIELD: summary}
+    if audio_url is not None:
+        fields[AUDIO_URL_FIELD] = audio_url
+        fields[AUDIO_GENERATED_AT_FIELD] = datetime.now(UTC).isoformat()
+    return fields
 
 
 # -- RSS_FEED ----------------------------------------------------------
@@ -191,6 +208,15 @@ def collect_articles(db, args):
     Firestore cannot filter on "field is missing", and ordering by audio_url
     would exclude exactly the documents that need audio, so the date is found
     and the batch assembled client-side.
+
+    Articles carrying a `curation_status` field belong to india-news-ingest /
+    us-news-ingest and are services/news-curator's job, collected separately
+    by --process-doc NEWS_STORIES once they're canonical — this collector
+    always skips them. Without this, a busy news day balloons this batch (all
+    of that day's curated articles share the same processed_at date as the
+    tech-blog articles), and MAX_RUNTIME can be exhausted before ever reaching
+    the tech-blog articles the caller actually asked for. `--article-id`
+    bypasses this, since asking for one document by id is explicit enough.
     """
     collection = db.collection(ARTICLES_COLLECTION)
 
@@ -201,9 +227,11 @@ def collect_articles(db, args):
         snapshots = [snapshot]
         day = processed_date(snapshot.to_dict() or {})
     else:
-        snapshots = list(collection.stream())
+        snapshots = [
+            s for s in collection.stream() if "curation_status" not in (s.to_dict() or {})
+        ]
         if not snapshots:
-            raise PipelineError(f"Collection {ARTICLES_COLLECTION} is empty.")
+            raise PipelineError(f"No non-curated articles in {ARTICLES_COLLECTION}.")
         # ISO-8601 UTC strings, always written by datetime.now(UTC).isoformat(),
         # so lexicographic max is chronological max.
         day = max(processed_date(snap.to_dict() or {}) for snap in snapshots)
@@ -338,6 +366,14 @@ def collect_news_stories(db, args):
     RSS_FEED there is no "latest batch" date: news-curator runs once a day and
     a canonical article stays canonical (and thus eligible here) until it has
     audio or its 90-day TTL removes the document.
+
+    Every canonical article gets a text summary; `audio_eligible` only caps
+    which ones also get audio. Under --tts cloud it is news-curator's stored
+    field (TOP_K_PER_CATEGORY, written by mark_clustered — missing on articles
+    written before this field existed, which default to True so nothing
+    already summarized loses its shot at audio). Under --tts local it is
+    always True, since the free-tier reason to cap Cloud TTS doesn't apply —
+    every canonical article gets audio.
     """
     collection = db.collection(ARTICLES_COLLECTION)
 
@@ -363,6 +399,16 @@ def collect_news_stories(db, args):
             continue
 
         article_id = doc.get("article_id") or snapshot.id
+        # --tts local has no free-tier ceiling to cap against, so every
+        # canonical article is audio_eligible; --tts cloud respects
+        # news-curator's stored cap.
+        audio_eligible = args.tts == TTS_LOCAL or bool(doc.get("audio_eligible", True))
+        existing_summary = (doc.get(AI_SUMMARY_FIELD) or "").strip()
+        has_audio = bool(doc.get(AUDIO_URL_FIELD))
+        # Done once it has audio, or once it has a summary and isn't
+        # audio_eligible under the current --tts — otherwise every run would
+        # re-scrape and re-summarize an item that will never get audio.
+        done = has_audio or (bool(existing_summary) and not audio_eligible)
         items.append(
             Item(
                 item_id=article_id,
@@ -376,7 +422,9 @@ def collect_news_stories(db, args):
                 # always "" here — snippet (the RSS description) is the
                 # only fallback text this pipeline ever has.
                 fallback=(doc.get("snippet") or "").strip(),
-                done=bool(doc.get(AUDIO_URL_FIELD)),
+                done=done,
+                audio_eligible=audio_eligible,
+                existing_summary=existing_summary,
             )
         )
     return f"{len(items)} canonical article(s)", items
@@ -514,7 +562,7 @@ def synthesize(text, workdir, args, ffmpeg):
         # on a spawned ThreadPoolExecutor thread — confirmed by instrumenting
         # a real deployment: it silently produces no output file, no
         # exception, nothing. A subprocess has no such thread-affinity
-        # requirement, so espeak-ng is invoked directly instead of through
+        # requirement, so Piper is invoked directly instead of through
         # pyttsx3's ctypes engine. See webscraper/speech.py's docstring.
         raw = synthesize_wav(text, workdir / "speech.wav", rate=args.rate, voice=args.voice)
         return to_mp3(raw, workdir / "speech.mp3", ffmpeg)
@@ -545,14 +593,27 @@ def upload(client, path, destination):
 def process(item, context):
     """Run the pipeline for one item. Raises PipelineError on failure.
 
-    Returns the audio URL, or None on a dry run.
+    Returns the audio URL, or None on a dry run or a text-only pass.
     """
     args = context["args"]
-    text = source_text(item, args)
-    summary = build_summary(text, context["settings"], context["condense"],
-                            context["config"])
-    if not summary.strip():
-        raise PipelineError("the model returned an empty summary")
+    if item.existing_summary and not args.force:
+        # Only audio was outstanding (see collect_news_stories' `done`
+        # logic) — reuse it instead of re-scraping and re-summarizing.
+        summary = item.existing_summary
+    else:
+        text = source_text(item, args)
+        summary = build_summary(text, context["settings"], context["condense"],
+                                context["config"])
+        if not summary.strip():
+            raise PipelineError("the model returned an empty summary")
+
+    # NEWS_STORIES only: audio_eligible already accounts for --tts (see
+    # collect_news_stories) — True for everything under local, capped to
+    # news-curator's TOP_K_PER_CATEGORY under cloud.
+    if not item.audio_eligible:
+        item.record(summary, None)
+        log("         summarized only - past the audio cap for this category")
+        return None
 
     with tempfile.TemporaryDirectory(prefix="feedmind-audio-") as tmp:
         # Spoken text carries the title; the stored summary below does not.
@@ -629,8 +690,10 @@ def build_parser():
     )
     parser.add_argument(
         "--voice",
-        help=f"a pyttsx3 voice name or id, or a Cloud TTS voice name such as "
-             f"en-US-Neural2-F with --tts {TTS_CLOUD}",
+        help=f"macOS/Windows: a pyttsx3 voice name or id. Linux/deployed: a "
+             f"path to a Piper .onnx model (defaults to the one baked into "
+             f"the image). With --tts {TTS_CLOUD}: a Cloud TTS voice name "
+             f"such as en-US-Neural2-F",
     )
     parser.add_argument("--rate", type=int, help="speech rate in words per minute")
     return parser
@@ -663,7 +726,7 @@ def main(argv=None):
 
     chosen, skipped = select(items, args)
     log(f"{args.process_doc} - {label}")
-    log(f"  {len(items)} item(s), {skipped} already have audio, "
+    log(f"  {len(items)} item(s), {skipped} already done, "
         f"{len(chosen)} to process")
     if not chosen:
         log("  nothing to do (use --force to regenerate)")
@@ -716,7 +779,12 @@ def main(argv=None):
             log(f"         FAILED: {error}")
             failures.append((item.item_id, str(error)))
             continue
-        print(audio_url or f"(dry run) {item.item_id}", flush=True)
+        if audio_url:
+            print(audio_url, flush=True)
+        elif args.dry_run:
+            print(f"(dry run) {item.item_id}", flush=True)
+        else:
+            print(f"(summary only) {item.item_id}", flush=True)
 
     attempted = len(chosen) - remaining
     succeeded = attempted - len(failures)
