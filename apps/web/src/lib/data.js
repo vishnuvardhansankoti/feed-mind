@@ -10,6 +10,7 @@ import {
   LENS_CODES,
   NEWS_WINDOW_DAYS,
   NEWS_MAX_ARTICLES,
+  NEWS_CATEGORY_RSS_CODES,
   STATIC_NEWS_LINKS,
   VIDEO_WINDOW_DAYS,
   VIDEO_MAX_ITEMS,
@@ -121,10 +122,17 @@ async function firestoreNews() {
   const { collection, query, where, orderBy, limit, getDocs } =
     await import("firebase/firestore");
   // processed_at is a uniform UTC ISO string, so a lexicographic >= range is
-  // chronological. Single-field inequality + orderBy needs no composite index.
+  // chronological. The feed_category filter is required, not defensive:
+  // services/india-news-ingest and services/us-news-ingest write into this
+  // same collection at far higher daily volume than the tech-blogs pipeline,
+  // with feed_category values ("general"/"business") outside NEWS_CATEGORIES
+  // entirely. Without this filter their docs fill the whole NEWS_MAX_ARTICLES
+  // window and every tech-blogs tab reads empty. Needs the composite index in
+  // ../../infra/firebase/firestore.indexes.json (feed_category, processed_at).
   const cutoff = newsCutoffIso();
   const q = query(
     collection(await db(), "processed_articles"),
+    where("feed_category", "in", NEWS_CATEGORY_RSS_CODES),
     where("processed_at", ">=", cutoff),
     orderBy("processed_at", "desc"),
     limit(NEWS_MAX_ARTICLES),

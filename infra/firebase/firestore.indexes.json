@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "processed_articles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "feed_category", "order": "ASCENDING" },
+        { "fieldPath": "processed_at", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "stories",
       "queryScope": "COLLECTION",
       "fields": [

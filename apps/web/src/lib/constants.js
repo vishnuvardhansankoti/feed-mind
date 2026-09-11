@@ -47,6 +47,18 @@ export const STATIC_NEWS_LINKS = [
 
 export const NEWS_CATEGORY_CODES = NEWS_CATEGORIES.map((c) => c.code);
 
+// The subset of NEWS_CATEGORY_CODES that actually have RSS-backed Firestore
+// docs — `open-source` is pinned client-side only (see STATIC_NEWS_LINKS) and
+// never written to `processed_articles`. getNews()'s Firestore query filters
+// on this list so the "most recent N" window can't be flooded out by
+// services/india-news-ingest and services/us-news-ingest, which write into
+// this same collection with `feed_category` values ("general"/"business")
+// outside this taxonomy entirely — see the root CLAUDE.md's category-codes
+// warning.
+export const NEWS_CATEGORY_RSS_CODES = NEWS_CATEGORY_CODES.filter(
+  (code) => code !== "open-source",
+);
+
 // Rolling window (days) and hard read cap for the news feed.
 export const NEWS_WINDOW_DAYS = 7;
 export const NEWS_MAX_ARTICLES = 200;
