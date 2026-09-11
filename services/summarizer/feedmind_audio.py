@@ -75,7 +75,7 @@ from webscraper.errors import ScraperError  # noqa: E402
 from webscraper.extractor import extract_article  # noqa: E402
 from webscraper.fetcher import fetch  # noqa: E402
 from webscraper.llm import summarize  # noqa: E402
-from webscraper.speech import speak  # noqa: E402
+from webscraper.speech import speak, synthesize_wav  # noqa: E402
 
 # -- FeedMind's own settings; see packages/feedmind-core/feedmind_core/settings.py
 GCP_PROJECT_ID = "feed-mind"
@@ -507,6 +507,20 @@ def synthesize(text, workdir, args, ffmpeg):
             text, workdir / "speech.mp3", voice=args.voice, rate=args.rate
         )
 
+    if sys.platform.startswith("linux"):
+        # This is the deployed path (Cloud Run is always Linux). pyttsx3's
+        # Linux driver is not safe to call off the process's main thread, and
+        # functions-framework's CloudEvent dispatch always runs the handler
+        # on a spawned ThreadPoolExecutor thread — confirmed by instrumenting
+        # a real deployment: it silently produces no output file, no
+        # exception, nothing. A subprocess has no such thread-affinity
+        # requirement, so espeak-ng is invoked directly instead of through
+        # pyttsx3's ctypes engine. See webscraper/speech.py's docstring.
+        raw = synthesize_wav(text, workdir / "speech.wav", rate=args.rate, voice=args.voice)
+        return to_mp3(raw, workdir / "speech.mp3", ffmpeg)
+
+    # macOS/Windows: the CLI's own use of --tts local, always invoked from a
+    # single main thread, so pyttsx3 has no thread-affinity problem here.
     # pyttsx3's macOS driver writes AIFF whatever extension it is handed.
     raw = speak(text, voice=args.voice, rate=args.rate, output=workdir / "speech.aiff")
     return to_mp3(raw, workdir / "speech.mp3", ffmpeg)

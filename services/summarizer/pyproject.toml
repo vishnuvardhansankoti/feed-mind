@@ -2,7 +2,10 @@
 name = "feedmind-summarizer"
 version = "1.0.0"
 description = "Scrape, LLM-summarize and narrate FeedMind articles and paper-prism papers"
-# Deployed as a python311 Cloud Function (see deploy/config.sh RUNTIME).
+# Deployed as a Cloud Run container (see deploy/00-config.sh, Dockerfile) —
+# functions-framework runs standalone as the HTTP server inside it, serving
+# main.py::on_content_ready with --signature-type=cloud_event, so the Pub/Sub
+# push decoding in main.py is unchanged from the Cloud Functions era.
 requires-python = ">=3.11"
 dependencies = [
     "functions-framework==3.*",
@@ -21,10 +24,20 @@ dependencies = [
     "pywebpush==2.0.3",
 ]
 
-# Deliberately absent: pyttsx3 and ffmpeg. The Cloud Function runtime has no
-# speech engine and no way to install one, which is why webscraper/cloud_speech.py
-# exists and why the function sets FEEDMIND_TTS=cloud. Install pyttsx3 by hand
-# for local `--speak` use of web-page-scraper.py.
+# Deliberately absent: pyttsx3. FEEDMIND_TTS=local (see docs/feed-mind/
+# tts-switch.md) does not need it on the deployed container — the Cloud Run
+# path invokes espeak-ng directly as a subprocess (webscraper/speech.py::
+# synthesize_wav), because pyttsx3's Linux driver is not safe to call off the
+# process's main thread, and functions-framework's CloudEvent dispatch always
+# runs the handler on a spawned thread (confirmed by instrumenting a real
+# deployment — pyttsx3 silently produced no output there, no exception).
+# `espeak-ng` and `ffmpeg` are still installed via apt in the Dockerfile, for
+# that subprocess and the WAV->MP3 transcode respectively.
+#
+# pyttsx3 remains the CLI's own local backend on macOS/Windows (feedmind_audio.py
+# only calls webscraper.speech.speak() there, never on Linux), where it has no
+# thread-affinity problem — install it by hand for that:
+#     uv pip install --python .venv/bin/python pyttsx3
 
 [project.optional-dependencies]
 dev = [

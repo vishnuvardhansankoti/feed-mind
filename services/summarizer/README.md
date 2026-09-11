@@ -92,11 +92,11 @@ Resolution order: `--config PATH` → `$WEB_SCRAPER_CONFIG` → `./scraper-confi
 }
 ```
 
-`ollama-cloud` is hosted Ollama — the provider the deployed function uses. Despite the name it is an **`openai`** provider: `ollama.com` speaks the OpenAI wire format, while the `ollama` adapter is for the native `/api/chat` a *local* Ollama serves.
+`ollama-cloud` is hosted Ollama — the provider the deployed service uses. Despite the name it is an **`openai`** provider: `ollama.com` speaks the OpenAI wire format, while the `ollama` adapter is for the native `/api/chat` a *local* Ollama serves.
 
 Per-field precedence is **CLI flag > env var (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API`, `LLM_API_KEY`, `LLM_MAX_TOKENS`, `LLM_PROVIDER`) > config file > built-in**. API keys are read from the env var named by `api_key_env` and never stored in the file.
 
-`LLM_MAX_TOKENS` exists for reasoning models: they spend part of the budget thinking before writing, so the built-in 300 — sized for a model that starts answering immediately — can leave nothing for the answer. Somewhere with no config file on disk, such as the deployed function, would otherwise have no way to raise it.
+`LLM_MAX_TOKENS` exists for reasoning models: they spend part of the budget thinking before writing, so the built-in 300 — sized for a model that starts answering immediately — can leave nothing for the answer. Somewhere with no config file on disk, such as the deployed service, would otherwise have no way to raise it.
 
 Three wire formats cover most providers:
 
@@ -225,30 +225,35 @@ Exit codes: `0` ok (even with some failures) · `1` no articles found · `2` eve
 
 ---
 
-## Deploying as a Cloud Function
+## Deploying to Cloud Run
 
-`main.py` wraps `feedmind_audio.main()` in a gen2 CloudEvent function, so the CLI and the deployment can't drift — the function just turns a message into argv.
+`main.py` wraps `feedmind_audio.main()` in a `functions-framework` CloudEvent handler, run standalone inside a Cloud Run container — not through Cloud Functions. The CLI and the deployment still can't drift, since the handler just turns a message into argv the same way either way.
 
-Two things from the local setup cannot come along: **pyttsx3** (the runtime has no speech engine, and buildpacks can't `apt-get` one) and **ffmpeg** (same reason). The deployment therefore sets `FEEDMIND_TTS=cloud`, which takes both out of the path. Local **Ollama** can't come either — the deployment points `LLM_*` at **Ollama Cloud** instead, which keeps the model catalogue familiar.
+One thing from the local setup needed a different approach, not a replacement: **pyttsx3**'s Linux driver (`espeak`) turned out unsafe to call off the process's main thread, and `functions-framework`'s dispatch always runs the handler on a spawned thread — confirmed the hard way during the migration (see `deploy/README.md`'s Troubleshooting table). The fix was invoking `espeak-ng` directly as a subprocess instead of through pyttsx3, which has no such thread-affinity requirement. Both that (`FEEDMIND_TTS=local`) and Google Text-to-Speech (`FEEDMIND_TTS=cloud`) ship in the same image, switchable with no rebuild — see [`docs/feed-mind/tts-switch.md`](../../docs/feed-mind/tts-switch.md). Local **Ollama** still can't come along — the deployment points `LLM_*` at **Ollama Cloud** instead, which keeps the model catalogue familiar.
 
 ```bash
-./deploy/setup.sh      # once per project: APIs, service accounts, IAM, topic
-./deploy/deploy.sh     # after every code change
-./deploy/publish.sh    # trigger a run by hand, any time
+./deploy/01-setup.sh              # once per project: APIs, Artifact Registry, SAs, IAM
+./deploy/02-build-push.sh         # build + push the image via Cloud Build
+./deploy/03-deploy-service.sh     # after every code or config change
+./deploy/04-push-subscription.sh  # once: wires the Pub/Sub push subscription
+./deploy/publish.sh               # trigger a run by hand, any time
 ```
 
-Everything configurable lives in `deploy/config.sh` and can be overridden from the environment (`REGION=europe-west1 ./deploy/deploy.sh`).
+Everything configurable lives in `deploy/00-config.sh` and can be overridden from the environment (`REGION=europe-west1 ./deploy/03-deploy-service.sh`).
 
 📖 **[`deploy/README.md`](deploy/README.md)** is the full runbook — prerequisites, what each step does, smoke tests, delivery semantics, troubleshooting and teardown. Start there for an actual deploy; what follows here is the summary.
 
 | File | Job |
 |---|---|
 | `main.py` | `on_content_ready` (Pub/Sub, deployed) and `summarize_feed` (HTTP, kept) |
+| `Dockerfile` | `python:3.11-slim` + `espeak-ng` + `ffmpeg`; `functions-framework` as the server |
 | `requirements.txt` | Runtime deps, including the spaCy model from its release URL |
-| `.gcloudignore` | Keeps the venv, `.git` and `deploy/` out of the upload |
-| `deploy/config.sh` | Every setting, sourced by the others |
-| `deploy/setup.sh` | APIs, service accounts, IAM, the topic — idempotent |
-| `deploy/deploy.sh` | `gcloud functions deploy`, the invoker binding, the ack deadline |
+| `.gcloudignore` / `.dockerignore` | Keeps the venv, `.git` and `deploy/` out of the build |
+| `deploy/00-config.sh` | Every setting, sourced by the others |
+| `deploy/01-setup.sh` | APIs, Artifact Registry, service accounts, IAM — idempotent |
+| `deploy/02-build-push.sh` | Cloud Build → Artifact Registry |
+| `deploy/03-deploy-service.sh` | `gcloud run deploy` |
+| `deploy/04-push-subscription.sh` | The `run.invoker` binding and the push subscription |
 | `deploy/publish.sh` | Publishes a trigger message by hand |
 
 ### What triggers it
@@ -256,19 +261,20 @@ Everything configurable lives in `deploy/config.sh` and can be overridden from t
 A **Pub/Sub message**, not a clock. Only the producing pipeline knows when its run actually finished; a schedule can only guess — too early and there's nothing to summarize, too late and the audio is stale.
 
 ```
-FeedMind run ends ──publish──► feedmind-content-ready ──Eventarc──► feedmind-audio
+FeedMind run ends ──publish──► feedmind-content-ready ──push──► feedmind-audio
 ```
 
-One topic carries both pipelines; the message says which.
+One topic carries three pipelines; the message says which.
 
 | Publisher | Message | Runs | Status |
 |---|---|---|---|
 | `feed-mind` | `{"process_doc": "RSS_FEED"}` | the latest RSS batch | **wired up** |
 | `paper-prism-job` | `{"process_doc": "RESEARCH_PAPERS"}` | the latest run per category | **wired up** |
+| `news-curator` | `{"process_doc": "NEWS_STORIES"}` | every canonical article not yet summarized | **wired up** |
 
-An empty message means the default: the latest RSS batch. Each producer publishes only after its own writes have landed — this function reads those collections, so announcing earlier would race it — and only when there is something new: FeedMind skips when no articles were delivered, paper-prism when no papers were written or the run wasn't writing to Firestore. Both swallow publish failures rather than failing a run that already did its work.
+An empty message means the default: the latest RSS batch. Each producer publishes only after its own writes have landed — this service reads those collections, so announcing earlier would race it — and only when there is something new. All three swallow publish failures rather than failing a run that already did its work.
 
-The topic and both `pubsub.publisher` grants live in this service's `deploy/setup.sh` — the topic belongs to whoever reads it — so run that before either producer's first publish.
+The `pubsub.publisher` grants for all three producers live in this service's `deploy/01-setup.sh` — the topic belongs to whoever reads it — so run that before any producer's first publish. `01-setup.sh` also grants Pub/Sub's own service agent `roles/iam.serviceAccountTokenCreator` on the push service account — miss this and every push 403s with "not authenticated" (found the hard way; see `deploy/README.md`'s Troubleshooting table).
 
 **Before the first deploy**, create the LLM API key secret — it is the one thing the scripts won't invent for you. Get a key from <https://ollama.com/settings/keys>, then:
 
@@ -277,9 +283,9 @@ printf '%s' "$YOUR_KEY" | gcloud secrets create feedmind-llm-api-key \
     --project=feed-mind --data-file=-
 ```
 
-`deploy.sh` mounts it as `LLM_API_KEY`, which `webscraper/config.py` reads like any other override — so the key never appears in a deploy command or in the function's environment configuration. The secret name is provider-neutral on purpose: switching providers later is a new secret *version*, not a new secret.
+`03-deploy-service.sh` mounts it as `LLM_API_KEY`, which `webscraper/config.py` reads like any other override — so the key never appears in a deploy command or in the service's environment configuration. The secret name is provider-neutral on purpose: switching providers later is a new secret *version*, not a new secret.
 
-| `deploy/config.sh` | Default |
+| `deploy/00-config.sh` | Default |
 |---|---|
 | `LLM_API` | `openai` — Ollama Cloud speaks the OpenAI wire format |
 | `LLM_BASE_URL` | `https://ollama.com/v1` → `POST /v1/chat/completions` |
@@ -295,7 +301,7 @@ curl -s https://ollama.com/v1/models | jq -r '.data[].id' | sort
 
 `gpt-oss:20b` is the same family at roughly a fifth the size — worth trying, since a batch is a serial loop and most of its wall time is spent waiting on this call.
 
-To run exactly what the function will run, before spending a deploy on it:
+To run exactly what the service will run, before spending a deploy on it:
 
 ```bash
 LLM_API=openai LLM_BASE_URL=https://ollama.com/v1 \
@@ -303,7 +309,7 @@ LLM_MODEL=gpt-oss:120b LLM_MAX_TOKENS=1200 LLM_API_KEY=... FEEDMIND_TTS=cloud \
     .venv/bin/python feedmind_audio.py --limit 1 --force --dry-run
 ```
 
-The env vars are the same four the function gets, so this needs no config file. If you'd rather have it as a named provider, `--init-config` writes an `ollama-cloud` block that reads the key from `$OLLAMA_API_KEY`; then `--provider ollama-cloud` selects it.
+The env vars are the same four the service gets, so this needs no config file. If you'd rather have it as a named provider, `--init-config` writes an `ollama-cloud` block that reads the key from `$OLLAMA_API_KEY`; then `--provider ollama-cloud` selects it.
 
 ### Invoking it
 

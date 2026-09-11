@@ -33,6 +33,22 @@ gcloud iam service-accounts create "$PUSH_SA_NAME" \
   --display-name="news-curator Pub/Sub push invoker" --project "$PROJECT_ID" \
   2>/dev/null || echo "    push SA exists — skipping"
 
+echo "==> Letting Pub/Sub mint OIDC tokens as ${PUSH_SA_NAME}"
+# A push subscription's --push-auth-service-account only works if Pub/Sub's own
+# service agent can impersonate that SA to mint the OIDC token it attaches to
+# each push request. Without this, Cloud Run rejects every push with 403 "The
+# request was not authenticated" — not a bad-token error, a NO-token error,
+# because Pub/Sub silently can't mint one. `gcloud pubsub subscriptions create
+# --push-auth-service-account` does NOT reliably set this up on its own —
+# confirmed the hard way: this exact gap left this subscription 403ing on 100%
+# of real deliveries since it was first deployed, found only by checking Cloud
+# Run request logs directly (Cloud Logging's default view never surfaced it).
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+gcloud iam service-accounts add-iam-policy-binding "$PUSH_SA" \
+  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project "$PROJECT_ID" --quiet >/dev/null
+
 echo "==> Service SA: Firestore read/write"
 # datastore.user is the narrowest predefined role that covers both reading
 # processed_articles and writing stories; there is no per-collection role.

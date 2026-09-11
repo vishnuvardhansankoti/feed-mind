@@ -1,23 +1,35 @@
 """Reading the summary out loud, or saving it as an audio file.
 
-pyttsx3 is the only non-stdlib dependency in the package and it is imported
-lazily, so everything else keeps working when it is not installed:
+Two local (non-Cloud-TTS) mechanisms live here:
 
-    uv pip install --python .venv/bin/python pyttsx3
+  speak()             pyttsx3, the only non-stdlib dependency in the package,
+                       imported lazily so everything else keeps working when
+                       it is not installed. Drives whatever engine the
+                       platform provides - NSSpeechSynthesizer on macOS,
+                       SAPI5 on Windows, espeak on Linux - which is what the
+                       CLI's --speak uses to play audio out loud interactively.
 
-pyttsx3 drives whatever engine the platform provides - NSSpeechSynthesizer on
-macOS, SAPI5 on Windows, espeak on Linux. That means saved audio takes the
-driver's native format: on macOS the output is always AIFF, whatever extension
-you ask for.
+  synthesize_wav()     espeak-ng invoked directly as a subprocess, stdlib
+                       only. This is what feedmind_audio.py's deployed
+                       pipeline actually uses for FEEDMIND_TTS=local, *not*
+                       speak() - see its docstring for why: pyttsx3's Linux
+                       driver is not safe to call off the process's main
+                       thread, and the Cloud Run container always calls it
+                       from a functions-framework dispatch thread. A
+                       subprocess has no such thread-affinity requirement.
 """
 
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 from .errors import SpeechError
+
+ESPEAK_INSTALL_HINT = "espeak-ng is not on PATH - install it with: apt-get install espeak-ng"
 
 INSTALL_HINT = "pyttsx3 is not installed - run: uv pip install pyttsx3"
 
@@ -85,6 +97,47 @@ def clean_for_speech(text):
         if line.strip():
             lines.append(line.strip())
     return " ".join(lines)
+
+
+def require_espeak():
+    espeak = shutil.which("espeak-ng") or shutil.which("espeak")
+    if not espeak:
+        raise SpeechError(ESPEAK_INSTALL_HINT)
+    return espeak
+
+
+def synthesize_wav(text, output, rate=None, voice=None, espeak=None):
+    """Speak `text` into a WAV at `output` via a direct espeak-ng subprocess.
+
+    `rate` is words per minute, passed straight through to espeak-ng's own
+    `-s` flag - no WPM-to-multiplier conversion needed here, unlike
+    cloud_speech.py's speaking_rate() (the Cloud TTS API wants a multiplier
+    instead of raw WPM). `voice` is an espeak-ng voice name (see
+    `espeak-ng --voices`); omitted, espeak-ng uses its own default.
+
+    A subprocess call has no thread-affinity requirement, unlike pyttsx3's
+    ctypes-driven engine in speak() - see this module's docstring.
+    """
+    text = clean_for_speech(text)
+    if not text:
+        raise SpeechError("Nothing to speak.")
+
+    espeak = espeak or require_espeak()
+    path = Path(output).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    argv = [espeak, "-w", str(path)]
+    if rate is not None:
+        argv += ["-s", str(int(rate))]
+    if voice:
+        argv += ["-v", voice]
+    argv.append(text)
+
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if result.returncode != 0 or not path.exists():
+        detail = (result.stderr or "").strip()[:300]
+        raise SpeechError(f"espeak-ng failed: {detail}")
+    return path
 
 
 def resolve_output_path(output):

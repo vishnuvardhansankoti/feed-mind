@@ -13,8 +13,7 @@
 # This publishes to the real topic, so anything without --dry-run does real
 # work: real synthesis, real uploads, real Firestore writes.
 
-source "$(dirname "$0")/config.sh"
-require_gcloud
+source "$(dirname "$0")/00-config.sh"
 
 MODE="RSS_FEED"
 if [[ $# -gt 0 && "$1" != --* ]]; then
@@ -49,7 +48,7 @@ done
 
 MESSAGE="{${fields}}"
 
-say "Publishing to ${TOPIC_NAME}"
+echo "==> Publishing to ${TOPIC_NAME}"
 echo "  ${MESSAGE}"
 
 gcloud pubsub topics publish "$TOPIC_NAME" \
@@ -58,4 +57,4 @@ gcloud pubsub topics publish "$TOPIC_NAME" \
 
 echo
 echo "Watch it run:"
-echo "  gcloud functions logs read ${FUNCTION_NAME} --gen2 --region=${REGION} --limit=50"
+echo "  gcloud run services logs read ${SERVICE_NAME} --region=${REGION} --project=${PROJECT_ID} --limit=50"

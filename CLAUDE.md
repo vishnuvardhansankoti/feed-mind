@@ -39,7 +39,7 @@ services/india-news-ingest/  CF gen2, 17:30 CT — five Indian publications
 services/us-news-ingest/     CF gen2, 04:00 CT — five US publications
 services/news-curator/       Cloud Run service, Pub/Sub push — dedup + rank, both countries
 services/paper-prism/        Cloud Run Job: paper-prism-job (Mondays)
-services/summarizer/         CF gen2: feedmind-audio (Pub/Sub triggered)
+services/summarizer/         Cloud Run: feedmind-audio (Pub/Sub push)
 infra/terraform/             Terraform for the GCP stack
 infra/firebase/              firestore.rules, firestore.indexes.json
 firebase.json                MUST stay at the root — the CLI resolves paths from it
@@ -218,12 +218,32 @@ concurrent duplicate digest.
 
 ## The Pub/Sub topic is owned by its consumer
 
-`feedmind-content-ready` is created by `services/summarizer/deploy/setup.sh`,
-which also grants `roles/pubsub.publisher` to **both** producers' service
-accounts. Neither producer's deploy manages that binding. Run the summarizer's
-setup before either producer first publishes; until then their runs still
-succeed and log a permission error, because publishing is best-effort by design
-on both sides.
+`feedmind-content-ready` was created by `services/summarizer/deploy/01-
+setup.sh` (originally `setup.sh`, from the gen2-Cloud-Function era — see that
+service's CLAUDE.md), which also grants `roles/pubsub.publisher` to all three
+producers' service accounts (`feedmind-sa`, `paper-prism-job`, `news-
+curator`). No producer's deploy manages that binding. Run the summarizer's
+setup before a producer first publishes; until then its runs still succeed
+and log a permission error, because publishing is best-effort by design on
+every side.
+
+## A push subscription needs one more grant than it looks like
+
+Every Cloud Run service in this repo that receives Pub/Sub via a **push**
+subscription (`services/news-curator`, `services/summarizer`) needs its push
+service account granted `roles/iam.serviceAccountTokenCreator` **by Pub/Sub's
+own service agent** — without it, Pub/Sub cannot mint the OIDC token a push
+request is authenticated with, and every delivery 403s with "The request was
+not authenticated." This is not automatic: `gcloud pubsub subscriptions
+create --push-auth-service-account=...` does not reliably set it up on its
+own. Both services' `01-setup.sh` grant it explicitly now — but this was
+missing for months on `news-curator`'s subscription, which failed on 100% of
+real deliveries the whole time, invisibly: `gcloud run services logs read`
+only shows what the *application* printed, never a request that never reached
+it. The tell is in Cloud Run's raw HTTP request logs
+(`httpRequest.status=403`), not the service's own log stream. If a new
+Cloud Run service ever needs a push subscription, grant this up front rather
+than discovering it the same way.
 
 `feedmind-telegram-ready` is the exception, and deliberately so: it is created
 by `scripts/setup-feedmind-infra.sh`, on the **publisher's** side. Producer and

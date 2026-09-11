@@ -171,6 +171,24 @@ idempotent. Run `../../scripts/setup-feedmind-infra.sh` first if
 `feedmind-news-ingested` does not exist yet — it is owned by the publisher's
 side, not this service's setup.
 
+**This subscription silently failed on 100% of real deliveries for months, up
+until it was diagnosed and fixed alongside `services/summarizer`'s Cloud Run
+migration.** `01-setup.sh` now grants Pub/Sub's service agent
+`roles/iam.serviceAccountTokenCreator` on `news-curator-invoker` explicitly —
+`gcloud pubsub subscriptions create --push-auth-service-account=...` does not
+reliably set this up on its own, and without it every push 403s with "The
+request was not authenticated," invisible in `gcloud run services logs read`
+(which only shows what the application printed, never a request that never
+reached it — the tell was in Cloud Run's raw `httpRequest.status=403` request
+logs). See the root `CLAUDE.md`'s "A push subscription needs one more grant
+than it looks like" and `services/summarizer/CLAUDE.md`'s "Cloud Run
+migration" section for the full story. If curation output looks stale, check
+this grant exists before assuming the pipeline itself is broken:
+
+```bash
+gcloud iam service-accounts get-iam-policy news-curator-invoker@<project>.iam.gserviceaccount.com
+```
+
 ## Dependencies
 
 `requirements.txt` is **generated** from `pyproject.toml`
