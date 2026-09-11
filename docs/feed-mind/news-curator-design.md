@@ -1,7 +1,9 @@
 # India News: ingest, cluster, rank
 
-**Status:** designed, not built
-**Date:** 2026-09-09
+**Status:** built (all six §11 build-order steps); not yet deployed
+**Date:** 2026-09-09 (implemented 2026-09-10). See `services/news-curator/CLAUDE.md`
+for the two places the implementation deviates from this document (canonical
+selection has no scraped body to rank by; `rss_rank` is derived, not persisted).
 **Scope:** one new ingest service, one new curation service, one collection, plus
 changes to `services/summarizer`, `services/archive`, `apps/web` and the deploy
 scripts.

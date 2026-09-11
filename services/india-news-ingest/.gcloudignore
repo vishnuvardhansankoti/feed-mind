@@ -1,0 +1,36 @@
+# What NOT to upload. gcloud reads this from the --source directory, which for
+# every service here is its .build/ staging dir — so this file is copied in by
+# scripts/stage-service.sh along with everything else.
+#
+# Self-contained on purpose: the monorepo .gitignore is three levels up, and a
+# `#!include:.gitignore` naming a file that is not present fails the deploy.
+
+.gcloudignore
+.git
+.gitignore
+.build/
+
+# Local envs and build residue
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+uv.lock
+pyproject.toml
+
+# Credentials — must never reach Cloud Build
+.env
+secrets.txt
+*.key
+*.pem
+service-account*.json
+credentials.json
+
+# Editor / OS / tool caches
+.vscode/
+.idea/
+*.swp
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+.coverage

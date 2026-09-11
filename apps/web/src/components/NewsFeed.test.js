@@ -1,7 +1,7 @@
 // NewsFeed renders one tab per NEWS_CATEGORIES entry and filters the article
-// list by `feed_category`. These cover the tabbing contract in general and the
-// `top_stories` tab in particular — the category whose code uses an underscore
-// where `open-source` uses a hyphen, which is the easy way to break it.
+// list by `feed_category`. These cover the tabbing contract in general and
+// exact-match filtering in particular — a category code matched loosely would
+// mask a real pipeline/reader drift.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import NewsFeed from "./NewsFeed.svelte";
@@ -50,78 +50,72 @@ describe("NewsFeed — category tabs", () => {
     }
   });
 
-  it("renders a Top Stories tab", () => {
-    render(NewsFeed, { articles: [] });
-    expect(catTab("Top Stories")).toBeTruthy();
-  });
-
   it("opens on Academic, not on the newly added category", () => {
     render(NewsFeed, {
-      articles: [article("a", "academic"), article("t", "top_stories")],
+      articles: [article("a", "academic"), article("t", "industry")],
     });
     expect(titles()).toContain("Article a");
     expect(titles()).not.toContain("Article t");
   });
 });
 
-describe("NewsFeed — top_stories filtering", () => {
+describe("NewsFeed — category filtering", () => {
   const mixed = [
     article("acad", "academic"),
     article("ind", "industry"),
-    article("top1", "top_stories", 2),
-    article("top2", "top_stories", 5),
+    article("oss1", "open-source", 2),
+    article("oss2", "open-source", 5),
   ];
 
-  it("shows only top_stories articles when that tab is selected", async () => {
+  it("shows only the selected category's articles", async () => {
     render(NewsFeed, { articles: mixed });
-    await clickTab("Top Stories");
+    await clickTab("Open Source");
 
-    expect(titles()).toContain("Article top1");
-    expect(titles()).toContain("Article top2");
+    expect(titles()).toContain("Article oss1");
+    expect(titles()).toContain("Article oss2");
     expect(titles()).not.toContain("Article acad");
     expect(titles()).not.toContain("Article ind");
   });
 
-  it("does not leak top_stories articles into the other tabs", async () => {
+  it("does not leak one category's articles into another tab", async () => {
     render(NewsFeed, { articles: mixed });
 
     // Academic is already selected.
-    expect(titles()).not.toContain("Article top1");
+    expect(titles()).not.toContain("Article oss1");
 
     await clickTab("Industry");
     expect(titles()).toContain("Article ind");
-    expect(titles()).not.toContain("Article top1");
+    expect(titles()).not.toContain("Article oss1");
   });
 
-  it("matches the underscore code exactly, not a hyphenated variant", async () => {
+  it("matches the hyphenated code exactly, not an underscored variant", async () => {
     // A doc written under the wrong separator must NOT appear — that would mean
     // the tab is matching loosely and would mask a real pipeline/reader drift.
     render(NewsFeed, {
-      articles: [article("wrong", "top-stories"), article("right", "top_stories")],
+      articles: [article("wrong", "open_source"), article("right", "open-source")],
     });
-    await clickTab("Top Stories");
+    await clickTab("Open Source");
 
     expect(titles()).toContain("Article right");
     expect(titles()).not.toContain("Article wrong");
   });
 
-  it("shows the empty state when no top stories have been ingested yet", async () => {
-    // The state on the day the category is added but the pipeline has not run.
+  it("shows the empty state when no articles have been ingested for a category yet", async () => {
     render(NewsFeed, { articles: [article("acad", "academic")] });
-    await clickTab("Top Stories");
+    await clickTab("Open Source");
 
     expect(screen.getByText(/No articles this week/)).toBeVisible();
   });
 
   it("keeps the Archive view scoped to the selected category", async () => {
     render(NewsFeed, {
-      articles: [article("acad", "academic", 30), article("top", "top_stories", 30)],
+      articles: [article("acad", "academic", 30), article("oss", "open-source", 30)],
     });
-    await clickTab("Top Stories");
+    await clickTab("Open Source");
     screen.getByRole("tab", { name: /Archive/ }).click();
     await vi.waitFor(() => {});
 
-    expect(titles()).toContain("Article top");
+    expect(titles()).toContain("Article oss");
     expect(titles()).not.toContain("Article acad");
   });
 });

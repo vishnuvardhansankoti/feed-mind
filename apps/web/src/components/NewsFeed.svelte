@@ -135,12 +135,12 @@
   .subtabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .cats button.active { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
 
-  /* On a phone the five category chips wrap to two rows and push Listen All
-     onto a third, which — pinned, under the masthead and nav — leaves almost no
-     room for articles. So the chips scroll sideways in one row instead, and
-     Listen All moves up beside the window tabs: sharing the row with the
-     scroller instead would cut its right-hand end off mid-chip, which reads as
-     the button sitting on top of "Open Source" and "Top Stories".
+  /* On a phone the category chips wrap to two rows and push Listen All onto a
+     third, which — pinned, under the masthead and nav — leaves almost no room
+     for articles. So the chips scroll sideways in one row instead, and Listen
+     All moves up beside the window tabs: sharing the row with the scroller
+     instead would cut its right-hand end off mid-chip, which reads as the
+     button sitting on top of "Open Source".
      Scrolling here is safe for the pinning — the scroller is a descendant of
      the sticky .controls, not an ancestor of it. */
   @media (max-width: 700px) {

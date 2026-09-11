@@ -9,9 +9,13 @@
     month: "short", day: "numeric",
   });
 
+  // Labels only — `type` stays "news" (see lib/constants.js::BOOKMARK_TYPES
+  // and lib/prefs.js, which namespace ids and whitelist snapshot fields on
+  // this string). "news" bookmarks are AI Cloud Blog articles specifically —
+  // there is no bookmarking yet for the News (curated Indian stories) tab.
   const GROUPS = [
     { type: "paper", label: "Papers" },
-    { type: "news", label: "News" },
+    { type: "news", label: "AI Cloud Blogs" },
     { type: "video", label: "Videos" },
   ];
 

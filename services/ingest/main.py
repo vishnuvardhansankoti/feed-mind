@@ -2,11 +2,16 @@
 main.py — feedmind-ingest: fetch every feed group into Firestore, then ring the
 Telegram notifier's doorbell.
 
-One function, three feed groups, one schedule (08:00 daily):
+One function, two feed groups, one schedule (08:00 daily):
 
     news.yaml        the digest feeds  -> stored telegram_status=pending
-    topstories.yaml  general news      -> stored telegram_status=skipped
     youtube.yaml     channel uploads   -> youtube_videos, no summarization
+
+Indian top-stories coverage moved out of this service to
+`services/india-news-ingest` + `services/news-curator` — see
+docs/feed-mind/news-curator-design.md. Articles already stored here with
+feed_category=top_stories keep their 90-day TTL and their web app tab; this
+service simply stops producing new ones.
 
 The groups are separate YAML files rather than one list because they behave
 differently — only `news` goes to Telegram, only the RSS groups are summarized,
@@ -55,7 +60,6 @@ logger = logging.getLogger("feedmind-ingest")
 # this ordering matter at all; on a normal day every group completes.
 GROUPS = [
     serviceconfig.load_beside(__file__, "youtube.yaml"),
-    serviceconfig.load_beside(__file__, "topstories.yaml"),
     serviceconfig.load_beside(__file__, "news.yaml"),
 ]
 

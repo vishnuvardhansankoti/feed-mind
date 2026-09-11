@@ -70,6 +70,7 @@ services/*/.build/
 
 # --- Service run artifacts ---
 services/paper-prism/output/
+services/news-curator/output/
 *.mp3
 *.wav
 *.m4a

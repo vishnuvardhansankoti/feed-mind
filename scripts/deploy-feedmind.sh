@@ -26,10 +26,19 @@ TELEGRAM_TOPIC="${TELEGRAM_TOPIC:-feedmind-telegram-ready}"
 #
 # The notifier has no schedule — it wakes on TELEGRAM_TOPIC, published by the
 # ingest run once all three feed groups are stored.
+#
+# india-news-ingest runs at 17:30 America/Chicago — already the next day in
+# India, which is what services/news-curator's IST run_date keys on. See
+# docs/feed-mind/news-curator-design.md §9. us-news-ingest runs at 04:00
+# America/Chicago — overnight US news, clear of both this and the 08:00 tech
+# blogs run. Both ring feedmind-news-ingested, not TELEGRAM_TOPIC, so neither
+# needs an entry here beyond its own row.
 SERVICES=(
   "ingest|ingest|http|300s|0 8 * * *"
   "telegram-notifier|telegram_notifier|topic|300s|"
   "archive|archive|http|900s|0 4 1,16 * *"
+  "india-news-ingest|ingest|http|300s|30 17 * * *"
+  "us-news-ingest|ingest|http|300s|0 4 * * *"
 )
 
 deploy_one() {

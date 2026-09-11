@@ -1,0 +1,27 @@
+# One of two feed groups ingested by us-news-ingest. Only articles from these
+# three outlets are eligible for the curator's detailed business sub-taxonomy
+# (markets/economy/companies/portfolio/personal_finance) — see
+# docs/feed-mind/news-curator-design.md §4.3 and
+# services/news-curator/src/news_curator/anchors.py::BUSINESS_ELIGIBLE_SOURCES.
+#
+# Feed URLs verified by direct fetch on 2026-09-10: CNBC 30 items, MarketWatch
+# 10 items, Fortune 10 items, all with clean plain-text <description> fields.
+# (Yahoo Finance and Reuters were evaluated and rejected: Yahoo's items carry
+# no per-item description at all, and Reuters retired its public RSS feeds.)
+
+service: business
+kind: rss
+summarize: none
+deliver_telegram: false
+content_ready: false
+
+feeds:
+  - name: CNBC
+    url: https://www.cnbc.com/id/100003114/device/rss/rss.html
+    category: business
+  - name: MarketWatch
+    url: http://feeds.marketwatch.com/marketwatch/topstories/
+    category: business
+  - name: Fortune
+    url: https://fortune.com/feed/
+    category: business

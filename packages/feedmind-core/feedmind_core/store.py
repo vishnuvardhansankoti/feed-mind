@@ -30,6 +30,7 @@ def save_article(
     article: Article,
     summary: str = "",
     telegram_status: str = config.TELEGRAM_SKIPPED,
+    extra: dict | None = None,
 ) -> None:
     """
     Write an ingested article to Firestore.
@@ -54,6 +55,11 @@ def save_article(
     ever be archived with what was written here, and the 90-day TTL means
     anything not captured now is unrecoverable. See
     docs/bigquery-archival-plan.md.
+
+    `extra` merges additional fields onto the write for a service that needs its
+    own bookkeeping alongside the shared schema — e.g. services/india-news-ingest
+    stamps `curation_status` so services/news-curator can find its own backlog.
+    None for every existing caller, so this changes nothing by default.
     """
     now = datetime.now(UTC)
     doc_ref = db.collection(config.FIRESTORE_COLLECTION).document(article.article_id)
@@ -75,6 +81,7 @@ def save_article(
             # split still read "delivered", which is how you tell them apart.
             "status": "stored",
             "telegram_status": telegram_status,
+            **(extra or {}),
         }
     )
     logger.info(

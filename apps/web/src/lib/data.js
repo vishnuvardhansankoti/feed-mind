@@ -10,9 +10,13 @@ import {
   LENS_CODES,
   NEWS_WINDOW_DAYS,
   NEWS_MAX_ARTICLES,
+  NEWS_CATEGORY_RSS_CODES,
   STATIC_NEWS_LINKS,
   VIDEO_WINDOW_DAYS,
   VIDEO_MAX_ITEMS,
+  STORY_CATEGORY_CODES,
+  STORY_MAX_PER_CATEGORY,
+  NEWS_COUNTRY_CODES,
 } from "./constants.js";
 
 const SOURCE = import.meta.env.VITE_DATA_SOURCE || "mock";
@@ -53,6 +57,17 @@ export function getNews() {
  */
 export function getVideos() {
   return SOURCE === "firestore" ? firestoreVideos() : mockVideos();
+}
+
+/**
+ * The newest curation run's ranked stories per country per category, from
+ * `stories`. Both countries are fetched eagerly (not on toggle) so switching
+ * the News tab's country is a client-side re-slice, same as switching a
+ * category tab — no loading flicker.
+ * -> { stories: { IN: { politics: Story[], ... }, US: { politics: Story[], ... } } }
+ */
+export function getStories() {
+  return SOURCE === "firestore" ? firestoreStories() : mockStories();
 }
 
 // --- Firestore source ------------------------------------------------------
@@ -107,10 +122,17 @@ async function firestoreNews() {
   const { collection, query, where, orderBy, limit, getDocs } =
     await import("firebase/firestore");
   // processed_at is a uniform UTC ISO string, so a lexicographic >= range is
-  // chronological. Single-field inequality + orderBy needs no composite index.
+  // chronological. The feed_category filter is required, not defensive:
+  // services/india-news-ingest and services/us-news-ingest write into this
+  // same collection at far higher daily volume than the tech-blogs pipeline,
+  // with feed_category values ("general"/"business") outside NEWS_CATEGORIES
+  // entirely. Without this filter their docs fill the whole NEWS_MAX_ARTICLES
+  // window and every tech-blogs tab reads empty. Needs the composite index in
+  // ../../infra/firebase/firestore.indexes.json (feed_category, processed_at).
   const cutoff = newsCutoffIso();
   const q = query(
     collection(await db(), "processed_articles"),
+    where("feed_category", "in", NEWS_CATEGORY_RSS_CODES),
     where("processed_at", ">=", cutoff),
     orderBy("processed_at", "desc"),
     limit(NEWS_MAX_ARTICLES),
@@ -137,6 +159,39 @@ async function firestoreVideos() {
   );
   const snap = await getDocs(q);
   return { videos: byPublishedDesc(snap.docs.map((d) => d.data())) };
+}
+
+async function firestoreStories() {
+  const out = {};
+  await Promise.all(NEWS_COUNTRY_CODES.map(async (country) => {
+    out[country] = {};
+    await Promise.all(STORY_CATEGORY_CODES.map(async (code) => {
+      out[country][code] = await latestStoriesForCategory(country, code);
+    }));
+  }));
+  return { stories: out };
+}
+
+// One query per (country, category) pair, same shape as firestoreLatest's
+// per-lens reads. `rank` resets to 1 on every run, so ordering by rank alone
+// across the whole collection would interleave today's stories with every
+// previous day's — the composite index is on
+// (country, coarse_category, run_date desc, rank asc) precisely so a day's
+// ranking is a contiguous prefix of the results. See
+// ../../infra/firebase/firestore.indexes.json and latestRunOnly below.
+async function latestStoriesForCategory(country, code) {
+  const { collection, query, where, orderBy, limit, getDocs } =
+    await import("firebase/firestore");
+  const q = query(
+    collection(await db(), "stories"),
+    where("country", "==", country),
+    where("coarse_category", "==", code),
+    orderBy("run_date", "desc"),
+    orderBy("rank", "asc"),
+    limit(STORY_MAX_PER_CATEGORY),
+  );
+  const snap = await getDocs(q);
+  return latestRunOnly(snap.docs.map((d) => normalizeStory(d.data())));
 }
 
 // --- Mock source (bundled fixtures) ---------------------------------------
@@ -216,7 +271,69 @@ async function mockVideos() {
   return { videos: byPublishedDesc(docs).slice(0, VIDEO_MAX_ITEMS) };
 }
 
+async function mockStories() {
+  let docs;
+  try {
+    docs = await fixture("stories.json");
+  } catch {
+    docs = [];
+  }
+  const out = {};
+  for (const country of NEWS_COUNTRY_CODES) {
+    out[country] = {};
+    for (const code of STORY_CATEGORY_CODES) {
+      const inCat = docs
+        .filter((s) => s.country === country && s.coarse_category === code)
+        .map(normalizeStory);
+      out[country][code] = latestRunOnly(sortByRunThenRank(inCat));
+    }
+  }
+  return { stories: out };
+}
+
 // --- helpers ---------------------------------------------------------------
+
+// run_date desc, then rank asc — matches the Firestore query's ordering so
+// both sources feed latestRunOnly identically. Copies rather than sorting in
+// place.
+function sortByRunThenRank(stories) {
+  return [...stories].sort(
+    (a, b) => (b.run_date ?? "").localeCompare(a.run_date ?? "") || a.rank - b.rank,
+  );
+}
+
+// `stories` must already be sorted by sortByRunThenRank. The newest run_date's
+// entries are a contiguous prefix (see latestStoriesForCategory) — take it and
+// stop. This is the same "the field that means latest can't be filtered on
+// server-side" shape as feedmind_audio.py::collect_articles' processed_date
+// match, just solved client-side here because the browser owns this query.
+function latestRunOnly(stories) {
+  if (!stories.length) return [];
+  const newest = stories[0].run_date;
+  return stories.filter((s) => s.run_date === newest);
+}
+
+// rank drives display order; ai_summary/audio_url are only ever populated for
+// the handful of stories services/summarizer has processed (design doc §4.6),
+// so both default like every other optional field in this file and the card
+// hides its controls rather than rendering an empty disclosure.
+//
+// `title` is flattened up from `canonical.title` so lib/playlists.js::tracksFrom
+// works on a story exactly like it does on an article or paper — it reads a
+// top-level `title` + `audio_url`, and a story's headline otherwise lives one
+// level down.
+function normalizeStory(s) {
+  return {
+    ...s,
+    title: s.canonical?.title ?? "",
+    ai_summary: s.ai_summary ?? "",
+    audio_url: publicAudioUrl(s.audio_url),
+    related_articles: s.related_articles ?? [],
+    sources: s.sources ?? [],
+  };
+}
+
+
 
 function newsCutoffIso() {
   return new Date(Date.now() - NEWS_WINDOW_DAYS * 86_400_000).toISOString();

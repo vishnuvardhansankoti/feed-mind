@@ -56,7 +56,7 @@ describe("SavedView", () => {
     ]);
     render(SavedView);
 
-    for (const label of ["Papers", "News", "Videos"]) {
+    for (const label of ["Papers", "AI Cloud Blogs", "Videos"]) {
       expect(screen.getByRole("heading", { name: `${label} (1)` })).toBeVisible();
     }
   });
@@ -67,7 +67,7 @@ describe("SavedView", () => {
 
     expect(screen.getByRole("heading", { name: "Videos (1)" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: /^Papers/ })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /^News/ })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /^AI Cloud Blogs/ })).toBeNull();
   });
 
   it("removes an item on click", async () => {

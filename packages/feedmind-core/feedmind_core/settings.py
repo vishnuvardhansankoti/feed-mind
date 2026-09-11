@@ -74,6 +74,11 @@ FIRESTORE_YOUTUBE_COLLECTION = "youtube_videos"
 # collections use).
 FIRESTORE_RUNS_COLLECTION = "runs"
 
+# Written by services/news-curator, not by this package — read-only here, and
+# only by the archiver. Carries a 90-day TTL on `expires_at`, matching
+# processed_articles. See docs/feed-mind/news-curator-design.md §5.2.
+FIRESTORE_STORIES_COLLECTION = "stories"
+
 # ---------------------------------------------------------------------------
 # Pub/Sub — telling downstream consumers a run has finished
 # ---------------------------------------------------------------------------
@@ -101,6 +106,19 @@ CONTENT_READY_PROCESS_DOC = "RSS_FEED"
 TELEGRAM_READY_TOPIC = "feedmind-telegram-ready"
 
 # ---------------------------------------------------------------------------
+# Pub/Sub — telling the news curator there are freshly-ingested articles
+# ---------------------------------------------------------------------------
+# services/india-news-ingest publishes here once per run, after every feed
+# group is stored. Same shape and same reasoning as TELEGRAM_READY_TOPIC: a
+# doorbell carrying no articles, so a dropped message costs the curator a
+# delay rather than an event it can never see. The curator queries Firestore
+# for CURATION_PENDING articles itself. Created on the publisher's side (see
+# scripts/setup-feedmind-infra.sh) — same exception as TELEGRAM_READY_TOPIC,
+# because both ends are FeedMind services and ingest deploys before the
+# curator exists.
+NEWS_INGESTED_TOPIC = "feedmind-news-ingested"
+
+# ---------------------------------------------------------------------------
 # Telegram delivery state (the `telegram_status` field on processed_articles)
 # ---------------------------------------------------------------------------
 # The old single-function pipeline wrote a document ONLY after Telegram accepted
@@ -120,6 +138,22 @@ TELEGRAM_SKIPPED = "skipped"   # this feed never goes to Telegram
 # past its timeout mid-batch. Anything left over stays PENDING and is collected
 # on the next trigger.
 TELEGRAM_MAX_ARTICLES_PER_RUN = 200
+
+# ---------------------------------------------------------------------------
+# Curation state (the `curation_status` field on processed_articles)
+# ---------------------------------------------------------------------------
+# Written only by services/india-news-ingest, on the same principle as
+# telegram_status above: a single-field equality filter lets services/news-curator
+# find its own unclustered backlog by querying Firestore, rather than trusting
+# the (payload-free) feedmind-news-ingested message to mean "and nothing is
+# still pending from before". A crashed curator run or a dropped message just
+# leaves articles PENDING for the next trigger to pick up.
+#
+# news-curator does not depend on feedmind-core (see its CLAUDE.md — no torch,
+# no shared Firestore version pin), so it re-declares these two strings rather
+# than importing this module. Keep them in sync by hand.
+CURATION_PENDING = "pending"    # written by india-news-ingest; awaiting clustering
+CURATION_CLUSTERED = "clustered"  # the curator has assigned story_id / is_canonical
 
 # ---------------------------------------------------------------------------
 # BigQuery archive

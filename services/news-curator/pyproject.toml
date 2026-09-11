@@ -1,0 +1,32 @@
+[project]
+name = "news-curator"
+version = "1.0.0"
+description = "Embed, classify, cluster and rank india-news-ingest's articles into `stories`"
+# The Cloud Run image is python:3.11-slim (see Dockerfile), matching paper-prism.
+requires-python = ">=3.11"
+dependencies = [
+    # --- core pipeline (deliberately no torch; see CLAUDE.md) ---
+    "numpy>=1.24",
+    "onnxruntime>=1.17",        # MiniLM inference, no torch
+    "tokenizers>=0.15",         # HF fast tokenizer, no torch
+    "huggingface_hub>=0.20",    # one-time model/tokenizer download
+    "scikit-learn>=1.4",        # agglomerative clustering
+    "python-dotenv>=1.0",
+    # --- required in the deployed image ---
+    "google-cloud-firestore>=2.13",
+    # --- announcing canonical stories to services/summarizer (events.py) ---
+    "google-cloud-pubsub>=2.21",
+    # --- Cloud Run push subscription entrypoint (main.py) ---
+    "flask>=3.0",
+    "gunicorn>=22.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+# Tests import the package straight from src/ (no install step needed).
+pythonpath = ["src"]
+testpaths = ["tests"]

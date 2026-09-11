@@ -9,14 +9,15 @@ anything another component writes.
 
 A Svelte 5 + Vite SPA (PWA) that reads Firestore **directly from the browser**.
 There is no backend API and no request-path compute. It is the reader for all
-three services:
+of FeedMind's services:
 
 | Section | Route | Collection | Written by |
 |---|---|---|---|
-| News | `#/news` | `processed_articles` | `services/ingest` (news + topstories groups) |
+| News | `#/news` | `processed_articles` | `services/ingest` (news group) |
 | Videos | `#/videos` | `youtube_videos` | `services/ingest` (youtube group) |
 | Papers | `#/` | `runs`, `run_status` | `services/paper-prism` |
-| (all three) | — | `ai_summary`, `audio_url` fields | `services/summarizer` |
+| Stories | `#/stories` | `stories` | `services/news-curator` |
+| (all four) | — | `ai_summary`, `audio_url` fields | `services/summarizer` |
 | Saved / prefs | `#/saved` | `users/{uid}` | this app — the only write path |
 
 ## Web architecture
@@ -53,6 +54,26 @@ The web app is a two-section SPA behind a minimal hash router in `App.svelte`: *
 **Latest is an ingest batch, not a time window — this is the whole design.** `services/ingest` writes a video once, on first sight, stamping `processed_at` with that run's `now`; the doc id is the video id, so re-runs never restamp. `lib/videos.js::latestBatch` anchors to the **newest `processed_at` present in the data** and keeps everything within `VIDEO_BATCH_TOLERANCE_HOURS` (6) of it. Any clock-relative rule (the two earlier ones: newest calendar day, then rolling 24h) makes the tab **shrink through the day** as videos age past the cutoff with no new run — the failure this design exists to prevent, pinned by tests in `videos.test.js` and `VideoFeed.test.js` that advance the clock and assert the count holds. For the same reason the Firestore query windows on `processed_at`, not `published_at`: a batch then ages out of the 3-day window all at once instead of one video at a time. Display order is still `published_at` desc (`byPublishedDesc` re-sorts, since `processed_at` is uniform within a batch), and Archive buckets by publish day.
 
 Videos with no parseable `processed_at` can't be placed in a batch, so Latest omits them and says so; Archive still lists them under a `—` header. Both `VideoFeed` and `VideoCard` must guard dates with `isDate`, never truthiness — an Invalid Date is truthy and `Intl.DateTimeFormat` throws on it, taking down the whole feed render.
+
+### Stories (fourth section, from `services/news-curator`)
+
+`#/stories` reads the `stories` collection in `feed-mind-db`, written by `services/news-curator`'s `pipeline.py` (`story_id`, `coarse_category`, `business_category`, `rank`, `score`, `cluster_size`, `sources`, `canonical`, `related_articles`, `run_date`) and later stamped with `ai_summary`/`audio_url` by `services/summarizer`'s `NEWS_STORIES` pipeline — same convention-only coupling as every other collection here. Full schema: `docs/feed-mind/news-curator-design.md` §5.2.
+
+**Categories are a second, independent taxonomy.** `constants.js::STORY_CATEGORIES` (politics/global/business/sports/culture) has nothing to do with `NEWS_CATEGORIES` — different collection, different pipeline, and `constants.test.js` asserts the two code sets don't overlap so a stray `===` filter can't silently cross them. Codes must match `services/news-curator/src/news_curator/anchors.py::COARSE_ANCHORS` byte-for-byte, same contract shape as `NEWS_CATEGORIES` ↔ ingest `feeds.yaml`. `BUSINESS_STORY_CATEGORIES` is a pure label lookup for the badge on a business story that has one; eligibility is decided entirely server-side.
+
+**One query per category, not one query for everything.** `firestoreStories` mirrors `firestoreLatest`'s per-lens shape (`Promise.all` over `STORY_CATEGORY_CODES`), each `where(coarse_category==code).orderBy(run_date desc).orderBy(rank asc).limit(STORY_MAX_PER_CATEGORY)` — needs the composite index in `../../infra/firebase/firestore.indexes.json` on exactly those three fields, in that order.
+
+**`rank` resets to 1 every run, so it cannot be ordered on alone.** `services/news-curator` writes a `Story` for *every* cluster in a category, not just the ones selected for summarization, so a busy category can carry 10-20+ ranked docs a day and the same rank number recurs across days. `latestRunOnly` in `data.js` takes the contiguous prefix of the (run_date desc, rank asc)-ordered results that shares the newest `run_date` — the same "the field that means latest can't be filtered on server-side, so take the newest and stop" shape as `services/summarizer/feedmind_audio.py::collect_articles`' `processed_date` match, just solved client-side here because the browser owns the query.
+
+**No Latest/Archive split, unlike News and Videos.** `getStories()` already resolves to "the newest run's ranked cards" — there is no rolling window to slice further. A history view is a natural follow-up (query without the `run_date` filter, group by day) but is not built here.
+
+**`title` is flattened up from `canonical.title`.** `normalizeStory` copies it to the top level so `lib/playlists.js::tracksFrom` — which reads a flat `title` + `audio_url`, same as an article or paper — works on a story with no changes to that shared code.
+
+**No bookmarking and no follow/unfollow yet, unlike News.** `StoryCard` has no `BookmarkButton`, and there is no per-source follow list for Indian publications — both are natural follow-ups once the section has settled, not omissions to fix reflexively.
+
+**Rules:** `../../infra/firebase/firestore.rules` adds `stories` as public-read / `write: if false`, same shape as `processed_articles`.
+
+**Mock parity:** `public/fixtures/stories.json` backs `VITE_DATA_SOURCE=mock` — a flat array like `news.json`/`videos.json`, not manifest-driven. `mockStories` applies the same category-split + `latestRunOnly` slicing as the Firestore path so both sources produce identical shapes.
 
 ### Sign-in and per-user data (the one write path)
 

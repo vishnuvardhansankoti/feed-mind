@@ -1,0 +1,23 @@
+# One of two feed groups ingested by us-news-ingest. General front-page
+# coverage: NPR and CBS News. Both are stored telegram_status=skipped (these
+# never go to Telegram) and curation_status=pending, country=US (see main.py).
+# `category` here is a placeholder for the pre-curation record; the real
+# classification is the curator's coarse_category on the `stories` collection,
+# computed from title+description, not from this field.
+#
+# Feed URLs verified by direct fetch on 2026-09-10: NPR 10 items, CBS News 30
+# items, both with clean plain-text <description> fields.
+
+service: general
+kind: rss
+summarize: none
+deliver_telegram: false
+content_ready: false
+
+feeds:
+  - name: NPR News
+    url: https://feeds.npr.org/1001/rss.xml
+    category: general
+  - name: CBS News
+    url: https://www.cbsnews.com/latest/rss/main
+    category: general

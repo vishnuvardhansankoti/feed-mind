@@ -65,32 +65,6 @@
     "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-cloud-01.mp3"
   },
   {
-    "article_id": "n-top-01",
-    "url": "https://timesofindia.indiatimes.com/india/example-monsoon-session",
-    "title": "Monsoon session opens with debate on data protection rules",
-    "feed_source": "TOI Top Stories",
-    "feed_category": "top_stories",
-    "summary": "The session opened with a scheduled debate on the draft data protection rules.",
-    "published_at": "2026-08-15T05:40:00+00:00",
-    "processed_at": "2026-08-15T07:00:00+00:00",
-    "status": "delivered",
-    "ai_summary": "The draft rules tighten consent requirements for cross-border transfers and introduce a graded penalty structure tied to turnover. Industry groups have asked for a longer compliance runway; the committee has not yet published a timeline.",
-    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-15/n-top-01.mp3"
-  },
-  {
-    "article_id": "n-top-02",
-    "url": "https://timesofindia.indiatimes.com/business/example-rate-decision",
-    "title": "Central bank holds rates, flags food inflation as the swing factor",
-    "feed_source": "TOI Top Stories",
-    "feed_category": "top_stories",
-    "summary": "Rates were left unchanged for a fourth consecutive meeting.",
-    "published_at": "2026-08-14T09:15:00+00:00",
-    "processed_at": "2026-08-14T10:00:00+00:00",
-    "status": "delivered",
-    "ai_summary": "The policy statement keeps the stance at neutral while revising the inflation projection upward on the back of vegetable prices. Two members dissented in favour of a cut, the first split vote this cycle.",
-    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-08-14/n-top-02.mp3"
-  },
-  {
     "article_id": "n-acad-03",
     "url": "https://www.microsoft.com/research/example-eval",
     "title": "Rethinking evaluation for small language models",
@@ -149,17 +123,6 @@
     "summary": "",
     "published_at": "2026-08-12T10:00:00+00:00",
     "processed_at": "2026-08-12T07:00:00+00:00",
-    "status": "delivered"
-  },
-  {
-    "article_id": "n-top-03",
-    "url": "https://timesofindia.indiatimes.com/city/example-metro-phase",
-    "title": "Metro phase three cleared, work to begin next quarter",
-    "feed_source": "TOI Top Stories",
-    "feed_category": "top_stories",
-    "summary": "Approval covers 32 km of new line across eleven stations.",
-    "published_at": "2026-08-12T04:20:00+00:00",
-    "processed_at": "2026-08-12T06:00:00+00:00",
     "status": "delivered"
   },
   {

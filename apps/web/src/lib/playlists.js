@@ -11,22 +11,19 @@
 import { NEWS_CATEGORIES, LENSES } from "./constants.js";
 
 /**
- * Top News quotas.
+ * Top News quota.
  *
- * Most categories draw per *source*, so one prolific feed cannot crowd the
+ * Every category draws per *source*, so one prolific feed cannot crowd the
  * others out of the queue — "Academic" is four different blogs, and the newest
  * from each beats three from whichever posted most recently. At one per source
  * the queue is a headline sweep: broad coverage, bounded by how many feeds
  * published that day rather than by how much any one of them wrote.
  *
- * `top_stories` is the exception: it is a single feed today, so grouping by
- * source there would just be a cap of one story. It draws a flat count from the
- * category instead. When it grows real sub-sources, moving it out of
- * FLAT_CATEGORIES is the whole change.
+ * This used to have a flat-count exception for `top_stories`, a single-feed
+ * category with no per-source grouping to speak of. That category (and the
+ * exception) were removed along with it — see the root CLAUDE.md.
  */
 export const TOP_PER_SOURCE = 1;
-export const TOP_PER_FLAT_CATEGORY = 3;
-export const FLAT_CATEGORIES = ["top_stories"];
 
 /**
  * Turn feed items (articles or papers) into playable tracks, dropping anything
@@ -96,12 +93,9 @@ function perSourceTracks(items, context, perSource) {
 /**
  * The Top News queue, drawn from the newest ingest day only.
  *
- * Two quotas, by category shape:
- *   - most categories -> TOP_PER_SOURCE per distinct feed_source, so one busy
- *     blog cannot fill "Academic" on its own; the category's length is then set
- *     by how many of its feeds published, not by how much any one wrote
- *   - FLAT_CATEGORIES (top_stories) -> TOP_PER_FLAT_CATEGORY from the category,
- *     since it is one feed and per-source grouping would be a cap of one
+ * TOP_PER_SOURCE per distinct feed_source, so one busy blog cannot fill
+ * "Academic" on its own; a category's length is then set by how many of its
+ * feeds published, not by how much any one wrote.
  *
  * News only — papers are deliberately excluded. The digest is weekly, so the
  * same nine papers would ride along in every daily listen; the Papers tab has
@@ -127,7 +121,6 @@ export function topSummaryTracks({
   articles = [],
   isFollowed = () => true,
   perSource = TOP_PER_SOURCE,
-  perFlatCategory = TOP_PER_FLAT_CATEGORY,
 } = {}) {
   const tracks = [];
 
@@ -149,11 +142,7 @@ export function topSummaryTracks({
       (a) => a.feed_category === c.code && (day === null || dayKey(a) === day),
     );
 
-    if (FLAT_CATEGORIES.includes(c.code)) {
-      tracks.push(...tracksFrom(inCat, c.label).slice(0, perFlatCategory));
-    } else {
-      tracks.push(...perSourceTracks(inCat, c.label, perSource));
-    }
+    tracks.push(...perSourceTracks(inCat, c.label, perSource));
   }
 
   return tracks;
