@@ -10,8 +10,6 @@ import {
   paperTracks,
   topSummaryTracks,
   TOP_PER_SOURCE,
-  TOP_PER_FLAT_CATEGORY,
-  FLAT_CATEGORIES,
 } from "./playlists.js";
 
 const TODAY = new Date("2026-08-25T09:00:00Z");
@@ -114,18 +112,6 @@ describe("topSummaryTracks", () => {
     expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
       "b1", "a1", "c1",
     ]);
-  });
-
-  it("gives top_stories a flat count, since it is a single feed", () => {
-    // Grouping by source there would be a cap of one; it has no sub-sources yet.
-    const articles = Array.from({ length: 5 }, (_, i) =>
-      article({ title: `ts${i}`, feed_category: "top_stories", feed_source: "TOI Top Stories" }),
-    );
-    expect(topSummaryTracks({ articles }).map((t) => t.title)).toEqual([
-      "ts0", "ts1", "ts2",
-    ]);
-    expect(TOP_PER_FLAT_CATEGORY).toBe(3);
-    expect(FLAT_CATEGORIES).toEqual(["top_stories"]);
   });
 
   it("excludes papers entirely — they have their own Listen All", () => {

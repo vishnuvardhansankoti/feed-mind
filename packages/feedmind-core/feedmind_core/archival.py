@@ -5,18 +5,20 @@ Pure transforms only: everything here takes plain dicts and returns plain
 dicts, so the reshaping the archive depends on is testable without touching
 Firestore or BigQuery. All client work lives in `bigquery.py`.
 
-Three sources, three shapes:
+Four sources, four shapes:
 
     processed_articles  → one row per document
     youtube_videos      → one row per document
     runs                → one row per *paper*, unnested from the doc's papers[]
+    stories             → one row per document, canonical.* flattened
 
 Every table carries a `raw` column holding the untouched Firestore document as
 JSON text. This repo now encodes schema owned by two other repos (paper-prism
-writes `runs`; feed-mind-summarizer adds `ai_summary` to both articles and
-papers), and `raw` is what keeps an upstream field addition merely *unpromoted*
-rather than lost — the source docs are on 45- and 90-day TTLs, so a field we
-drop today is unrecoverable tomorrow.
+writes `runs`, services/news-curator writes `stories`; feed-mind-summarizer
+adds `ai_summary` to articles, papers and stories alike), and `raw` is what
+keeps an upstream field addition merely *unpromoted* rather than lost — the
+source docs are on 45- and 90-day TTLs, so a field we drop today is
+unrecoverable tomorrow.
 """
 
 import json
@@ -58,6 +60,14 @@ ARTICLES = TableSpec(
         ("ai_summary", "STRING"),
         ("feed_source", "STRING"),
         ("feed_category", "STRING"),
+        # NULL for every article outside the india-news-ingest/us-news-ingest
+        # family (the original tech-blog feeds have no country concept at
+        # all). NOT defaulted to "IN" here the way news-curator's live
+        # pipeline defaults a missing field — that default exists so an old
+        # India document without this field still gets clustered; baking the
+        # same guess into the permanent archive would mislabel every
+        # non-India tech-blog row as Indian.
+        ("country", "STRING"),
         ("published_at", "TIMESTAMP"),
         ("processed_at", "TIMESTAMP"),
         ("status", "STRING"),
@@ -111,6 +121,42 @@ PAPERS = TableSpec(
     key_fields=("run_id", "arxiv_id"),
     partition_field="run_date",
     clustering_fields=("category",),
+)
+
+# `sources` and `related_articles` are JSON-encoded text, not BigQuery REPEATED
+# columns — no other table here uses a repeated field, and `raw` already
+# carries the untouched arrays for anything that needs them structured.
+# `canonical.*` is flattened to top-level columns, same treatment as PAPERS
+# unnesting a run doc's papers[] — just one level shallower.
+STORIES = TableSpec(
+    name="stories",
+    columns=(
+        ("story_id", "STRING"),
+        ("country", "STRING"),
+        ("coarse_category", "STRING"),
+        ("business_category", "STRING"),
+        ("rank", "INTEGER"),
+        ("score", "FLOAT"),
+        ("cluster_size", "INTEGER"),
+        ("sources", "STRING"),
+        ("canonical_article_id", "STRING"),
+        ("canonical_title", "STRING"),
+        ("canonical_url", "STRING"),
+        ("canonical_source", "STRING"),
+        ("canonical_published_at", "TIMESTAMP"),
+        ("related_articles", "STRING"),
+        ("ai_summary", "STRING"),
+        ("audio_url", "STRING"),
+        ("run_date", "TIMESTAMP"),
+        ("created_at", "TIMESTAMP"),
+        ("raw", "STRING"),
+        ("archived_at", "TIMESTAMP"),
+    ),
+    key_fields=("story_id",),
+    partition_field="run_date",
+    # country leads: apps/web's country toggle means "give me one country's
+    # stories" is the single most common filter this table will ever see.
+    clustering_fields=("country", "coarse_category"),
 )
 
 
@@ -201,6 +247,8 @@ def article_row(doc_id: str, doc: dict, archived_at: str) -> dict:
         "ai_summary": _text(doc.get("ai_summary")),
         "feed_source": _text(doc.get("feed_source")),
         "feed_category": _text(doc.get("feed_category")),
+        # Straight passthrough, no default — see the ARTICLES TableSpec comment.
+        "country": _text(doc.get("country")),
         "published_at": to_timestamp(doc.get("published_at")),
         "processed_at": to_timestamp(doc.get("processed_at")),
         "status": _text(doc.get("status")),
@@ -271,6 +319,40 @@ def paper_rows(doc_id: str, doc: dict, archived_at: str) -> list[dict]:
         )
 
     return rows
+
+
+def story_row(doc_id: str, doc: dict, archived_at: str) -> dict:
+    """Build one `stories` row. `ai_summary`/`audio_url` are often absent — see
+    services/summarizer/CLAUDE.md's NEWS_STORIES pipeline, which fills them in
+    asynchronously, same relationship as `articles.ai_summary`.
+    """
+    canonical = doc.get("canonical") or {}
+    return {
+        "story_id": _text(doc.get("story_id")) or doc_id,
+        # Every `stories` document carries this explicitly (unlike articles,
+        # this collection predates nothing — see this module's docstring and
+        # services/news-curator/CLAUDE.md), so no default is needed here
+        # either, just consistency with article_row's straight passthrough.
+        "country": _text(doc.get("country")),
+        "coarse_category": _text(doc.get("coarse_category")),
+        "business_category": _text(doc.get("business_category")),
+        "rank": _int(doc.get("rank")),
+        "score": _float(doc.get("score")),
+        "cluster_size": _int(doc.get("cluster_size")),
+        "sources": to_raw_json(doc.get("sources") or []),
+        "canonical_article_id": _text(doc.get("canonical_article_id")),
+        "canonical_title": _text(canonical.get("title")),
+        "canonical_url": _text(canonical.get("url")),
+        "canonical_source": _text(canonical.get("source")),
+        "canonical_published_at": to_timestamp(canonical.get("published_at")),
+        "related_articles": to_raw_json(doc.get("related_articles") or []),
+        "ai_summary": _text(doc.get("ai_summary")),
+        "audio_url": _text(doc.get("audio_url")),
+        "run_date": to_timestamp(doc.get("run_date")),
+        "created_at": to_timestamp(doc.get("created_at")),
+        "raw": to_raw_json(doc),
+        "archived_at": archived_at,
+    }
 
 
 def dedupe_by_key(rows: list[dict], key_fields: tuple[str, ...]) -> list[dict]:

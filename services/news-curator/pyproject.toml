@@ -14,6 +14,8 @@ dependencies = [
     "python-dotenv>=1.0",
     # --- required in the deployed image ---
     "google-cloud-firestore>=2.13",
+    # --- announcing canonical stories to services/summarizer (events.py) ---
+    "google-cloud-pubsub>=2.21",
     # --- Cloud Run push subscription entrypoint (main.py) ---
     "flask>=3.0",
     "gunicorn>=22.0",

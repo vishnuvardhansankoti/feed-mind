@@ -1,12 +1,13 @@
 <script>
   import { onMount } from "svelte";
   import { LENSES } from "./lib/constants.js";
-  import { getLatest, getArchive, getStatus, getNews, getVideos } from "./lib/data.js";
+  import { getLatest, getArchive, getStatus, getNews, getVideos, getStories } from "./lib/data.js";
   import LensColumn from "./components/LensColumn.svelte";
   import PaperCard from "./components/PaperCard.svelte";
   import FreshnessBadge from "./components/FreshnessBadge.svelte";
   import NewsFeed from "./components/NewsFeed.svelte";
   import VideoFeed from "./components/VideoFeed.svelte";
+  import StoriesFeed from "./components/StoriesFeed.svelte";
   import SearchBar from "./components/SearchBar.svelte";
   import ConsentBanner from "./components/ConsentBanner.svelte";
   import AccountMenu from "./components/AccountMenu.svelte";
@@ -24,23 +25,26 @@
   import { bookmarks } from "./lib/bookmarks.svelte.js";
 
   // Top-level section from the URL hash: "#/papers" -> papers, "#/videos" ->
-  // videos, "#/saved" -> saved, anything else (incl. the default "#/") -> news,
-  // the landing section.
+  // videos, "#/stories" -> stories, "#/saved" -> saved, anything else (incl.
+  // the default "#/") -> news, the landing section.
   const pageFromHash = () => {
     if (typeof location === "undefined") return "news";
     if (location.hash === "#/papers") return "papers";
     if (location.hash === "#/videos") return "videos";
+    if (location.hash === "#/stories") return "stories";
     if (location.hash === "#/saved") return "saved";
     return "news";
   };
   let page = $state(pageFromHash());
-  const HASH = { papers: "#/papers", videos: "#/videos", saved: "#/saved", news: "#/" };
+  const HASH = {
+    papers: "#/papers", videos: "#/videos", stories: "#/stories", saved: "#/saved", news: "#/",
+  };
   const goto = (p) => { location.hash = HASH[p] ?? "#/"; };
 
   let tab = $state("latest");
 
   // Everything above the content is sticky, in three stacked layers: masthead
-  // (search / Listen Top News / account) → section nav → the section's own tab
+  // (search / Listen Top Blogs / account) → section nav → the section's own tab
   // bar. Each layer pins below the ones above it, so their heights are measured
   // rather than hardcoded — both wrap to extra rows on narrow screens. `.wrap`
   // publishes them as custom properties, which is how the bars inside
@@ -95,6 +99,23 @@
       videosError = e?.message ?? String(e);
     } finally {
       videosLoading = false;
+    }
+  }
+
+  // Stories are loaded lazily the first time the Stories section is opened.
+  let stories = $state(null);         // { stories } once loaded
+  let storiesLoading = $state(false);
+  let storiesError = $state(null);
+
+  async function loadStories() {
+    if (stories || storiesLoading) return;
+    storiesLoading = true;
+    try {
+      stories = await getStories();
+    } catch (e) {
+      storiesError = e?.message ?? String(e);
+    } finally {
+      storiesLoading = false;
     }
   }
 
@@ -188,6 +209,7 @@
   // Kick off the lazy fetch whenever a lazy section becomes active.
   $effect(() => { if (page === "news") loadNews(); });
   $effect(() => { if (page === "videos") loadVideos(); });
+  $effect(() => { if (page === "stories") loadStories(); });
 
   // The settings sheet lists sources derived from the loaded documents, so both
   // lazy sections have to be fetched before it can show a complete list —
@@ -201,8 +223,9 @@
   let contentEl;
   const getContentEl = () => contentEl;
   let searchRevision = $derived(
-    `${page}|${tab}|${loading}|${newsLoading}|${videosLoading}|` +
+    `${page}|${tab}|${loading}|${newsLoading}|${videosLoading}|${storiesLoading}|` +
       `${news ? news.articles?.length : 0}|${videos ? videos.videos?.length : 0}|` +
+      `${stories ? Object.values(stories.stories ?? {}).flat().length : 0}|` +
       `${Object.keys(latest).length}|${Object.keys(archive).length}|` +
       // Saved items are searchable content too, and starring one re-renders
       // the list without changing anything else in this key.
@@ -222,12 +245,14 @@
     </div>
     <div class="masthead-tools">
       <SearchBar root={getContentEl} revision={searchRevision} />
-      <!-- News only, in both senses: the queue is news, and the control appears
-           only on the News section. Elsewhere it would offer to play one
-           section's content from another's — and on Papers it would sit beside
-           that tab's own Listen All playing something different. A queue
-           already running keeps playing as you navigate away; the mini-player
-           still holds Stop and Skip. -->
+      <!-- AI Cloud Blogs only, in both senses: the queue is that section's
+           articles, and the control appears only there. Elsewhere it would
+           offer to play one section's content from another's — and on Papers
+           it would sit beside that tab's own Listen All playing something
+           different. A queue already running keeps playing as you navigate
+           away; the mini-player still holds Stop and Skip.
+           Internal id is still "news" (see pageFromHash) — only the visible
+           label changed when this section was renamed to "AI Cloud Blogs". -->
       {#if page === "news"}
         <button
           type="button"
@@ -236,11 +261,11 @@
           onclick={playTopSummaries}
           disabled={topLoading}
           aria-label={topPlaying
-            ? "Stop playing the top news"
-            : "Listen to the top news from every category"}
+            ? "Stop playing the top blogs"
+            : "Listen to the top blogs from every category"}
         >
           <span class="icon" aria-hidden="true">{topPlaying ? "■" : "▶"}</span>
-          {topPlaying ? "Stop" : topLoading ? "Preparing…" : "Listen Top News"}
+          {topPlaying ? "Stop" : topLoading ? "Preparing…" : "Listen Top Blogs"}
         </button>
         {#if topNote}<span class="top-note" role="status">{topNote}</span>{/if}
       {/if}
@@ -250,14 +275,21 @@
   </header>
 
   <nav class="nav" aria-label="Sections" bind:clientHeight={navH}>
+    <!-- Labels only — the internal page ids ("news", "stories") and their
+         hashes (#/, #/stories) are unchanged, so existing bookmarks keep
+         working. "news" now displays as "AI Cloud Blogs"; "stories" now
+         displays as "News". See the root CLAUDE.md. -->
     <button aria-current={page === "news"} class:active={page === "news"} onclick={() => goto("news")}>
-      News
+      AI Cloud Blogs
     </button>
     <button aria-current={page === "papers"} class:active={page === "papers"} onclick={() => goto("papers")}>
       Papers
     </button>
     <button aria-current={page === "videos"} class:active={page === "videos"} onclick={() => goto("videos")}>
       Videos
+    </button>
+    <button aria-current={page === "stories"} class:active={page === "stories"} onclick={() => goto("stories")}>
+      News
     </button>
     <!-- Only for signed-in users: there is nothing to show otherwise, and the
          tab would advertise a section that immediately turns them away. -->
@@ -293,6 +325,14 @@
       <div class="state err">Couldn’t load the videos feed: {videosError}</div>
     {:else}
       <VideoFeed videos={videos?.videos ?? []} />
+    {/if}
+  {:else if page === "stories"}
+    {#if storiesLoading}
+      <div class="state"><span class="spinner"></span> Loading stories…</div>
+    {:else if storiesError}
+      <div class="state err">Couldn’t load the stories feed: {storiesError}</div>
+    {:else}
+      <StoriesFeed stories={stories?.stories ?? {}} />
     {/if}
   {:else}
 
@@ -348,7 +388,7 @@
   </main>
 
   <footer>
-    <span>Daily tech news across academia, industry, cloud, open source &amp; top stories · Weekly arXiv research ranked to your interests and summarized by AI</span>
+    <span>Daily AI &amp; cloud blogs across academia, industry and open source · Curated Indian news · Weekly arXiv research ranked to your interests and summarized by AI</span>
     {#if analyticsEnabled}
       <span class="footsep">·</span>
       <button type="button" class="cookie-link" onclick={openConsent}>Cookie settings</button>

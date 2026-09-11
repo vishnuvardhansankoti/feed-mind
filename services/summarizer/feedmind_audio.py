@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn the newest FeedMind content into spoken summaries in Cloud Storage.
 
-Two sources, selected with --process-doc:
+Three sources, selected with --process-doc:
 
   RSS_FEED (default)   every article sharing the latest processed_at date in
                        `processed_articles`. The page is scraped for its text.
@@ -10,7 +10,16 @@ Two sources, selected with --process-doc:
                        `runs`. The stored abstract is the text, so nothing is
                        fetched over the network.
 
-Both then follow the same tail:
+  NEWS_STORIES         every `processed_articles` document with
+                       is_canonical=true, written by services/news-curator.
+                       The page is scraped, same as RSS_FEED; the result is
+                       written onto both the article and its `stories` doc
+                       (docs/feed-mind/news-curator-design.md §5, §6 row 4).
+                       Unlike the other two, there is no "latest batch" — a
+                       canonical article stays fair game until it has audio
+                       or its 90-day TTL removes it.
+
+All three then follow the same tail:
 
     text -> spaCy extractive filter -> LLM rewrite -> title prepended -> speech
          -> Cloud Storage -> Firestore (ai_summary, audio_url, audio_generated_at)
@@ -73,10 +82,12 @@ GCP_PROJECT_ID = "feed-mind"
 FIRESTORE_DATABASE = "feed-mind-db"
 ARTICLES_COLLECTION = "processed_articles"
 RUNS_COLLECTION = "runs"
+STORIES_COLLECTION = "stories"
 BUCKET_NAME = "feed-mind-audio-summaries"
 
 PAPERS_PREFIX = "research-papers"
 PAPERS_ARRAY = "papers"
+NEWS_STORIES_PREFIX = "news-stories"
 
 PUBLIC_URL = "https://storage.googleapis.com/{bucket}/{blob}"
 AUDIO_CONTENT_TYPE = "audio/mpeg"
@@ -84,6 +95,7 @@ AUDIO_BITRATE = "64k"
 
 RSS_FEED = "RSS_FEED"
 RESEARCH_PAPERS = "RESEARCH_PAPERS"
+NEWS_STORIES = "NEWS_STORIES"
 
 # Which speech engine to use. `local` is pyttsx3 plus an ffmpeg transcode, and
 # needs a machine with a speech engine on it. `cloud` is the Text-to-Speech API,
@@ -301,7 +313,76 @@ def collect_papers(db, args):
     return "latest run per category: " + ", ".join(labels), items
 
 
-COLLECTORS = {RSS_FEED: collect_articles, RESEARCH_PAPERS: collect_papers}
+# -- NEWS_STORIES --------------------------------------------------------
+def record_news_story(article_ref, story_ref):
+    """Return a callback that writes the audio fields onto BOTH documents.
+
+    services/news-curator writes `stories` and stamps `is_canonical` /
+    `story_id` back onto the article, but never touches ai_summary/audio_url
+    itself (docs/feed-mind/news-curator-design.md §6 row 4) — this is the one
+    place both documents converge, so apps/web can read either the article or
+    the story and see the same summary.
+    """
+    def write(summary, audio_url):
+        payload = audio_fields(summary, audio_url)
+        article_ref.update(payload)
+        story_ref.update(payload)
+    return write
+
+
+def collect_news_stories(db, args):
+    """Items for every canonical article services/news-curator has selected.
+
+    `is_canonical` is a single-field equality filter on `processed_articles`,
+    same trick as fetch_pending_telegram — no composite index needed. Unlike
+    RSS_FEED there is no "latest batch" date: news-curator runs once a day and
+    a canonical article stays canonical (and thus eligible here) until it has
+    audio or its 90-day TTL removes the document.
+    """
+    collection = db.collection(ARTICLES_COLLECTION)
+
+    if args.article_id:
+        snapshot = collection.document(args.article_id).get()
+        if not snapshot.exists:
+            raise PipelineError(f"No document {args.article_id!r} in {ARTICLES_COLLECTION}.")
+        snapshots = [snapshot]
+    else:
+        snapshots = list(
+            collection.where(filter=firestore.FieldFilter("is_canonical", "==", True)).stream()
+        )
+        if not snapshots:
+            raise PipelineError(f"No canonical articles found in {ARTICLES_COLLECTION}.")
+        snapshots.sort(key=lambda s: (s.to_dict() or {}).get("processed_at", ""))
+
+    items = []
+    for snapshot in snapshots:
+        doc = snapshot.to_dict() or {}
+        story_id = doc.get("story_id")
+        if not story_id:
+            log(f"  skipping {snapshot.id}: is_canonical but no story_id — malformed write")
+            continue
+
+        article_id = doc.get("article_id") or snapshot.id
+        items.append(
+            Item(
+                item_id=article_id,
+                title=doc.get("title") or UNTITLED,
+                blob=f"{NEWS_STORIES_PREFIX}/{processed_date(doc)}/{article_id}.mp3",
+                record=record_news_story(
+                    snapshot.reference, db.collection(STORIES_COLLECTION).document(story_id)
+                ),
+                url=doc.get("url") or "",
+                # india-news-ingest runs summarize: none, so `summary` is
+                # always "" here — snippet (the RSS description) is the
+                # only fallback text this pipeline ever has.
+                fallback=(doc.get("snippet") or "").strip(),
+                done=bool(doc.get(AUDIO_URL_FIELD)),
+            )
+        )
+    return f"{len(items)} canonical article(s)", items
+
+
+COLLECTORS = {RSS_FEED: collect_articles, RESEARCH_PAPERS: collect_papers, NEWS_STORIES: collect_news_stories}
 
 
 # ----------------------------------------------------------------------
@@ -485,7 +566,7 @@ def build_parser():
                     "audio file per item.",
     )
     parser.add_argument(
-        "--process-doc", choices=[RSS_FEED, RESEARCH_PAPERS], default=RSS_FEED,
+        "--process-doc", choices=[RSS_FEED, RESEARCH_PAPERS, NEWS_STORIES], default=RSS_FEED,
         help=f"which source to process (default: {RSS_FEED})",
     )
     parser.add_argument(

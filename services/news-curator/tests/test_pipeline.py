@@ -193,11 +193,70 @@ def test_mark_clustered_flags_only_the_selected_canonical(config):
     assert flags[_A3.article_id] is False
 
 
-def test_story_id_encodes_category_run_date_and_rank(config):
+def test_story_id_encodes_country_category_run_date_and_rank(config):
     sink = FakeSink()
     run(config, FakeEmbedder(), [_A1, _A2, _A3], sink)
 
     ids = sorted(s.story_id for s in sink.stories)
-    assert ids[0].startswith("business_")
+    # _A1/_A2/_A3 default to country="IN" (CuratedArticle's default).
+    assert ids[0].startswith("in_business_")
     assert ids[0].endswith("_01")
     assert ids[1].endswith("_02")
+
+
+def test_story_carries_its_country(config):
+    sink = FakeSink()
+    run(config, FakeEmbedder(), [_A1, _A2], sink)
+    assert sink.stories[0].country == "IN"
+
+
+# ---------------------------------------------------------------------------
+# Country isolation: a US and an India article must never share a cluster,
+# even when they are otherwise identical (same coarse category, same vector).
+# ---------------------------------------------------------------------------
+
+_A1_US = CuratedArticle(
+    article_id="a1-us", url="https://example.com/a1-us", title="Fed holds rates steady",
+    snippet="short.", feed_source="CNBC", feed_category="business",
+    published_at="2026-09-09T01:00:00Z", country="US",
+)
+_A2_US = CuratedArticle(
+    article_id="a2-us", url="https://example.com/a2-us", title="Fed keeps rates unchanged",
+    snippet="A much longer writeup of the same Fed decision, with more detail.",
+    feed_source="MarketWatch", feed_category="business",
+    published_at="2026-09-09T02:00:00Z", country="US",
+)
+
+# Deliberately the *same* vector A1/A2 (India) use, to prove country — not
+# embedding distance — is what keeps the two apart.
+_ARTICLE_VECTORS[_A1_US.embed_text] = _ARTICLE_VECTORS[_A1.embed_text]
+_ARTICLE_VECTORS[_A2_US.embed_text] = _ARTICLE_VECTORS[_A2.embed_text]
+
+
+def test_us_and_india_never_merge_even_with_identical_embeddings(config):
+    sink = FakeSink()
+    run(config, FakeEmbedder(), [_A1, _A2, _A1_US, _A2_US], sink)
+
+    business_stories = [s for s in sink.stories if s.coarse_category == "business"]
+    assert len(business_stories) == 2  # one IN cluster, one US cluster, never merged
+
+    by_country = {s.country: s for s in business_stories}
+    assert by_country["IN"].cluster_size == 2
+    assert by_country["US"].cluster_size == 2
+    assert by_country["IN"].story_id.startswith("in_business_")
+    assert by_country["US"].story_id.startswith("us_business_")
+
+
+def test_ranking_uses_each_countrys_own_outlet_count(config):
+    # A US-only run and an India-only run of the *same shape* cluster score
+    # identically only because anchors.N_PAPERS_BY_COUNTRY happens to be 5 for
+    # both today — score_cluster still receives a country-specific n_papers,
+    # not a shared global constant. See rank.py's test coverage for the case
+    # where the counts differ.
+    sink_in = FakeSink()
+    run(config, FakeEmbedder(), [_A1, _A2], sink_in)
+
+    sink_us = FakeSink()
+    run(config, FakeEmbedder(), [_A1_US, _A2_US], sink_us)
+
+    assert sink_in.stories[0].score == sink_us.stories[0].score

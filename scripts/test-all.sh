@@ -77,5 +77,12 @@ from feedmind_core import events
 from feedmind_core.store import is_duplicate, save_article
 '
 
+probe us-news-ingest '
+import main
+from feedmind_core.ingestion import fetch_feed
+from feedmind_core import events
+from feedmind_core.store import is_duplicate, save_article
+'
+
 
 exit $fail

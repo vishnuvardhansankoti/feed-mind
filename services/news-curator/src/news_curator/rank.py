@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from .anchors import N_PAPERS
 from .models import CuratedArticle
 
 CONSENSUS_WEIGHT = 0.50
@@ -21,9 +20,15 @@ SIMILARITY_WEIGHT = 0.20
 
 
 def score_cluster(
-    members: list[CuratedArticle], member_embeddings: np.ndarray, centroid: np.ndarray
+    members: list[CuratedArticle], member_embeddings: np.ndarray, centroid: np.ndarray,
+    n_papers: int,
 ) -> float:
-    consensus = len(members) / N_PAPERS
+    """`n_papers` is the cluster's country's outlet count
+    (anchors.N_PAPERS_BY_COUNTRY) — required, not defaulted, so a caller
+    cannot accidentally score a US cluster against India's count or vice
+    versa.
+    """
+    consensus = len(members) / n_papers
     placement = sum(article.placement_score for article in members) / len(members)
     similarity = float((member_embeddings @ centroid).mean())
 

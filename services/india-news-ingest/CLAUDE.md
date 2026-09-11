@@ -57,6 +57,14 @@ index needed — same trick as `fetch_pending_telegram`), the same way
 `telegram_status` lets the notifier find its own. The curator flips it to
 `"clustered"` once `story_id` / `is_canonical` are written.
 
+`_EXTRA_FIELDS` also stamps `country=IN` on every article, alongside
+`curation_status`. `services/us-news-ingest` publishes to this exact same
+`feedmind-news-ingested` topic with `country=US` instead — one shared curator,
+one shared doorbell, and `country` is what lets it cluster the two countries'
+articles separately instead of merging a US "business" story into an India one
+just because both landed in the same coarse category the same day. See
+`services/news-curator/CLAUDE.md`'s country-isolation section.
+
 ## Commands
 
 Run from `services/india-news-ingest/`.

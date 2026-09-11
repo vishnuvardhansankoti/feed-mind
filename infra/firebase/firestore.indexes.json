@@ -7,6 +7,16 @@
         { "fieldPath": "category", "order": "ASCENDING" },
         { "fieldPath": "run_date", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "stories",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "country", "order": "ASCENDING" },
+        { "fieldPath": "coarse_category", "order": "ASCENDING" },
+        { "fieldPath": "run_date", "order": "DESCENDING" },
+        { "fieldPath": "rank", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

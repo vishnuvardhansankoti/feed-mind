@@ -72,17 +72,27 @@ BUSINESS_ANCHORS: dict[str, str] = {
     ),
 }
 
-# feed_source values (services/india-news-ingest's business.yaml `name:`
-# fields, byte-for-byte — this is a cross-service contract, see this
-# package's CLAUDE.md) that make a business cluster eligible for a detailed
-# sub-category.
+# feed_source values (services/india-news-ingest's and services/us-news-
+# ingest's business.yaml `name:` fields, byte-for-byte — this is a
+# cross-service contract, see this package's CLAUDE.md) that make a business
+# cluster eligible for a detailed sub-category. One flat set across both
+# countries is safe because outlet names never collide between them.
 BUSINESS_ELIGIBLE_SOURCES: frozenset[str] = frozenset(
-    {"Business Standard", "Economic Times", "Hindu BusinessLine"}
+    {
+        "Business Standard", "Economic Times", "Hindu BusinessLine",
+        "CNBC", "MarketWatch", "Fortune",
+    }
 )
 
 UNCATEGORIZED = "uncategorized"
 
-# Total distinct source publications. Used as N_papers in the ranking formula
-# (design doc §4.5) — fixed rather than derived, so a slow day for one outlet
-# cannot inflate every other cluster's consensus term.
-N_PAPERS = 5
+# Distinct source publications, per country. Used as N_papers in the ranking
+# formula (design doc §4.5) — fixed rather than derived from what actually
+# published that day, so one outlet's fetch failure cannot inflate every other
+# cluster's consensus term.
+#
+# Keyed by country because clustering is scoped to (country, coarse_category)
+# — see pipeline.py — and a US cluster's consensus term must never be judged
+# against India's outlet count or vice versa. Update this if either country's
+# ingest config gains or loses an outlet.
+N_PAPERS_BY_COUNTRY: dict[str, int] = {"IN": 5, "US": 5}

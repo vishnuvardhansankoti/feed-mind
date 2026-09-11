@@ -1,11 +1,11 @@
 """
 main.py — feedmind-archive: copy Firestore into BigQuery before its TTL fires.
 
-Every source collection is on a TTL — 90 days for processed_articles and
-youtube_videos, 45 for paper-prism's runs — so anything not copied out is
-deleted permanently. This runs on the 1st and 16th: a 16-day maximum gap,
-chosen against the 45-day TTL so a completely missed run still has ~29 days of
-margin.
+Every source collection is on a TTL — 90 days for processed_articles,
+youtube_videos and stories, 45 for paper-prism's runs — so anything not copied
+out is deleted permanently. This runs on the 1st and 16th: a 16-day maximum
+gap, chosen against the 45-day TTL so a completely missed run still has ~29
+days of margin.
 
 Its own function, separate from every ingest service, for two reasons: an
 archival bug cannot break the daily digest, and it needs a 900s timeout that a
@@ -77,6 +77,11 @@ _ARCHIVE_SOURCES = (
         archival.PAPERS,
         config.FIRESTORE_RUNS_COLLECTION,
         archival.paper_rows,
+    ),
+    (
+        archival.STORIES,
+        config.FIRESTORE_STORIES_COLLECTION,
+        lambda doc_id, doc, at: [archival.story_row(doc_id, doc, at)],
     ),
 )
 

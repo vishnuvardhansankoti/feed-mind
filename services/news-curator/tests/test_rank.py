@@ -18,14 +18,27 @@ def _article(article_id, snippet="", rss_rank=0, feed_length=1, feed_source="Out
 
 
 def test_score_cluster_matches_the_formula_by_hand():
-    # N_PAPERS = 5 (anchors.py). One member, top of its feed, embedding
-    # identical to the centroid: every term maxes out at 1.0.
+    # One member, top of its feed, embedding identical to the centroid: every
+    # term maxes out at 1.0. n_papers=5 matches anchors.N_PAPERS_BY_COUNTRY.
     members = [_article("a1", rss_rank=0, feed_length=1)]
     member_vecs = np.array([[1.0, 0.0]])
     centroid = np.array([1.0, 0.0])
 
-    score = score_cluster(members, member_vecs, centroid)
+    score = score_cluster(members, member_vecs, centroid, n_papers=5)
     assert np.isclose(score, 0.50 * (1 / 5) + 0.30 * 1.0 + 0.20 * 1.0)
+
+
+def test_score_cluster_n_papers_changes_the_consensus_term():
+    # A US cluster scored against India's outlet count (or vice versa) would
+    # be silently wrong, so n_papers must be a required argument that actually
+    # affects the score, not a fallback constant callers can ignore.
+    members = [_article("a1")]
+    vecs = np.array([[1.0, 0.0]])
+    centroid = np.array([1.0, 0.0])
+
+    assert score_cluster(members, vecs, centroid, n_papers=1) > score_cluster(
+        members, vecs, centroid, n_papers=5
+    )
 
 
 def test_score_cluster_rewards_consensus_across_outlets():
@@ -36,7 +49,9 @@ def test_score_cluster_rewards_consensus_across_outlets():
     pair_vecs = np.array([[1.0, 0.0], [1.0, 0.0]])
 
     centroid = np.array([1.0, 0.0])
-    assert score_cluster(pair, pair_vecs, centroid) > score_cluster(solo, solo_vecs, centroid)
+    assert score_cluster(pair, pair_vecs, centroid, n_papers=5) > score_cluster(
+        solo, solo_vecs, centroid, n_papers=5
+    )
 
 
 def test_score_cluster_rewards_editorial_placement():
@@ -45,7 +60,9 @@ def test_score_cluster_rewards_editorial_placement():
     vecs = np.array([[1.0, 0.0]])
     centroid = np.array([1.0, 0.0])
 
-    assert score_cluster(top_of_feed, vecs, centroid) > score_cluster(bottom_of_feed, vecs, centroid)
+    assert score_cluster(top_of_feed, vecs, centroid, n_papers=5) > score_cluster(
+        bottom_of_feed, vecs, centroid, n_papers=5
+    )
 
 
 def test_pick_canonical_is_the_only_option_for_a_singleton():

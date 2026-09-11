@@ -19,7 +19,7 @@ import os
 from datetime import datetime
 from typing import Protocol
 
-from .models import CuratedArticle, Story
+from .models import DEFAULT_COUNTRY, CuratedArticle, Story
 
 log = logging.getLogger("news_curator.store")
 
@@ -34,13 +34,15 @@ CURATION_CLUSTERED = "clustered"
 
 
 def fetch_pending_articles(db) -> list[CuratedArticle]:
-    """Every article india-news-ingest has stored but this service has not yet
-    clustered.
+    """Every article india-news-ingest or us-news-ingest has stored but this
+    service has not yet clustered.
 
     A single-field equality filter with no order_by, deliberately — same
     reasoning as feedmind_core.store.fetch_pending_telegram: Firestore indexes
     single fields automatically, and a composite index would have to be
-    deployed before this could run at all.
+    deployed before this could run at all. It is also country-agnostic on
+    purpose: one query returns both countries' backlog, and pipeline.py splits
+    by `country` afterwards — see this package's CLAUDE.md.
     """
     from google.cloud.firestore_v1.base_query import FieldFilter
 
@@ -65,6 +67,9 @@ def fetch_pending_articles(db) -> list[CuratedArticle]:
                 feed_source=doc.get("feed_source", ""),
                 feed_category=doc.get("feed_category", ""),
                 published_at=doc.get("published_at", ""),
+                # Absent only on docs written before this field existed —
+                # India was the only country then, so absence means "IN".
+                country=doc.get("country") or DEFAULT_COUNTRY,
             )
         )
 

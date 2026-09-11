@@ -30,6 +30,7 @@ from flask import Flask
 
 from .config import load_config
 from .embedder import Embedder
+from .events import publish_content_ready
 from .pipeline import run
 from .store import FirestoreSink, build_firestore_client, fetch_pending_articles
 
@@ -62,6 +63,10 @@ def handle_push():
         articles = fetch_pending_articles(db)
         summary = run(config, _get_embedder(), articles, sink)
         logger.info("Curation run complete: %s", summary)
+        # Published last, after every story is written — services/summarizer
+        # reads Firestore, so announcing earlier would race it to documents
+        # that do not exist yet. Best-effort: see events.py.
+        publish_content_ready(config, summary)
     except Exception:
         logger.exception("Curation run failed")
 

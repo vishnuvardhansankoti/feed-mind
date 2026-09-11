@@ -13,6 +13,11 @@ service cloud.firestore {
     // YouTube videos written server-side by the feed-mind pipeline; the browser
     // only reads. Surfaced by the "Videos" page.
     match /youtube_videos/{doc} { allow read: if true; allow write: if false; }
+    // Curated Indian-news stories written server-side by services/news-curator
+    // (and later stamped with ai_summary/audio_url by services/summarizer);
+    // the browser only reads. Surfaced by the "Stories" page. See
+    // docs/feed-mind/news-curator-design.md §6 row 6.
+    match /stories/{doc} { allow read: if true; allow write: if false; }
 
     // Per-user preferences (bookmarks, followed sources) — the ONLY collection
     // the browser may write, and the only one that is not public.

@@ -2,7 +2,7 @@
 // Exercises the default "mock" data source (VITE_DATA_SOURCE unset) by stubbing
 // global fetch, so no fixtures on disk and no Firestore are required.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getLatest, getArchive, getStatus, getNews, getVideos } from "./data.js";
+import { getLatest, getArchive, getStatus, getNews, getVideos, getStories } from "./data.js";
 import { STATIC_NEWS_LINKS, VIDEO_MAX_ITEMS } from "./constants.js";
 
 const MANIFEST = {
@@ -450,5 +450,99 @@ describe("videos", () => {
     global.fetch = vi.fn(async () => ({ ok: true, json: async () => docs }));
     await getVideos();
     expect(docs.map((v) => v.video_id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("getStories", () => {
+  const story = (id, overrides = {}) => ({
+    story_id: id,
+    country: "IN",
+    coarse_category: "business",
+    rank: 1,
+    score: 0.7,
+    cluster_size: 1,
+    sources: ["Economic Times"],
+    canonical_article_id: `${id}-canonical`,
+    canonical: { title: `Title ${id}`, url: `https://example.com/${id}`, source: "Economic Times" },
+    related_articles: [],
+    ai_summary: "",
+    audio_url: "",
+    run_date: "2026-09-10",
+    ...overrides,
+  });
+
+  it("returns an empty map for every country and category when the fixture is missing", async () => {
+    global.fetch = vi.fn(async () => ({ ok: false }));
+    const { stories } = await getStories();
+    expect(stories.IN.business).toEqual([]);
+    expect(stories.IN.politics).toEqual([]);
+    expect(stories.US.business).toEqual([]);
+  });
+
+  it("splits stories into their country bucket first, then coarse_category", async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => [
+        story("in-b1"),
+        { ...story("us-b1"), country: "US" },
+        { ...story("in-s1"), coarse_category: "sports" },
+      ],
+    }));
+    const { stories } = await getStories();
+    expect(stories.IN.business.map((s) => s.story_id)).toEqual(["in-b1"]);
+    expect(stories.US.business.map((s) => s.story_id)).toEqual(["us-b1"]);
+    expect(stories.IN.sports.map((s) => s.story_id)).toEqual(["in-s1"]);
+    expect(stories.US.sports).toEqual([]);
+    expect(stories.IN.culture).toEqual([]);
+  });
+
+  it("never leaks one country's stories into the other's bucket", async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => [story("in-b1"), { ...story("us-b1"), country: "US" }],
+    }));
+    const { stories } = await getStories();
+    expect(stories.IN.business.map((s) => s.story_id)).not.toContain("us-b1");
+    expect(stories.US.business.map((s) => s.story_id)).not.toContain("in-b1");
+  });
+
+  it("orders by rank within a (country, category) pair", async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => [
+        story("b2", { rank: 2 }),
+        story("b1", { rank: 1 }),
+      ],
+    }));
+    const { stories } = await getStories();
+    expect(stories.IN.business.map((s) => s.story_id)).toEqual(["b1", "b2"]);
+  });
+
+  it("keeps only the newest run_date per (country, category) pair", async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => [
+        story("old", { run_date: "2026-09-08", rank: 1 }),
+        story("new", { run_date: "2026-09-10", rank: 1 }),
+      ],
+    }));
+    const { stories } = await getStories();
+    expect(stories.IN.business.map((s) => s.story_id)).toEqual(["new"]);
+  });
+
+  it("flattens canonical.title up to a top-level title for playlists.tracksFrom", async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => [story("b1", { audio_url: "https://storage.googleapis.com/bucket/b1.mp3" })],
+    }));
+    const { stories } = await getStories();
+    expect(stories.IN.business[0].title).toBe("Title b1");
+  });
+
+  it("degrades ai_summary/audio_url to empty on a story with neither yet", async () => {
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => [story("b1")] }));
+    const { stories } = await getStories();
+    expect(stories.IN.business[0].ai_summary).toBe("");
+    expect(stories.IN.business[0].audio_url).toBe("");
   });
 });

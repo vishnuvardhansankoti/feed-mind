@@ -4,28 +4,61 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
-# UTC+5:30, no DST. A 17:30 America/Chicago ingest run is already the next
-# calendar day in India, and these are Indian papers — keying run_date on the
-# publisher's day is the only reading that makes the date mean anything
-# (design doc §5.2).
-_IST_OFFSET = timedelta(hours=5, minutes=30)
+# Country codes this service knows about. Not an enum: article/story docs
+# carry these as plain strings (Firestore has no enum type), and a country
+# this dict doesn't recognize falls back to India in run_date_for below —
+# see DEFAULT_COUNTRY.
+DEFAULT_COUNTRY = "IN"
+
+# India has no DST, so a fixed UTC+5:30 offset is correct and cheap. The US
+# does observe DST, so it needs a real zoneinfo entry rather than a fixed
+# offset — a fixed -6:00 would be an hour wrong for half the year.
+#
+# Both ingest services already run in their target country's local morning-or-
+# evening slot (17:30 America/Chicago for India, 04:00 America/Chicago for
+# US), so in both cases "today in the publisher's zone" at curation time is
+# unambiguous — see design doc §5.2 for why the publisher's day, not UTC or
+# the curator's own clock, is the only run_date that means anything.
+_COUNTRY_TZ = {
+    "IN": timedelta(hours=5, minutes=30),
+    "US": ZoneInfo("America/Chicago"),
+}
 
 
-def ist_run_date() -> str:
-    """Today's date in India Standard Time, as YYYY-MM-DD."""
-    return (datetime.now(UTC) + _IST_OFFSET).strftime("%Y-%m-%d")
+def run_date_for(country: str, *, now: datetime | None = None) -> str:
+    """Today's calendar date in `country`'s local time, as YYYY-MM-DD.
+
+    An unrecognized country falls back to DEFAULT_COUNTRY rather than raising
+    — a typo'd or future country code should degrade to "today in India", not
+    take down a whole curation run over a date string.
+
+    `now` is injectable (defaults to the real current time) so DST behavior
+    around the US's spring/fall transitions is testable without waiting for
+    the calendar to cooperate.
+    """
+    now = now or datetime.now(UTC)
+    tz = _COUNTRY_TZ.get(country, _COUNTRY_TZ[DEFAULT_COUNTRY])
+    if isinstance(tz, timedelta):
+        return (now + tz).strftime("%Y-%m-%d")
+    return now.astimezone(tz).strftime("%Y-%m-%d")
 
 
 @dataclass(frozen=True)
 class CuratedArticle:
     """One `processed_articles` document, as read by the curator.
 
-    `rss_rank` / `feed_length` are NOT persisted fields — `services/india-news-
-    ingest` does not capture per-article feed position (see this package's
-    CLAUDE.md). They are derived in pipeline.py from `published_at` order
-    within `feed_source`, which is the closest available proxy for editorial
+    `rss_rank` / `feed_length` are NOT persisted fields — neither ingest
+    service captures per-article feed position (see this package's CLAUDE.md).
+    They are derived in pipeline.py from `published_at` order within
+    `feed_source`, which is the closest available proxy for editorial
     placement on a front-page snapshot feed.
+
+    `country` IS persisted (by india-news-ingest / us-news-ingest's
+    `extra_fields`), but a document written before the field existed has none
+    — store.py defaults that case to DEFAULT_COUNTRY ("IN"), since India was
+    the only country before this.
     """
 
     article_id: str
@@ -35,6 +68,7 @@ class CuratedArticle:
     feed_source: str
     feed_category: str
     published_at: str
+    country: str = DEFAULT_COUNTRY
     rss_rank: int = 0
     feed_length: int = 1
 
@@ -58,33 +92,17 @@ class CuratedArticle:
 
 
 @dataclass
-class Cluster:
-    """One event cluster within a single coarse category, before ranking."""
-
-    coarse_category: str
-    members: list[CuratedArticle]
-    centroid: object  # np.ndarray; kept untyped so this module has no numpy import
-    score: float = 0.0
-    business_category: str | None = None
-    rank: int = 0
-
-    @property
-    def size(self) -> int:
-        return len(self.members)
-
-    @property
-    def sources(self) -> list[str]:
-        seen: dict[str, None] = {}
-        for article in self.members:
-            seen[article.feed_source] = None
-        return list(seen)
-
-
-@dataclass
 class Story:
-    """One `stories` document (design doc §5.2)."""
+    """One `stories` document (design doc §5.2).
+
+    `country` did not exist before the US pipeline; every India story written
+    from here on carries it explicitly (unlike processed_articles, this
+    collection has no pre-existing rows to stay silent-compatible with — see
+    this package's CLAUDE.md country-isolation section).
+    """
 
     story_id: str
+    country: str
     coarse_category: str
     rank: int
     score: float
@@ -93,7 +111,7 @@ class Story:
     canonical_article_id: str
     canonical: dict
     related_articles: list[dict]
-    run_date: str  # YYYY-MM-DD, IST calendar date
+    run_date: str  # YYYY-MM-DD, calendar date in the country's local time
     created_at: datetime
     expires_at: datetime
     business_category: str | None = None
@@ -104,6 +122,7 @@ class Story:
     def to_dict(self) -> dict:
         return {
             "story_id": self.story_id,
+            "country": self.country,
             "coarse_category": self.coarse_category,
             "business_category": self.business_category,
             "rank": self.rank,

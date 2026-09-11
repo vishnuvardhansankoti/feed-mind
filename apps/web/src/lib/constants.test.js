@@ -11,6 +11,11 @@ import {
   VIDEO_WINDOW_DAYS,
   VIDEO_MAX_ITEMS,
   VIDEO_BATCH_TOLERANCE_HOURS,
+  STORY_CATEGORIES,
+  STORY_CATEGORY_CODES,
+  BUSINESS_STORY_CATEGORIES,
+  NEWS_COUNTRIES,
+  NEWS_COUNTRY_CODES,
 } from "./constants.js";
 
 describe("lens metadata", () => {
@@ -39,19 +44,19 @@ describe("news categories", () => {
       "industry",
       "cloud",
       "open-source",
-      "top_stories",
     ]);
   });
 
   it("keeps each code in the exact separator form the pipeline writes", () => {
-    // feed-mind's RSS_FEEDS is inconsistent — `open-source` hyphenates,
-    // `top_stories` underscores — and the reader matches on `feed_category`
-    // with ===. "Tidying" either one here silently empties that tab, with no
-    // error anywhere, so pin both spellings.
+    // feed-mind's RSS_FEEDS uses a hyphen for open-source, and the reader
+    // matches on `feed_category` with ===. "Tidying" it here silently empties
+    // that tab, with no error anywhere.
     expect(NEWS_CATEGORY_CODES).toContain("open-source");
-    expect(NEWS_CATEGORY_CODES).toContain("top_stories");
-    expect(NEWS_CATEGORY_CODES).not.toContain("top-stories");
     expect(NEWS_CATEGORY_CODES).not.toContain("open_source");
+  });
+
+  it("no longer carries top_stories — that pipeline moved to STORY_CATEGORIES", () => {
+    expect(NEWS_CATEGORY_CODES).not.toContain("top_stories");
   });
 
   it("opens on Academic, so a new category cannot hijack the landing tab", () => {
@@ -75,6 +80,80 @@ describe("news categories", () => {
       expect(c.code).toBeTruthy();
       expect(c.label).toBeTruthy();
     }
+  });
+});
+
+describe("story categories", () => {
+  it("matches services/news-curator's coarse_category values", () => {
+    // Byte-for-byte contract with news_curator/anchors.py::COARSE_ANCHORS —
+    // the reader matches with ===, same as NEWS_CATEGORY_CODES.
+    expect(STORY_CATEGORY_CODES).toEqual([
+      "politics",
+      "global",
+      "business",
+      "sports",
+      "culture",
+    ]);
+  });
+
+  it("opens on Politics, so a new category cannot hijack the landing tab", () => {
+    // StoriesFeed seeds its selected tab from STORY_CATEGORIES[0].
+    expect(STORY_CATEGORIES[0].code).toBe("politics");
+  });
+
+  it("gives every category a distinct code and label", () => {
+    const codes = STORY_CATEGORIES.map((c) => c.code);
+    const labels = STORY_CATEGORIES.map((c) => c.label);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("STORY_CATEGORY_CODES is derived from STORY_CATEGORIES", () => {
+    expect(STORY_CATEGORY_CODES).toEqual(STORY_CATEGORIES.map((c) => c.code));
+  });
+
+  it("has no overlap with NEWS_CATEGORY_CODES", () => {
+    // Two independent taxonomies on two independent collections — a shared
+    // code would not break anything today, but would be a trap for a future
+    // `===` filter written against the wrong constant.
+    for (const code of STORY_CATEGORY_CODES) {
+      expect(NEWS_CATEGORY_CODES).not.toContain(code);
+    }
+  });
+});
+
+describe("BUSINESS_STORY_CATEGORIES", () => {
+  it("labels every business sub-category services/news-curator can assign", () => {
+    // design doc §4.3's five codes.
+    expect(Object.keys(BUSINESS_STORY_CATEGORIES)).toEqual([
+      "markets",
+      "economy",
+      "companies",
+      "portfolio",
+      "personal_finance",
+    ]);
+  });
+});
+
+describe("news countries", () => {
+  it("matches the country values services/news-curator writes", () => {
+    expect(NEWS_COUNTRY_CODES).toEqual(["IN", "US"]);
+  });
+
+  it("opens on India, so a new country cannot hijack the landing view", () => {
+    // StoriesFeed seeds its selected country from NEWS_COUNTRIES[0].
+    expect(NEWS_COUNTRIES[0].code).toBe("IN");
+  });
+
+  it("gives every country a distinct code and label", () => {
+    const codes = NEWS_COUNTRIES.map((c) => c.code);
+    const labels = NEWS_COUNTRIES.map((c) => c.label);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("NEWS_COUNTRY_CODES is derived from NEWS_COUNTRIES", () => {
+    expect(NEWS_COUNTRY_CODES).toEqual(NEWS_COUNTRIES.map((c) => c.code));
   });
 });
 

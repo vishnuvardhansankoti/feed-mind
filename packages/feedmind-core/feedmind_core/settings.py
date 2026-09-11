@@ -74,6 +74,11 @@ FIRESTORE_YOUTUBE_COLLECTION = "youtube_videos"
 # collections use).
 FIRESTORE_RUNS_COLLECTION = "runs"
 
+# Written by services/news-curator, not by this package — read-only here, and
+# only by the archiver. Carries a 90-day TTL on `expires_at`, matching
+# processed_articles. See docs/feed-mind/news-curator-design.md §5.2.
+FIRESTORE_STORIES_COLLECTION = "stories"
+
 # ---------------------------------------------------------------------------
 # Pub/Sub — telling downstream consumers a run has finished
 # ---------------------------------------------------------------------------

@@ -20,6 +20,19 @@ class Config:
     coarse_threshold: float
     cluster_distance_threshold: float
     top_k_per_category: int
+    content_ready_topic: str | None = None
+
+    @property
+    def content_ready_enabled(self) -> bool:
+        """Whether __main__.py should announce a finished run on Pub/Sub.
+
+        Mirrors paper-prism's Config.content_ready_enabled: a SINK=local run
+        produced no Firestore documents, so there is nothing a downstream
+        consumer could read. main.py (the Cloud Run push entrypoint) does not
+        consult this — it always writes to Firestore, so it always announces
+        when canonical stories were selected.
+        """
+        return bool(self.content_ready_topic and self.firestore_project and self.sink == "firestore")
 
 
 def load_config() -> Config:
@@ -40,4 +53,7 @@ def load_config() -> Config:
         cluster_distance_threshold=float(os.getenv("CLUSTER_DISTANCE_THRESHOLD", "0.22")),
         # Clusters marked canonical per coarse category (design doc §4.6).
         top_k_per_category=int(os.getenv("TOP_K_PER_CATEGORY", "5")),
+        # Owned by services/summarizer, not this service — see events.py and
+        # the root CLAUDE.md's "The Pub/Sub topic is owned by its consumer".
+        content_ready_topic=os.getenv("CONTENT_READY_TOPIC", "feedmind-content-ready").strip() or None,
     )

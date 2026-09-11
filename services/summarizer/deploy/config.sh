@@ -25,17 +25,20 @@ RUNTIME="${RUNTIME:-python311}"
 # only ever guess at that - too early and there is nothing to summarize, too
 # late and the audio is stale.
 #
-# One topic carries both modes; the message says which. See main.py.
+# One topic carries three modes; the message says which. See main.py.
 #
 #   feed-mind        publishes {"process_doc": "RSS_FEED"} at the end of its run
 #   paper-prism-job  publishes {"process_doc": "RESEARCH_PAPERS"} at the end of
 #                    its weekly run, having written the `runs` collection
+#   news-curator     publishes {"process_doc": "NEWS_STORIES"} after clustering,
+#                    having marked some articles is_canonical=true (see
+#                    docs/feed-mind/news-curator-design.md §6 rows 2-4)
 TOPIC_NAME="${TOPIC_NAME:-feedmind-content-ready}"
 
 # Service accounts allowed to publish to the topic, space separated. This is
-# where the grant lives for both producers: the topic belongs to whoever reads
-# it, so neither publisher's own deploy manages the binding.
-PUBLISHER_SERVICE_ACCOUNTS="${PUBLISHER_SERVICE_ACCOUNTS:-feedmind-sa@${PROJECT_ID}.iam.gserviceaccount.com paper-prism-job@${PROJECT_ID}.iam.gserviceaccount.com}"
+# where the grant lives for all three producers: the topic belongs to whoever
+# reads it, so no publisher's own deploy manages the binding.
+PUBLISHER_SERVICE_ACCOUNTS="${PUBLISHER_SERVICE_ACCOUNTS:-feedmind-sa@${PROJECT_ID}.iam.gserviceaccount.com paper-prism-job@${PROJECT_ID}.iam.gserviceaccount.com news-curator@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 # spaCy holds its pipeline in memory and the LLM call is mostly waiting, so the
 # function is memory-bound rather than CPU-bound. 1Gi fits en_core_web_sm with

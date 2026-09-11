@@ -15,8 +15,28 @@ and uploads the MP3 to a public Cloud Storage bucket (`audio_url`).
 
 It is a **second writer to documents it does not own** — `processed_articles`
 and `youtube_videos` belong to the FeedMind ingest services, `runs` to
-`services/paper-prism`. It only ever adds `ai_summary` / `audio_url` /
-`audio_generated_at`; it never creates or deletes a document.
+`services/paper-prism`, `stories` to `services/news-curator`. It only ever
+adds `ai_summary` / `audio_url` / `audio_generated_at`; it never creates or
+deletes a document.
+
+## Three pipelines, one topic
+
+`--process-doc` selects which (`feedmind_audio.py::COLLECTORS`):
+
+| | source | text | writes to |
+|---|---|---|---|
+| `RSS_FEED` (default) | latest-batch articles in `processed_articles` | scraped page | the article |
+| `RESEARCH_PAPERS` | latest run per category in `runs` | stored abstract | the `papers` array entry |
+| `NEWS_STORIES` | every `processed_articles` doc with `is_canonical=true` | scraped page | **both** the article and its `stories` doc (`story_id` on the article says which) |
+
+`NEWS_STORIES` is the odd one out: the other two collect "the latest batch";
+this one has no batch concept; instead it collects every canonical article not
+yet summarized, because `services/news-curator` runs once a day and a
+canonical article stays eligible until it has audio or its 90-day TTL removes
+it. Its fallback text is `snippet` (the RSS description), not `summary` —
+`services/india-news-ingest` runs `summarize: none`, so `summary` is always
+empty for these articles. See `docs/feed-mind/news-curator-design.md` §6 rows
+2-4 and `services/news-curator/CLAUDE.md`.
 
 ## Two entry points, one implementation
 
@@ -68,9 +88,9 @@ because it encodes most of these. The ones easiest to break:
 ## The topic is owned here, not by the publishers
 
 `deploy/setup.sh` creates `feedmind-content-ready` **and** grants
-`roles/pubsub.publisher` to both producers' service accounts. Neither publisher's
+`roles/pubsub.publisher` to all three producers' service accounts. No publisher's
 own deploy manages that binding, because the topic belongs to whoever reads it.
-Run `deploy/setup.sh` before either producer first publishes — until then their
+Run `deploy/setup.sh` before a producer first publishes — until then its
 runs still succeed and simply log a permission error.
 
 ## Commands

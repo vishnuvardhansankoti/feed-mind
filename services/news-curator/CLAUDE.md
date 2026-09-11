@@ -11,22 +11,53 @@ sections (e.g. "design doc §4.5").
 A Cloud Run **service** (not a Job — Eventarc cannot target a Job directly,
 and this needs to run on an event, not a clock) with a Pub/Sub **push**
 subscription on `feedmind-news-ingested`. It embeds, classifies, clusters and
-ranks `services/india-news-ingest`'s articles, then writes the `stories`
-collection and stamps `story_id` / `is_canonical` back onto
-`processed_articles`.
+ranks the articles `services/india-news-ingest` **and** `services/us-news-
+ingest` write, then writes the `stories` collection and stamps `story_id` /
+`is_canonical` back onto `processed_articles`. One shared deployment, one
+shared collection, one shared taxonomy — see "Country isolation" below for how
+the two countries stay apart within that.
 
-**Scope of what is built here (steps 1-2 of the design doc's build order,
-§11):** the curation pipeline itself, run either from a real Pub/Sub push
-(`main.py`) or by hand against real Firestore data for tuning
-(`__main__.py`). **Not built yet:** wiring `feedmind-content-ready` so
-`services/summarizer` picks up canonical stories (§11 step 3), the
-`apps/web` Stories view (step 4), or the `services/archive` table (step 5).
-Until step 3 lands, `stories` documents exist with `ai_summary: null` and
-`audio_url: null` forever — that is expected, not a bug.
+All six steps of the original design doc's build order (§11) are built: this
+service (steps 1-2), announcing finished runs to `services/summarizer` via
+`events.py` (step 3), the `apps/web` Stories view (step 4), the
+`services/archive` table (step 5), and `services/ingest`'s `topstories.yaml`
+retirement (step 6, done ahead of the others at the user's request). The US
+pipeline (`services/us-news-ingest` + country-scoping in this service) is a
+second iteration on top of that — see `docs/feed-mind/us-news-design.md`. See
+the two "deviates from the design doc" sections below for where the
+implementation and the original (India-only) doc disagree.
+
+## Country isolation
+
+Classification is country-agnostic — the coarse/business anchors are shared,
+so a US and an India article are classified against the exact same anchor
+text. **Clustering is not**: `pipeline.py::run` scopes every cluster to
+`(country, coarse_category)`, never `coarse_category` alone, so a US
+"business" story and an India "business" story on the same day are never
+merged just because both landed in the same coarse bucket. `story_id` carries
+the country as a prefix (`us_business_2026-09-10_01` vs
+`in_business_2026-09-10_01`) — without it, the two countries' doc IDs would
+collide on the same category/date/rank.
+
+`N_PAPERS_BY_COUNTRY` (`anchors.py`) replaces the single `N_PAPERS` constant
+the original design used — the ranking formula's consensus term must be judged
+against *that cluster's own* country's outlet count, never a shared or the
+wrong country's. `models.py::run_date_for` is similarly per-country: India
+uses a fixed UTC+5:30 offset (no DST), the US uses real `zoneinfo` for
+`America/Chicago` (DST matters there — a fixed offset would be an hour wrong
+half the year).
+
+`country` on `processed_articles` is written by each ingest service's
+`extra_fields` (`country="IN"` / `country="US"`), the same mechanism that
+already carries `curation_status`. A document with no `country` field at all
+predates the US pipeline entirely — `store.py::fetch_pending_articles` treats
+that absence as `"IN"`, since India was the only country before this (see
+`models.py::DEFAULT_COUNTRY`). `stories` documents have no such legacy case —
+every one carries `country` explicitly, always.
 
 ## Pipeline order is the whole point
 
-Embed → classify (coarse) → cluster (within coarse, across all 5 papers) →
+Embed → classify (coarse) → cluster (within a country's coarse category, across all of that country's papers) →
 rank → select top-K/category. This runs entirely on `title. description` —
 never the scraped article body, never an LLM call. See design doc §3.1 for
 the cost math this protects: clustering after summarization would mean every
@@ -90,6 +121,35 @@ by "run it against a day of real ingested data with the Firestore write
 disabled": τ (`CLUSTER_DISTANCE_THRESHOLD`) and the anchor sentences in
 `anchors.py` are tuned by reading `./output/stories/*.json` from a real batch,
 without touching the `stories` collection or `processed_articles`.
+
+Both also call `events.publish_content_ready` after `pipeline.run()` — a
+no-op for `__main__.py` unless you explicitly set `SINK=firestore`
+(`Config.content_ready_enabled` gates on it), since a local tuning run has
+nothing downstream to announce.
+
+## Announcing to `services/summarizer`, not publishing content itself
+
+`events.py` copies `services/paper-prism/src/paper_prism/events.py`'s pattern
+rather than importing it (same reasoning as `embedder.py`: no shared
+dependency). It publishes `{"process_doc": "NEWS_STORIES", ...}` to
+`feedmind-content-ready` once per run, only when at least one cluster was
+marked canonical — never per-story, so a run with 25 canonical stories wakes
+`feedmind-audio` once, not 25 times.
+
+**The topic is owned by `services/summarizer`, not here.** Its
+`deploy/setup.sh` creates `feedmind-content-ready` and grants this service's
+runtime SA (`news-curator@…`) `roles/pubsub.publisher` — see
+`services/summarizer/deploy/config.sh`'s `PUBLISHER_SERVICE_ACCOUNTS`. Run
+that setup before this service's first deploy; until then a run still
+succeeds and `events.py` just logs a permission error, same as every other
+producer in this repo.
+
+`services/summarizer` finds the work via `is_canonical == true` on
+`processed_articles` (a single-field filter, same trick as `curation_status`
+above), not by reading the Pub/Sub message body — the message is a doorbell
+that says "look now", exactly like `feedmind-news-ingested` and
+`feedmind-telegram-ready`. It writes `ai_summary` / `audio_url` onto **both**
+the article and its `stories` doc; see `services/summarizer/CLAUDE.md`.
 
 ## Commands
 

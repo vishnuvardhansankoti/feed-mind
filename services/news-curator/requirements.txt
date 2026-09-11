@@ -33,26 +33,38 @@ google-api-core==2.36.0
     # via
     #   google-cloud-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
 google-auth==2.58.0
     # via
     #   google-api-core
     #   google-cloud-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
 google-cloud-core==2.7.0
     # via google-cloud-firestore
 google-cloud-firestore==2.30.0
     # via news-curator (pyproject.toml)
+google-cloud-pubsub==2.40.0
+    # via news-curator (pyproject.toml)
 googleapis-common-protos==1.75.3
     # via
     #   google-api-core
+    #   grpc-google-iam-v1
     #   grpcio-status
+grpc-google-iam-v1==0.14.5
+    # via google-cloud-pubsub
 grpcio==1.83.1
     # via
     #   google-api-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
+    #   googleapis-common-protos
+    #   grpc-google-iam-v1
     #   grpcio-status
 grpcio-status==1.83.1
-    # via google-api-core
+    # via
+    #   google-api-core
+    #   google-cloud-pubsub
 gunicorn==26.2.0
     # via news-curator (pyproject.toml)
 h11==0.16.0
@@ -94,7 +106,15 @@ numpy==2.4.6
 onnxruntime==1.29.0
     # via news-curator (pyproject.toml)
 opentelemetry-api==1.44.0
-    # via google-api-core
+    # via
+    #   google-api-core
+    #   google-cloud-pubsub
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-sdk==1.44.0
+    # via google-cloud-pubsub
+opentelemetry-semantic-conventions==0.65b0
+    # via opentelemetry-sdk
 packaging==26.3
     # via
     #   huggingface-hub
@@ -103,11 +123,14 @@ proto-plus==1.28.4
     # via
     #   google-api-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
 protobuf==7.36.1
     # via
     #   google-api-core
     #   google-cloud-firestore
+    #   google-cloud-pubsub
     #   googleapis-common-protos
+    #   grpc-google-iam-v1
     #   grpcio-status
     #   onnxruntime
     #   proto-plus
@@ -139,6 +162,8 @@ typing-extensions==4.16.0
     #   grpcio
     #   huggingface-hub
     #   opentelemetry-api
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
 urllib3==2.7.0
     # via requests
 werkzeug==3.1.8

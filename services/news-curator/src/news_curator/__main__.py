@@ -21,6 +21,7 @@ import sys
 
 from .config import load_config
 from .embedder import Embedder
+from .events import publish_content_ready
 from .pipeline import run
 from .store import build_firestore_client, build_sink, fetch_pending_articles
 
@@ -45,6 +46,9 @@ def main() -> int:
 
     articles = fetch_pending_articles(db)
     summary = run(config, Embedder(), articles, sink)
+    # A no-op unless SINK=firestore — see Config.content_ready_enabled. A
+    # SINK=local tuning run has nothing downstream to announce.
+    publish_content_ready(config, summary)
 
     log.info(
         "done: read=%d uncategorized=%d clusters=%s stories=%d canonical=%d",

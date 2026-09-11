@@ -14,14 +14,14 @@ ARCHIVED_AT = "2026-08-29T12:00:00+00:00"
 def test_every_spec_partitions_and_clusters_on_real_columns():
     # A partition or clustering field that is not a column fails at table
     # creation — on the first run, in production, twice a month.
-    for spec in (archival.ARTICLES, archival.VIDEOS, archival.PAPERS):
+    for spec in (archival.ARTICLES, archival.VIDEOS, archival.PAPERS, archival.STORIES):
         assert spec.partition_field in spec.column_names
         for field in spec.clustering_fields:
             assert field in spec.column_names
 
 
 def test_every_spec_keys_on_real_columns():
-    for spec in (archival.ARTICLES, archival.VIDEOS, archival.PAPERS):
+    for spec in (archival.ARTICLES, archival.VIDEOS, archival.PAPERS, archival.STORIES):
         assert spec.key_fields
         for field in spec.key_fields:
             assert field in spec.column_names
@@ -29,7 +29,7 @@ def test_every_spec_keys_on_real_columns():
 
 def test_every_spec_carries_a_raw_safety_net():
     # `raw` is what keeps an upstream field addition unpromoted rather than lost.
-    for spec in (archival.ARTICLES, archival.VIDEOS, archival.PAPERS):
+    for spec in (archival.ARTICLES, archival.VIDEOS, archival.PAPERS, archival.STORIES):
         assert "raw" in spec.column_names
 
 
@@ -147,6 +147,21 @@ def test_article_row_keeps_unpromoted_fields_in_raw():
     assert json.loads(row["raw"])["audio_url"] == "gs://bucket/a.mp3"
 
 
+def test_article_row_passes_country_through_when_present():
+    row = archival.article_row("abc123", _article_doc(country="US"), ARCHIVED_AT)
+    assert row["country"] == "US"
+
+
+def test_article_row_leaves_country_null_when_absent():
+    # The overwhelming majority of processed_articles rows are tech-blog
+    # articles with no country concept at all (academic/industry/cloud/
+    # open-source/top_stories) — defaulting a missing country to "IN" here,
+    # the way news-curator's live pipeline does for its own narrower purpose,
+    # would mislabel every one of them as Indian. NULL is the honest answer.
+    row = archival.article_row("abc123", _article_doc(), ARCHIVED_AT)
+    assert row["country"] is None
+
+
 # ---------------------------------------------------------------------------
 # Video rows
 # ---------------------------------------------------------------------------
@@ -262,6 +277,112 @@ def test_unusable_rank_and_score_become_null():
     row = archival.paper_rows("2026-08-29_ML", doc, ARCHIVED_AT)[0]
     assert row["rank"] is None
     assert row["score"] is None
+
+
+# ---------------------------------------------------------------------------
+# Story rows
+# ---------------------------------------------------------------------------
+
+
+def _story_doc(**overrides):
+    doc = {
+        "story_id": "in_business_2026-08-29_01",
+        "country": "IN",
+        "coarse_category": "business",
+        "business_category": "markets",
+        "rank": 1,
+        "score": 0.842,
+        "cluster_size": 3,
+        "sources": ["Economic Times", "Business Standard", "Times of India"],
+        "canonical_article_id": "a1",
+        "canonical": {
+            "title": "RBI holds repo rate at 6.5%",
+            "url": "https://example.com/rbi",
+            "source": "Economic Times",
+            "published_at": "2026-08-29T04:15:00+00:00",
+        },
+        "related_articles": [
+            {"source": "Business Standard", "url": "https://example.com/bs", "title": "RBI MPC keeps rates unchanged"},
+        ],
+        "run_date": "2026-08-29",
+        "created_at": "2026-08-29T00:05:32+00:00",
+    }
+    doc.update(overrides)
+    return doc
+
+
+def test_story_row_has_exactly_the_spec_columns():
+    row = archival.story_row("business_2026-08-29_01", _story_doc(), ARCHIVED_AT)
+    assert set(row) == set(archival.STORIES.column_names)
+
+
+def test_story_row_maps_top_level_fields():
+    row = archival.story_row("business_2026-08-29_01", _story_doc(), ARCHIVED_AT)
+    assert row["country"] == "IN"
+    assert row["coarse_category"] == "business"
+    assert row["business_category"] == "markets"
+    assert row["rank"] == 1
+    assert row["score"] == 0.842
+    assert row["cluster_size"] == 3
+    assert row["canonical_article_id"] == "a1"
+    assert row["archived_at"] == ARCHIVED_AT
+
+
+def test_story_row_flattens_canonical_fields():
+    row = archival.story_row("business_2026-08-29_01", _story_doc(), ARCHIVED_AT)
+    assert row["canonical_title"] == "RBI holds repo rate at 6.5%"
+    assert row["canonical_url"] == "https://example.com/rbi"
+    assert row["canonical_source"] == "Economic Times"
+    assert row["canonical_published_at"] == "2026-08-29T04:15:00+00:00"
+
+
+def test_story_row_encodes_sources_and_related_articles_as_json_text():
+    # No REPEATED columns in this schema — sources/related_articles are JSON
+    # text, same treatment as `raw`, so bigquery.py needs no special casing.
+    row = archival.story_row("business_2026-08-29_01", _story_doc(), ARCHIVED_AT)
+    assert json.loads(row["sources"]) == ["Economic Times", "Business Standard", "Times of India"]
+    assert json.loads(row["related_articles"])[0]["source"] == "Business Standard"
+
+
+def test_story_row_passes_a_us_country_through():
+    row = archival.story_row(
+        "us_business_2026-08-29_01", _story_doc(story_id="us_business_2026-08-29_01", country="US"),
+        ARCHIVED_AT,
+    )
+    assert row["country"] == "US"
+
+
+def test_story_id_falls_back_to_document_id():
+    row = archival.story_row("doc-id-42", _story_doc(story_id=None), ARCHIVED_AT)
+    assert row["story_id"] == "doc-id-42"
+
+
+def test_missing_ai_summary_and_audio_url_are_null_not_missing():
+    # Written asynchronously by services/summarizer's NEWS_STORIES pipeline,
+    # and never at all for a cluster outside the top-K. Absence is normal.
+    row = archival.story_row("business_2026-08-29_01", _story_doc(), ARCHIVED_AT)
+    assert row["ai_summary"] is None
+    assert row["audio_url"] is None
+
+
+def test_late_summary_and_audio_are_picked_up_on_a_later_run():
+    doc = _story_doc(ai_summary="A generated summary.", audio_url="gs://bucket/s.mp3")
+    row = archival.story_row("business_2026-08-29_01", doc, ARCHIVED_AT)
+    assert row["ai_summary"] == "A generated summary."
+    assert row["audio_url"] == "gs://bucket/s.mp3"
+
+
+def test_missing_business_category_is_null():
+    # A cluster made only of general-paper articles keeps the coarse code —
+    # design doc §4.3.
+    row = archival.story_row("p1", _story_doc(business_category=None, coarse_category="politics"), ARCHIVED_AT)
+    assert row["business_category"] is None
+
+
+def test_story_row_keeps_unpromoted_fields_in_raw():
+    row = archival.story_row("business_2026-08-29_01", _story_doc(expires_at="2026-11-27T00:05:32+00:00"), ARCHIVED_AT)
+    assert "expires_at" not in row
+    assert json.loads(row["raw"])["expires_at"] == "2026-11-27T00:05:32+00:00"
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,13 @@
 
 The order matters and is the design doc's central decision (§3.1): clustering
 happens on title+description, before anything is scraped or sent to an LLM, so
-only the ~25 canonical articles/day ever reach services/summarizer.
+only the top canonical articles/day ever reach services/summarizer.
+
+Classification runs across every pending article regardless of country — the
+anchors are shared (see anchors.py). Clustering does not: it is scoped to
+(country, coarse_category), so a US and an India article are never merged
+into the same event just because both are "business" the same day. See this
+package's CLAUDE.md country-isolation section.
 """
 
 from __future__ import annotations
@@ -13,10 +19,10 @@ from datetime import UTC, datetime, timedelta
 
 from . import classify, rank
 from . import cluster as clustering
-from .anchors import BUSINESS_ELIGIBLE_SOURCES, UNCATEGORIZED
+from .anchors import BUSINESS_ELIGIBLE_SOURCES, N_PAPERS_BY_COUNTRY, UNCATEGORIZED
 from .config import Config
 from .embedder import Embedder
-from .models import CuratedArticle, CurationRunSummary, Story, ist_run_date
+from .models import CuratedArticle, CurationRunSummary, Story, run_date_for
 from .store import Sink
 
 log = logging.getLogger("news_curator.pipeline")
@@ -25,7 +31,12 @@ STORY_RETENTION_DAYS = 90  # matches processed_articles — root CLAUDE.md's "ev
 
 
 def _with_feed_rank(articles: list[CuratedArticle]) -> list[CuratedArticle]:
-    """Derive rss_rank / feed_length per article — see CuratedArticle's docstring."""
+    """Derive rss_rank / feed_length per article — see CuratedArticle's docstring.
+
+    Grouped by feed_source alone, not (country, feed_source): outlet names
+    never collide between countries (see anchors.BUSINESS_ELIGIBLE_SOURCES'
+    docstring), so this is already country-safe without the extra key.
+    """
     by_source: dict[str, list[CuratedArticle]] = defaultdict(list)
     for article in articles:
         by_source[article.feed_source].append(article)
@@ -43,6 +54,7 @@ def _with_feed_rank(articles: list[CuratedArticle]) -> list[CuratedArticle]:
                     feed_source=article.feed_source,
                     feed_category=article.feed_category,
                     published_at=article.published_at,
+                    country=article.country,
                     rss_rank=index,
                     feed_length=len(group),
                 )
@@ -68,81 +80,96 @@ def run(config: Config, embedder: Embedder, articles: list[CuratedArticle], sink
 
     business_vecs, business_codes = classify.business_anchor_matrix(embedder.encode)
 
-    run_date = ist_run_date()
     created_at = datetime.now(UTC)
     expires_at = created_at + timedelta(days=STORY_RETENTION_DAYS)
 
-    for coarse_category in coarse_codes:
-        indices = [i for i, label in enumerate(coarse_labels) if label == coarse_category]
-        if not indices:
-            continue
+    # Clustering is scoped to (country, coarse_category), never coarse_category
+    # alone — design doc §3.4 clusters across all of one country's papers so
+    # e.g. TOI and ET can dedupe against each other, but a US and an India
+    # article must never merge just because both are "business" the same day.
+    # Countries are discovered from the batch rather than hardcoded, so a
+    # country with nothing pending this run costs nothing.
+    countries = sorted({a.country for a in articles})
 
-        category_embeddings = embeddings[indices]
-        raw_clusters = clustering.cluster_indices(category_embeddings, config.cluster_distance_threshold)
-        summary.clusters_by_category[coarse_category] = len(raw_clusters)
+    for country in countries:
+        run_date = run_date_for(country)
+        n_papers = N_PAPERS_BY_COUNTRY.get(country, N_PAPERS_BY_COUNTRY["IN"])
 
-        scored: list[tuple[float, list[int]]] = []
-        for local_indices in raw_clusters:
-            global_indices = [indices[i] for i in local_indices]
-            members = [articles[i] for i in global_indices]
-            member_vecs = embeddings[global_indices]
-            centroid = clustering.centroid(embeddings, global_indices)
-            score = rank.score_cluster(members, member_vecs, centroid)
-            scored.append((score, global_indices))
+        for coarse_category in coarse_codes:
+            indices = [
+                i for i, (article, label) in enumerate(zip(articles, coarse_labels, strict=True))
+                if article.country == country and label == coarse_category
+            ]
+            if not indices:
+                continue
 
-        scored.sort(key=lambda item: item[0], reverse=True)
+            category_embeddings = embeddings[indices]
+            raw_clusters = clustering.cluster_indices(category_embeddings, config.cluster_distance_threshold)
+            summary.clusters_by_category[f"{country}:{coarse_category}"] = len(raw_clusters)
 
-        for position, (score, global_indices) in enumerate(scored, start=1):
-            members = [articles[i] for i in global_indices]
-            is_selected = position <= config.top_k_per_category
-            canonical = rank.pick_canonical(members)
+            scored: list[tuple[float, list[int]]] = []
+            for local_indices in raw_clusters:
+                global_indices = [indices[i] for i in local_indices]
+                members = [articles[i] for i in global_indices]
+                member_vecs = embeddings[global_indices]
+                centroid = clustering.centroid(embeddings, global_indices)
+                score = rank.score_cluster(members, member_vecs, centroid, n_papers)
+                scored.append((score, global_indices))
 
-            business_category = None
-            if coarse_category == "business" and _is_business_eligible(members):
-                canonical_idx = next(
-                    gi for gi, a in zip(global_indices, members, strict=True)
-                    if a.article_id == canonical.article_id
+            scored.sort(key=lambda item: item[0], reverse=True)
+
+            for position, (score, global_indices) in enumerate(scored, start=1):
+                members = [articles[i] for i in global_indices]
+                is_selected = position <= config.top_k_per_category
+                canonical = rank.pick_canonical(members)
+
+                business_category = None
+                if coarse_category == "business" and _is_business_eligible(members):
+                    canonical_idx = next(
+                        gi for gi, a in zip(global_indices, members, strict=True)
+                        if a.article_id == canonical.article_id
+                    )
+                    business_category = classify.classify_business(
+                        embeddings[canonical_idx], business_vecs, business_codes
+                    )
+
+                story = Story(
+                    story_id=f"{country.lower()}_{coarse_category}_{run_date}_{position:02d}",
+                    country=country,
+                    coarse_category=coarse_category,
+                    business_category=business_category,
+                    rank=position,
+                    score=score,
+                    cluster_size=len(members),
+                    sources=[a.feed_source for a in _dedupe_by_source(members)],
+                    canonical_article_id=canonical.article_id,
+                    canonical={
+                        "title": canonical.title,
+                        "url": canonical.url,
+                        "source": canonical.feed_source,
+                        "published_at": canonical.published_at,
+                    },
+                    related_articles=[
+                        {"source": a.feed_source, "url": a.url, "title": a.title}
+                        for a in members
+                        if a.article_id != canonical.article_id
+                    ],
+                    run_date=run_date,
+                    created_at=created_at,
+                    expires_at=expires_at,
+                    is_canonical_selected=is_selected,
                 )
-                business_category = classify.classify_business(
-                    embeddings[canonical_idx], business_vecs, business_codes
-                )
+                sink.write_story(story)
+                summary.stories_written += 1
+                if is_selected:
+                    summary.canonical_selected += 1
 
-            story = Story(
-                story_id=f"{coarse_category}_{run_date}_{position:02d}",
-                coarse_category=coarse_category,
-                business_category=business_category,
-                rank=position,
-                score=score,
-                cluster_size=len(members),
-                sources=[a.feed_source for a in _dedupe_by_source(members)],
-                canonical_article_id=canonical.article_id,
-                canonical={
-                    "title": canonical.title,
-                    "url": canonical.url,
-                    "source": canonical.feed_source,
-                    "published_at": canonical.published_at,
-                },
-                related_articles=[
-                    {"source": a.feed_source, "url": a.url, "title": a.title}
-                    for a in members
-                    if a.article_id != canonical.article_id
-                ],
-                run_date=run_date,
-                created_at=created_at,
-                expires_at=expires_at,
-                is_canonical_selected=is_selected,
-            )
-            sink.write_story(story)
-            summary.stories_written += 1
-            if is_selected:
-                summary.canonical_selected += 1
-
-            for article in members:
-                sink.mark_clustered(
-                    article.article_id,
-                    story.story_id,
-                    is_canonical=is_selected and article.article_id == canonical.article_id,
-                )
+                for article in members:
+                    sink.mark_clustered(
+                        article.article_id,
+                        story.story_id,
+                        is_canonical=is_selected and article.article_id == canonical.article_id,
+                    )
 
     summary.articles_uncategorized = sum(1 for label in coarse_labels if label == UNCATEGORIZED)
     log.info(
