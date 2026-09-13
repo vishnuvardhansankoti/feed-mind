@@ -54,10 +54,12 @@ PIPER_DEFAULT_MODEL = os.environ.get(
 
 # Piper takes --length_scale (a duration multiplier: <1.0 faster, >1.0
 # slower, 1.0 = the model's own natural pace), not words-per-minute, so `rate`
-# is converted against this constant. Not measured against this exact voice
-# model - a starting point, not a spec. If the mapped rate sounds off,
-# --length_scale is the authoritative knob; tune PIPER_NATIVE_WPM by ear.
-PIPER_NATIVE_WPM = 165
+# is converted against this constant. Deliberately set to the same value as
+# cloud_speech.py's BASELINE_WPM (not a measurement of this exact voice's true
+# native pace) so that a given `rate` maps to the identical proportional
+# speedup on both backends - otherwise the two backends drift apart at any
+# rate other than the one they happen to have been tuned by ear against.
+PIPER_NATIVE_WPM = 175
 
 INSTALL_HINT = "pyttsx3 is not installed - run: uv pip install pyttsx3"
 
