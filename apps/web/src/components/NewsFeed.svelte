@@ -100,11 +100,12 @@
 <style>
   .news { display: flex; flex-direction: column; gap: 1rem; }
 
-  /* Pins directly below App's sticky masthead + section nav, whose combined
-     height it reads from --stick-top (published on .wrap by App).
+  /* Pins directly below App's sticky content-pane top bar, whose height it
+     reads from --stick-top (published on .content by App). First-level nav
+     lives in the sidebar/bottom-bar now, not in this stack.
      The zero-blur shadows extend this bar's background over the gap above (the
-     nav's margin) and a little below, so articles scrolling underneath never
-     show through; padding would have shifted the layout instead. */
+     top bar's margin) and a little below, so articles scrolling underneath
+     never show through; padding would have shifted the layout instead. */
   .controls {
     /* Wide layout: window tabs on their own row, then categories with Listen
        All parked at the right end of the second row. */

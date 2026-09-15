@@ -111,11 +111,16 @@ class ArxivClient:
                 return parsed.entries
             except (requests.RequestException, _TransientEmpty) as exc:
                 backoff = min(2 ** attempt, 30)
+                detail = type(exc).__name__
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if status is not None:
+                    body = (exc.response.text or "")[:200]
+                    detail = f"{detail} status={status} body={body!r}"
                 log.warning(
                     "arXiv fetch attempt %d/%d failed (%s); backing off %ds",
                     attempt,
                     self.max_retries,
-                    type(exc).__name__,
+                    detail,
                     backoff,
                 )
                 time.sleep(backoff)

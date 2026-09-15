@@ -67,7 +67,7 @@
 <style>
   .stories { display: flex; flex-direction: column; gap: 1rem; }
 
-  /* Pins directly below App's sticky masthead + section nav, same convention
+  /* Pins directly below App's sticky content-pane top bar, same convention
      as NewsFeed's .controls. Two tab rows stacked (country, then category) —
      same grid shape as NewsFeed's subtabs+cats, just one more axis. */
   .controls {

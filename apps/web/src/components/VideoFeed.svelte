@@ -89,8 +89,8 @@
 <style>
   .videos { display: flex; flex-direction: column; gap: 1rem; }
 
-  /* Same sticky bar as the other sections: pins under App's masthead + section
-     nav (--stick-top), with zero-blur shadows extending its background over the
+  /* Same sticky bar as the other sections: pins under App's content-pane top
+     bar (--stick-top), with zero-blur shadows extending its background over the
      gaps above and below so cards passing underneath don't show through. */
   .subtabs {
     display: flex; gap: 0.4rem; flex-wrap: wrap;

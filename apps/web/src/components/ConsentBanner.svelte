@@ -42,7 +42,9 @@
 
 <style>
   .consent {
-    position: fixed; left: 1rem; right: 1rem; bottom: 1rem; z-index: 50;
+    /* bottom clears the mobile bottom nav bar (App.svelte) rather than sitting under it. */
+    position: fixed; left: 1rem; right: 1rem;
+    bottom: calc(1rem + var(--bottom-nav-h, 0px)); z-index: 50;
     max-width: 640px; margin: 0 auto;
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
     padding: 0.9rem 1.1rem; border-radius: var(--radius);

@@ -49,7 +49,8 @@
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 1rem;
+    /* Clears the mobile bottom nav bar (App.svelte) rather than sitting under it. */
+    bottom: calc(1rem + var(--bottom-nav-h, 0px));
     z-index: 40;
     width: min(560px, calc(100vw - 2rem));
     display: flex;
