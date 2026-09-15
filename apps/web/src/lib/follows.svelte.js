@@ -11,8 +11,8 @@
 import { loadUnfollowed, saveUnfollowed } from "./prefs.js";
 
 export const follows = $state({
-  /** { news: string[], video: string[] } — sources switched OFF. */
-  unfollowed: { news: [], video: [] },
+  /** { news, video, story, knowledge: string[] } — sources switched OFF. */
+  unfollowed: { news: [], video: [], story: [], knowledge: [] },
   loading: false,
   error: null,
 });
@@ -29,7 +29,7 @@ export async function initFollows(userId) {
   } catch (e) {
     // Failing open: show everything rather than hiding content because a
     // preference read failed.
-    follows.unfollowed = { news: [], video: [] };
+    follows.unfollowed = { news: [], video: [], story: [], knowledge: [] };
     follows.error = e?.message ?? String(e);
   } finally {
     follows.loading = false;
@@ -38,7 +38,7 @@ export async function initFollows(userId) {
 
 export function resetFollows() {
   uid = null;
-  follows.unfollowed = { news: [], video: [] };
+  follows.unfollowed = { news: [], video: [], story: [], knowledge: [] };
   follows.loading = false;
   follows.error = null;
 }
@@ -47,8 +47,9 @@ export function resetFollows() {
  * Is this source shown? True unless it was explicitly switched off, so an
  * unknown or brand-new source is followed by default.
  *
- * @param {"news"|"video"} kind
- * @param {string} name  feed_source (news) or channel (video)
+ * @param {"news"|"video"|"story"|"knowledge"} kind
+ * @param {string} name  feed_source (news/knowledge), channel (video), or a
+ *   publication name from a story's `sources` array (story)
  */
 export function isFollowed(kind, name) {
   return !(follows.unfollowed[kind] ?? []).includes(name);

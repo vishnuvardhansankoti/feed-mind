@@ -7,6 +7,7 @@
   // NewsFeed's `days`/`shownDays`. Both countries are fetched eagerly, so
   // switching any of the three tabs is a client-side re-slice, not a fetch.
   import { STORY_CATEGORIES, NEWS_COUNTRIES } from "../lib/constants.js";
+  import { isFollowed } from "../lib/follows.svelte.js";
   import StoryCard from "./StoryCard.svelte";
   import ListenAllButton from "./ListenAllButton.svelte";
   import { tracksFrom } from "../lib/playlists.js";
@@ -22,7 +23,16 @@
   });
 
   let inCountry = $derived(stories[country] ?? {});
-  let inCat = $derived(inCountry[cat] ?? []);
+  // A story clusters several publications' coverage (`sources`), so
+  // unfollowing one of them should not hide a story other followed sources
+  // still contributed to — only hide it once every one of its sources is off
+  // (a story with no `sources` at all stays visible, same as everywhere else
+  // in this app: unknown defaults to followed).
+  let inCat = $derived(
+    (inCountry[cat] ?? []).filter(
+      (s) => !s.sources?.length || s.sources.some((src) => isFollowed("story", src)),
+    ),
+  );
   let catLabel = $derived(STORY_CATEGORIES.find((c) => c.code === cat)?.label ?? "");
   let countryLabel = $derived(NEWS_COUNTRIES.find((c) => c.code === country)?.label ?? "");
 

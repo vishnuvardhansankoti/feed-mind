@@ -5,10 +5,11 @@
   // established convention is duplicating this shape per section rather than
   // generalizing it (see NewsFeed/StoriesFeed/VideoFeed). All slicing is
   // client-side over the single `articles` list handed in by App (newest
-  // first). No follow/unfollow here, unlike News — Knowledge Bytes has only
-  // two sources total (one per series), so per-source muting would just be a
-  // second way to hide a whole tab.
+  // first). Source follow/unfollow lives in SettingsSheet, same "kind" scheme
+  // as News/Videos/Stories — muting a series' feed_source here just hides that
+  // tab's items, which today means the whole tab, since each series has one.
   import { KNOWLEDGE_CATEGORIES } from "../lib/constants.js";
+  import { isFollowed } from "../lib/follows.svelte.js";
   import ArticleCard from "./ArticleCard.svelte";
   import ListenAllButton from "./ListenAllButton.svelte";
   import { tracksFrom } from "../lib/playlists.js";
@@ -22,7 +23,9 @@
     weekday: "short", month: "short", day: "numeric",
   });
 
-  let inCat = $derived(articles.filter((a) => a.feed_category === cat));
+  let inCat = $derived(
+    articles.filter((a) => a.feed_category === cat && isFollowed("knowledge", a.feed_source)),
+  );
 
   // Group into calendar-day buckets, preserving newest-first order.
   let days = $derived.by(() => {

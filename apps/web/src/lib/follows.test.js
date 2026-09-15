@@ -50,6 +50,13 @@ describe("toggleFollow", () => {
     expect(isFollowed("video", "Shared Name")).toBe(true);
   });
 
+  it("keeps story and knowledge preferences independent of news/video", async () => {
+    await initFollows(UID);
+    await toggleFollow("story", "Shared Name");
+    expect(isFollowed("news", "Shared Name")).toBe(true);
+    expect(isFollowed("knowledge", "Shared Name")).toBe(true);
+  });
+
   it("persists across a reload", async () => {
     await initFollows(UID);
     await toggleFollow("video", "Some Channel");
@@ -112,19 +119,23 @@ describe("initFollows", () => {
     await toggleFollow("news", "Hidden");
     resetFollows();
     expect(isFollowed("news", "Hidden")).toBe(true);
-    expect(follows.unfollowed).toEqual({ news: [], video: [] });
+    expect(follows.unfollowed).toEqual({ news: [], video: [], story: [], knowledge: [] });
   });
 });
 
 describe("prefs storage shape", () => {
-  it("round-trips both kinds", async () => {
-    await saveUnfollowed(UID, { news: ["A"], video: ["B"] });
-    expect(await loadUnfollowed(UID)).toEqual({ news: ["A"], video: ["B"] });
+  it("round-trips all four kinds", async () => {
+    await saveUnfollowed(UID, { news: ["A"], video: ["B"], story: ["C"], knowledge: ["D"] });
+    expect(await loadUnfollowed(UID)).toEqual({
+      news: ["A"], video: ["B"], story: ["C"], knowledge: ["D"],
+    });
   });
 
   it("defaults missing kinds to empty rather than undefined", async () => {
     await saveUnfollowed(UID, { news: ["A"] });
-    expect(await loadUnfollowed(UID)).toEqual({ news: ["A"], video: [] });
+    expect(await loadUnfollowed(UID)).toEqual({
+      news: ["A"], video: [], story: [], knowledge: [],
+    });
   });
 
   it("de-duplicates before writing", async () => {
@@ -133,6 +144,8 @@ describe("prefs storage shape", () => {
   });
 
   it("is empty for a user with no stored preferences", async () => {
-    expect(await loadUnfollowed("nobody")).toEqual({ news: [], video: [] });
+    expect(await loadUnfollowed("nobody")).toEqual({
+      news: [], video: [], story: [], knowledge: [],
+    });
   });
 });

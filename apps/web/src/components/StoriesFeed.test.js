@@ -2,9 +2,10 @@
 // slices the already-nested {country: {category: cards}} prop client-side —
 // no re-fetch on toggle. These pin the toggling contract and the country
 // isolation it exists for.
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import StoriesFeed from "./StoriesFeed.svelte";
+import { initFollows, resetFollows, toggleFollow } from "../lib/follows.svelte.js";
 
 const story = (id, overrides = {}) => ({
   story_id: id,
@@ -103,5 +104,39 @@ describe("StoriesFeed — Latest/Archive window", () => {
     await clickTab("Archive · 3 days");
     await clickTab("Latest");
     expect(screen.queryByRole("link", { name: "Title in-b-old" })).toBeNull();
+  });
+});
+
+describe("StoriesFeed — source follow/unfollow", () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    resetFollows();
+    await initFollows("u1");
+  });
+  afterEach(() => resetFollows());
+
+  it("hides a story once every one of its sources is unfollowed", async () => {
+    const multiSource = {
+      IN: { politics: [], global: [], sports: [], culture: [],
+        business: [story("in-both", { sources: ["Economic Times", "Business Standard"] })] },
+      US: { politics: [], global: [], business: [], sports: [], culture: [] },
+    };
+    await toggleFollow("story", "Economic Times");
+    await toggleFollow("story", "Business Standard");
+    render(StoriesFeed, { stories: multiSource });
+    await clickTab("Business");
+    expect(screen.queryByRole("link", { name: "Title in-both" })).toBeNull();
+  });
+
+  it("keeps a story visible while at least one of its sources is followed", async () => {
+    const multiSource = {
+      IN: { politics: [], global: [], sports: [], culture: [],
+        business: [story("in-both", { sources: ["Economic Times", "Business Standard"] })] },
+      US: { politics: [], global: [], business: [], sports: [], culture: [] },
+    };
+    await toggleFollow("story", "Economic Times");
+    render(StoriesFeed, { stories: multiSource });
+    await clickTab("Business");
+    expect(screen.getByRole("link", { name: "Title in-both" })).toBeInTheDocument();
   });
 });

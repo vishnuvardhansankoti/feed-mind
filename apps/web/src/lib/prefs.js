@@ -139,7 +139,8 @@ export async function removeBookmark(uid, id) {
 }
 
 /**
- * Which sources the user has switched OFF, as `{ news: [...], video: [...] }`.
+ * Which sources the user has switched OFF, as
+ * `{ news, video, story, knowledge: [...] }`.
  *
  * Stored as the *unfollowed* set rather than the followed one, which is the
  * whole trick: the source catalog is not ours — it lives in feed-mind's
@@ -152,7 +153,12 @@ export async function removeBookmark(uid, id) {
  */
 export async function loadUnfollowed(uid) {
   const raw = isMock ? mockReadUnfollowed(uid) : await firestoreReadUnfollowed(uid);
-  return { news: raw?.news ?? [], video: raw?.video ?? [] };
+  return {
+    news: raw?.news ?? [],
+    video: raw?.video ?? [],
+    story: raw?.story ?? [],
+    knowledge: raw?.knowledge ?? [],
+  };
 }
 
 /** Persist the unfollowed set. Returns what was written. */
@@ -160,6 +166,8 @@ export async function saveUnfollowed(uid, unfollowed) {
   const clean = {
     news: [...new Set(unfollowed.news ?? [])].map(str),
     video: [...new Set(unfollowed.video ?? [])].map(str),
+    story: [...new Set(unfollowed.story ?? [])].map(str),
+    knowledge: [...new Set(unfollowed.knowledge ?? [])].map(str),
   };
   if (isMock) mockWriteUnfollowed(uid, clean);
   else await firestoreWriteUnfollowed(uid, clean);

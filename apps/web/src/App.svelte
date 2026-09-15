@@ -236,11 +236,11 @@
   $effect(() => { if (page === "stories") loadStories(); });
   $effect(() => { if (page === "knowledge") loadKnowledge(); });
 
-  // The settings sheet lists sources derived from the loaded documents, so both
-  // lazy sections have to be fetched before it can show a complete list —
+  // The settings sheet lists sources derived from the loaded documents, so all
+  // four lazy sections have to be fetched before it can show a complete list —
   // otherwise a user who never opened Videos would see no channels to manage.
   $effect(() => {
-    if (settingsUi.open) { loadNews(); loadVideos(); }
+    if (settingsUi.open) { loadNews(); loadVideos(); loadStories(); loadKnowledge(); }
   });
 
   // The element whose text the global search scans, and a key that changes
@@ -439,7 +439,12 @@
 <ConsentBanner />
 
 {#if settingsUi.open && session.status === "in"}
-  <SettingsSheet articles={news?.articles ?? []} videos={videos?.videos ?? []} />
+  <SettingsSheet
+    articles={news?.articles ?? []}
+    videos={videos?.videos ?? []}
+    stories={stories?.stories ?? {}}
+    knowledgeArticles={knowledge?.articles ?? []}
+  />
 {/if}
 
 <style>

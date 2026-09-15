@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import KnowledgeFeed from "./KnowledgeFeed.svelte";
 import { KNOWLEDGE_CATEGORIES } from "../lib/constants.js";
+import { initFollows, resetFollows, toggleFollow } from "../lib/follows.svelte.js";
 
 // Pin the clock: the day-bucket headers and "Latest" both key off calendar days.
 const NOW = new Date(2026, 8, 14, 10, 0, 0);
@@ -109,5 +110,27 @@ describe("KnowledgeFeed — series filtering", () => {
       articles: [lesson("aiml1", "aiml", 1, { summary: "Real florilex description text." })],
     });
     expect(screen.getByText("Real florilex description text.")).toBeVisible();
+  });
+});
+
+describe("KnowledgeFeed — source follow/unfollow", () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    resetFollows();
+    await initFollows("u1");
+  });
+  afterEach(() => resetFollows());
+
+  it("hides a series' lessons once its source is unfollowed", async () => {
+    await toggleFollow("knowledge", "aiml source");
+    render(KnowledgeFeed, { articles: [lesson("aiml1", "aiml")] });
+    expect(titles()).not.toContain("Lesson aiml1");
+  });
+
+  it("leaves the other series' lessons alone", async () => {
+    await toggleFollow("knowledge", "aiml source");
+    render(KnowledgeFeed, { articles: [lesson("dsa1", "dsa")] });
+    await clickTab("DSA");
+    expect(titles()).toContain("Lesson dsa1");
   });
 });

@@ -1,5 +1,9 @@
 <script>
-  // Follow / unfollow the sources behind the News and Videos sections.
+  // Follow / unfollow the sources behind the News (tech blogs), Videos,
+  // Stories (curated India/US news) and Knowledge Bytes sections. Same
+  // relabeling as App.svelte's NAV: this file's "news"/"story" kinds are the
+  // internal ids, but the headings below show the user-facing labels — "AI
+  // Cloud Blogs" for news, "News" for stories.
   //
   // The catalog is DERIVED from the documents already loaded, not hardcoded:
   // the real list lives in feed-mind's config.py, in another repo, and a copy
@@ -10,18 +14,32 @@
   import { session } from "../lib/session.svelte.js";
   import { enablePush, disablePush, isSubscribed, pushUnavailableReason } from "../lib/push.js";
 
-  let { articles = [], videos = [] } = $props();
+  // stories is the {country: {category: Story[]}} shape App hands to
+  // StoriesFeed — a Story names its contributing publications in `sources`
+  // (a cluster can have several), so the catalog here is every distinct name
+  // across every country and category, not one field on one doc.
+  let { articles = [], videos = [], stories = {}, knowledgeArticles = [] } = $props();
 
   const distinct = (items, field) =>
     [...new Set(items.map((i) => i[field]).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b),
     );
 
+  const distinctValues = (values) =>
+    [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
   let newsSources = $derived(distinct(articles, "feed_source"));
   let videoChannels = $derived(distinct(videos, "channel"));
+  let allStories = $derived(Object.values(stories).flatMap((byCat) => Object.values(byCat).flat()));
+  let storySources = $derived(distinctValues(allStories.flatMap((s) => s.sources ?? [])));
+  let knowledgeSources = $derived(distinct(knowledgeArticles, "feed_source"));
 
   let hiddenNews = $derived(newsSources.filter((s) => !isFollowed("news", s)).length);
   let hiddenVideos = $derived(videoChannels.filter((c) => !isFollowed("video", c)).length);
+  let hiddenStories = $derived(storySources.filter((s) => !isFollowed("story", s)).length);
+  let hiddenKnowledge = $derived(
+    knowledgeSources.filter((s) => !isFollowed("knowledge", s)).length,
+  );
 
   // --- notifications -------------------------------------------------------
   // The toggle must run from the click itself: every browser rejects a
@@ -115,7 +133,7 @@
 
   <section>
     <div class="head">
-      <h3>News <span class="n">({newsSources.length})</span></h3>
+      <h3>AI Cloud Blogs <span class="n">({newsSources.length})</span></h3>
       {#if hiddenNews}
         <button type="button" class="all" onclick={() => followAll("news", newsSources)}>
           Show all
@@ -134,7 +152,7 @@
         </label>
       {/each}
     {:else}
-      <p class="empty">No news sources loaded yet.</p>
+      <p class="empty">No AI Cloud Blogs sources loaded yet.</p>
     {/if}
   </section>
 
@@ -160,6 +178,56 @@
       {/each}
     {:else}
       <p class="empty">No channels loaded yet.</p>
+    {/if}
+  </section>
+
+  <section>
+    <div class="head">
+      <h3>News <span class="n">({storySources.length})</span></h3>
+      {#if hiddenStories}
+        <button type="button" class="all" onclick={() => followAll("story", storySources)}>
+          Show all
+        </button>
+      {/if}
+    </div>
+    {#if storySources.length}
+      {#each storySources as source (source)}
+        <label class="row">
+          <input
+            type="checkbox"
+            checked={isFollowed("story", source)}
+            onchange={() => toggleFollow("story", source)}
+          />
+          <span>{source}</span>
+        </label>
+      {/each}
+    {:else}
+      <p class="empty">No News sources loaded yet.</p>
+    {/if}
+  </section>
+
+  <section>
+    <div class="head">
+      <h3>Knowledge Bytes <span class="n">({knowledgeSources.length})</span></h3>
+      {#if hiddenKnowledge}
+        <button type="button" class="all" onclick={() => followAll("knowledge", knowledgeSources)}>
+          Show all
+        </button>
+      {/if}
+    </div>
+    {#if knowledgeSources.length}
+      {#each knowledgeSources as source (source)}
+        <label class="row">
+          <input
+            type="checkbox"
+            checked={isFollowed("knowledge", source)}
+            onchange={() => toggleFollow("knowledge", source)}
+          />
+          <span>{source}</span>
+        </label>
+      {/each}
+    {:else}
+      <p class="empty">No Knowledge Bytes sources loaded yet.</p>
     {/if}
   </section>
 </div>
