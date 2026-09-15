@@ -73,8 +73,9 @@ old rows expire.
                     ┌── news.yaml            -> telegram_status=pending
                     ├── youtube.yaml         -> youtube_videos
 Scheduler ─08:00─▶ ingest
-                    └── knowledge_bytes.yaml -> processed_articles (aiml/dsa,
-                                                 from the florilex repo's RSS)
+                    └── knowledge_bytes.yaml -> processed_articles (aiml/dsa/
+                                                 system_design, from the
+                                                 florilex repo's RSS)
                           │
                           │ once, after every group
                           ├──▶ feedmind-telegram-ready ──▶ telegram-notifier

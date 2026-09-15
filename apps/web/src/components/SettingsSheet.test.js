@@ -33,6 +33,7 @@ const stories = {
 const knowledgeArticles = [
   { article_id: "k1", feed_source: "AI Engineering from Scratch" },
   { article_id: "k2", feed_source: "DSA from Scratch" },
+  { article_id: "k3", feed_source: "System Design from Scratch" },
 ];
 
 beforeEach(async () => {
@@ -72,9 +73,10 @@ describe("SettingsSheet", () => {
 
   it("lists the Knowledge Bytes series as sources", () => {
     render(SettingsSheet, { articles, videos, knowledgeArticles });
-    expect(screen.getByRole("heading", { name: "Knowledge Bytes (2)" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Knowledge Bytes (3)" })).toBeVisible();
     expect(screen.getByLabelText("AI Engineering from Scratch")).toBeVisible();
     expect(screen.getByLabelText("DSA from Scratch")).toBeVisible();
+    expect(screen.getByLabelText("System Design from Scratch")).toBeVisible();
   });
 
   it("unfollows a story source independently of news", async () => {

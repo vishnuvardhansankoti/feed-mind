@@ -18,12 +18,13 @@ from feedmind_core.telegram import _CATEGORY_META
 # Feed categories the web app knows how to render. Duplicated across two
 # independent tab lists — apps/web/src/lib/constants.js::NEWS_CATEGORIES
 # (academic/industry/cloud/open-source/top_stories) and ::KNOWLEDGE_CATEGORIES
-# (aiml/dsa) — which key their tabs off these same strings, including the
-# inconsistent separators (open-source hyphenates, top_stories underscores),
-# preserved exactly on both sides. The reader matches with ===, so a "tidied"
-# separator empties a tab silently.
+# (aiml/dsa/system_design) — which key their tabs off these same strings,
+# including the inconsistent separators (open-source hyphenates, top_stories
+# and system_design underscore), preserved exactly on both sides. The reader
+# matches with ===, so a "tidied" separator empties a tab silently.
 KNOWN_CATEGORIES = {
-    "academic", "industry", "cloud", "open-source", "top_stories", "aiml", "dsa",
+    "academic", "industry", "cloud", "open-source", "top_stories",
+    "aiml", "dsa", "system_design",
 }
 
 SERVICES_DIR = Path(__file__).resolve().parents[3] / "services"
@@ -67,7 +68,7 @@ def test_every_category_has_telegram_header_metadata(path):
     Legible, but not the wording anyone intended — and easy to miss, since it
     renders fine. Scoped to groups that actually reach Telegram
     (`deliver_telegram: true`) — a category from a web-app-only group (e.g.
-    knowledge_bytes.yaml's aiml/dsa) never renders into a digest header at
+    knowledge_bytes.yaml's aiml/dsa/system_design) never renders into a digest header at
     all, so requiring metadata for it here would just be dead configuration.
     """
     cfg = serviceconfig.load(path)

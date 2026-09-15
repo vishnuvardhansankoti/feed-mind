@@ -57,6 +57,17 @@ describe("KnowledgeFeed — series tabs", () => {
     expect(titles()).toContain("Lesson a");
     expect(titles()).not.toContain("Lesson d");
   });
+
+  it("shows System Design lessons under their own tab", async () => {
+    render(KnowledgeFeed, {
+      articles: [lesson("a", "aiml"), lesson("sd", "system_design")],
+    });
+    expect(titles()).not.toContain("Lesson sd");
+
+    await clickTab("System Design");
+    expect(titles()).toContain("Lesson sd");
+    expect(titles()).not.toContain("Lesson a");
+  });
 });
 
 describe("KnowledgeFeed — series filtering", () => {

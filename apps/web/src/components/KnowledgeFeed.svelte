@@ -1,13 +1,14 @@
 <script>
   // Knowledge Bytes section: Latest (newest day that has articles) + Archive
-  // (whole window), each split by series tab (AI/ML, DSA). Structurally a copy
-  // of NewsFeed.svelte's Latest/Archive + category-tab pattern — this repo's
-  // established convention is duplicating this shape per section rather than
-  // generalizing it (see NewsFeed/StoriesFeed/VideoFeed). All slicing is
-  // client-side over the single `articles` list handed in by App (newest
-  // first). Source follow/unfollow lives in SettingsSheet, same "kind" scheme
-  // as News/Videos/Stories — muting a series' feed_source here just hides that
-  // tab's items, which today means the whole tab, since each series has one.
+  // (whole window), each split by series tab (AI/ML, DSA, System Design).
+  // Structurally a copy of NewsFeed.svelte's Latest/Archive + category-tab
+  // pattern — this repo's established convention is duplicating this shape
+  // per section rather than generalizing it (see NewsFeed/StoriesFeed/
+  // VideoFeed). All slicing is client-side over the single `articles` list
+  // handed in by App (newest first). Source follow/unfollow lives in
+  // SettingsSheet, same "kind" scheme as News/Videos/Stories — muting a
+  // series' feed_source here hides that series' items within a tab, same as
+  // everywhere else, now that each series has its own `category` too.
   import { KNOWLEDGE_CATEGORIES } from "../lib/constants.js";
   import { isFollowed } from "../lib/follows.svelte.js";
   import ArticleCard from "./ArticleCard.svelte";

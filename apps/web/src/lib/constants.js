@@ -74,6 +74,7 @@ export const NEWS_MAX_ARTICLES = 200;
 export const KNOWLEDGE_CATEGORIES = [
   { code: "aiml", label: "AI/ML" },
   { code: "dsa", label: "DSA" },
+  { code: "system_design", label: "System Design" },
 ];
 
 export const KNOWLEDGE_CATEGORY_CODES = KNOWLEDGE_CATEGORIES.map((c) => c.code);

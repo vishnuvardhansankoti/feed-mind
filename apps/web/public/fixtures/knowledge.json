@@ -37,5 +37,18 @@
     "status": "stored",
     "ai_summary": "",
     "audio_url": ""
+  },
+  {
+    "article_id": "k-system-design-01",
+    "url": "https://florilex.web.app/system-design/phases/00-foundations/01-scaling-a-single-server/",
+    "title": "Scaling a Single Server",
+    "feed_source": "System Design from Scratch",
+    "feed_category": "system_design",
+    "summary": "This lesson starts from the smallest possible system — one server, one database, no cache — and walks through the sequence of bottlenecks that force it to change: CPU and memory limits, then disk I/O, then the point where vertical scaling stops being cost-effective. It introduces the vocabulary the rest of the series builds on — throughput, latency, availability — and the core tradeoff between scaling up and scaling out.",
+    "published_at": "2026-09-14T00:00:00+00:00",
+    "processed_at": "2026-09-14T08:00:00+00:00",
+    "status": "stored",
+    "ai_summary": "",
+    "audio_url": ""
   }
 ]

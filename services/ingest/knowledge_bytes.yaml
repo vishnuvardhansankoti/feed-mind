@@ -26,3 +26,6 @@ feeds:
   - name: DSA from Scratch
     url: https://florilex.web.app/dsa/rss.xml
     category: dsa
+  - name: System Design from Scratch
+    url: https://florilex.web.app/system-design/rss.xml
+    category: system_design

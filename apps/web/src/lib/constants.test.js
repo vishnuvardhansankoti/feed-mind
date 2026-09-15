@@ -128,7 +128,7 @@ describe("story categories", () => {
 
 describe("knowledge categories", () => {
   it("matches services/ingest/knowledge_bytes.yaml's category values", () => {
-    expect(KNOWLEDGE_CATEGORY_CODES).toEqual(["aiml", "dsa"]);
+    expect(KNOWLEDGE_CATEGORY_CODES).toEqual(["aiml", "dsa", "system_design"]);
   });
 
   it("opens on AI/ML, so a new category cannot hijack the landing tab", () => {
