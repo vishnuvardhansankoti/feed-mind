@@ -37,7 +37,13 @@ service cloud.firestore {
           && request.auth.uid == uid
           && request.auth.token.email_verified == true
           && request.auth.token.email in [
-            'shankotai@gmail.com'
+            'shankotai@gmail.com',
+            'jayavardhans@gmail.com',
+            'harini.shankotai@gmail.com',
+            'gveswar@gmail.com',
+            'kavitha.sivaram@gmail.com',
+            'srikutty1803@gmail.com',
+            'sathish1.ks@gmail.com'
           ];
       }
       // Bookmarks are capped at 5 and stored as an array on this one document,
