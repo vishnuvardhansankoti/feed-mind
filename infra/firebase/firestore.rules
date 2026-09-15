@@ -46,13 +46,14 @@ service cloud.firestore {
             'sathish1.ks@gmail.com'
           ];
       }
-      // Bookmarks are capped at 5 and stored as an array on this one document,
-      // which is what makes the cap enforceable here at all — rules cannot
-      // count the documents in a subcollection.
+      // Bookmarks are capped at 10 (apps/web/src/lib/constants.js::BOOKMARK_LIMIT)
+      // and stored as an array on this one document, which is what makes the
+      // cap enforceable here at all — rules cannot count the documents in a
+      // subcollection.
       function withinLimits() {
         return !('bookmarks' in request.resource.data)
           || (request.resource.data.bookmarks is list
-              && request.resource.data.bookmarks.size() <= 5);
+              && request.resource.data.bookmarks.size() <= 10);
       }
       allow read: if allowed();
       allow write: if allowed() && withinLimits();

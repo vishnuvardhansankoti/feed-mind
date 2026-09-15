@@ -166,7 +166,7 @@ export const VIDEO_BATCH_TOLERANCE_HOURS = 6;
 // the documents in a subcollection). Raising it is safe well into the hundreds
 // — a Firestore document holds 1 MiB and a snapshot is a couple of KB — but it
 // must be raised in BOTH places: here and in the rules.
-export const BOOKMARK_LIMIT = 5;
+export const BOOKMARK_LIMIT = 10;
 
 // The saved item's `type`, which decides how the Saved view renders it and how
 // its id is namespaced (see prefs.js::bookmarkIdFor).
