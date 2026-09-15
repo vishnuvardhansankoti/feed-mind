@@ -2,7 +2,7 @@
 // Exercises the default "mock" data source (VITE_DATA_SOURCE unset) by stubbing
 // global fetch, so no fixtures on disk and no Firestore are required.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getLatest, getArchive, getStatus, getNews, getVideos, getStories } from "./data.js";
+import { getLatest, getArchive, getStatus, getNews, getVideos, getStories, getKnowledgeBytes } from "./data.js";
 import { STATIC_NEWS_LINKS, VIDEO_MAX_ITEMS } from "./constants.js";
 
 const MANIFEST = {
@@ -518,7 +518,7 @@ describe("getStories", () => {
     expect(stories.IN.business.map((s) => s.story_id)).toEqual(["b1", "b2"]);
   });
 
-  it("keeps only the newest run_date per (country, category) pair", async () => {
+  it("keeps every run_date in the window, newest first — StoriesFeed slices Latest/Archive", async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => [
@@ -527,7 +527,7 @@ describe("getStories", () => {
       ],
     }));
     const { stories } = await getStories();
-    expect(stories.IN.business.map((s) => s.story_id)).toEqual(["new"]);
+    expect(stories.IN.business.map((s) => s.story_id)).toEqual(["new", "old"]);
   });
 
   it("flattens canonical.title up to a top-level title for playlists.tracksFrom", async () => {
@@ -544,5 +544,60 @@ describe("getStories", () => {
     const { stories } = await getStories();
     expect(stories.IN.business[0].ai_summary).toBe("");
     expect(stories.IN.business[0].audio_url).toBe("");
+  });
+});
+
+describe("getKnowledgeBytes", () => {
+  const lesson = (id, overrides = {}) => ({
+    article_id: id,
+    url: `https://florilex.web.app/aiml/phases/00/${id}/`,
+    title: `Lesson ${id}`,
+    feed_source: "AI Engineering from Scratch",
+    feed_category: "aiml",
+    // summarize: none means this is the RSS feed's own description, not an
+    // empty string — see packages/feedmind-core/feedmind_core/runner.py.
+    summary: `Summary text for ${id}.`,
+    processed_at: "2026-09-14T08:00:00+00:00",
+    ...overrides,
+  });
+
+  it("returns an empty list when the fixture is missing", async () => {
+    global.fetch = vi.fn(async () => ({ ok: false }));
+    expect(await getKnowledgeBytes()).toEqual({ articles: [] });
+  });
+
+  it("normalizes and carries the feed's own summary through untouched", async () => {
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => [lesson("a")] }));
+    const { articles } = await getKnowledgeBytes();
+    expect(articles[0].summary).toBe("Summary text for a.");
+    expect(articles[0].feed_category).toBe("aiml");
+  });
+
+  it("degrades ai_summary/audio_url to empty on a lesson with neither yet", async () => {
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => [lesson("a")] }));
+    const { articles } = await getKnowledgeBytes();
+    expect(articles[0].ai_summary).toBe("");
+    expect(articles[0].audio_url).toBe("");
+  });
+
+  it("sorts newest-first by processed_at, across both series", async () => {
+    const docs = [
+      lesson("mid", { processed_at: "2026-09-10T08:00:00+00:00" }),
+      lesson("old-dsa", { feed_category: "dsa", processed_at: "2026-09-08T08:00:00+00:00" }),
+      lesson("new", { processed_at: "2026-09-14T08:00:00+00:00" }),
+    ];
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => docs }));
+    const { articles } = await getKnowledgeBytes();
+    expect(articles.map((a) => a.article_id)).toEqual(["new", "mid", "old-dsa"]);
+  });
+
+  it("does not mutate the fetched array while sorting", async () => {
+    const docs = [
+      lesson("a", { processed_at: "2026-09-08T00:00:00+00:00" }),
+      lesson("b", { processed_at: "2026-09-14T00:00:00+00:00" }),
+    ];
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => docs }));
+    await getKnowledgeBytes();
+    expect(docs.map((a) => a.article_id)).toEqual(["a", "b"]);
   });
 });

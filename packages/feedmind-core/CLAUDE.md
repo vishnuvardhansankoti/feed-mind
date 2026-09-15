@@ -28,7 +28,7 @@ code change — which is the whole reason this package exists.
 | `archival.py` | Firestore doc → BigQuery row; pure transforms |
 | `bigquery.py` | archive dataset/table creation, load and MERGE |
 
-## Three things that will bite you
+## Four things that will bite you
 
 **1. `models.py` must not import anything outside the standard library, and
 lazy imports in `runner.py` must stay lazy.** Both exist to make the per-service
@@ -54,6 +54,21 @@ which is what makes a dropped message cost a delay instead of articles.
 `order_by`** — Firestore indexes single fields automatically, but ordering on a
 different field needs a composite index deployed before the notifier could run
 at all. Sorting happens in Python.
+
+**4. `summarize: none` means "use the feed's own text as the summary," not "no
+summary."** `runner.py::_summarize`'s `SUMMARIZE_NONE` branch returns
+`article.snippet` (the RSS `<description>`/`<summary>` already fetched), which
+`store.py::save_article` writes to the `summary` field — the one field
+`ArticleCard.svelte` actually renders. It used to return `""`, discarding that
+text into `snippet` instead, a field nothing in this pipeline reads back (see
+`store.py::save_article`'s own docstring). This only changes visible behavior
+for a caller whose articles are shown via `summary` directly:
+`services/ingest/knowledge_bytes.yaml` (florilex tutorial RSS, where the
+description genuinely is a hand-written summary) is the reason this changed.
+`youtube.yaml` never calls `_summarize` at all, and
+`services/india-news-ingest`'s articles are excluded from the web reader's
+`summary` display entirely (routed instead through `services/news-curator`'s
+own `ai_summary`), so both existing `summarize: none` callers are unaffected.
 
 ## Commands
 

@@ -83,7 +83,19 @@ def _init_summarizer(cfg: serviceconfig.ServiceConfig):
 def _summarize(mode, gemini_model, article) -> str | None:
     """Summary for one article, or None if it should be retried next run."""
     if mode == serviceconfig.SUMMARIZE_NONE:
-        return ""
+        # "No summarization step" does not mean "no summary" — it means the
+        # feed's own description is already good enough to skip Sumy/Gemini,
+        # so it becomes `summary` (the field the web app actually renders,
+        # store.py::save_article) directly, rather than being discarded in
+        # favor of `article.snippet`, a field nothing downstream reads back.
+        # Safe for every current summarize:none caller: youtube.yaml never
+        # calls _summarize at all (run_youtube_ingest has no summarizer path),
+        # and services/india-news-ingest's articles are excluded from the web
+        # reader's summary display entirely (curation_status routes them into
+        # services/news-curator's own ai_summary instead) — so this only
+        # changes what actually gets shown for services/ingest's new
+        # knowledge_bytes.yaml group.
+        return article.snippet
     if mode == serviceconfig.SUMMARIZE_GEMINI:
         from feedmind_core.summarization import summarize
 

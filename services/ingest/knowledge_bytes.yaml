@@ -1,0 +1,28 @@
+# One of three feed groups ingested by feedmind-ingest. Sources are the
+# tutorial-series RSS feeds published by the sibling `florilex` repo
+# (https://florilex.web.app/<series>/rss.xml) — each item's <description> is
+# already the lesson's own hand-written summary, so `summarize: none` is not
+# just a cost optimization here the way it is for youtube.yaml: there is
+# nothing to summarize. `content_ready: true` still wakes feed-mind-summarizer,
+# which generates the audio version from that same description text — these
+# articles carry no `curation_status`, so they flow through summarizer's
+# default RSS_FEED pipeline exactly like news.yaml's articles, no summarizer
+# changes needed. Never sent to Telegram: this is web-app-only content.
+#
+# Each florilex series feed exposes only its 2 most-recently-published lessons
+# (not a rolling time window), so most days this group finds nothing new —
+# that is expected, not a misconfiguration.
+
+service: knowledge_bytes
+kind: rss
+summarize: none
+deliver_telegram: false
+content_ready: true
+
+feeds:
+  - name: AI Engineering from Scratch
+    url: https://florilex.web.app/aiml/rss.xml
+    category: aiml
+  - name: DSA from Scratch
+    url: https://florilex.web.app/dsa/rss.xml
+    category: dsa

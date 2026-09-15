@@ -16,7 +16,11 @@ import {
   VIDEO_MAX_ITEMS,
   STORY_CATEGORY_CODES,
   STORY_MAX_PER_CATEGORY,
+  STORY_ARCHIVE_WINDOW_DAYS,
   NEWS_COUNTRY_CODES,
+  KNOWLEDGE_CATEGORY_CODES,
+  KNOWLEDGE_WINDOW_DAYS,
+  KNOWLEDGE_MAX_ARTICLES,
 } from "./constants.js";
 
 const SOURCE = import.meta.env.VITE_DATA_SOURCE || "mock";
@@ -50,6 +54,17 @@ export function getNews() {
 }
 
 /**
+ * Last KNOWLEDGE_WINDOW_DAYS of tutorial lessons from `processed_articles`,
+ * newest first — same one-query-backs-both-views shape as getNews(), filtered
+ * to KNOWLEDGE_CATEGORY_CODES so News's and Videos' independent RSS ingests
+ * into this same collection can never leak into this tab (or vice versa).
+ * -> { articles: Article[] }
+ */
+export function getKnowledgeBytes() {
+  return SOURCE === "firestore" ? firestoreKnowledgeBytes() : mockKnowledgeBytes();
+}
+
+/**
  * Last VIDEO_WINDOW_DAYS of YouTube videos from `youtube_videos`, newest first.
  * One read backs both the Videos "Latest" (newest day) and "Archive" (whole
  * window) tabs; the UI slices/groups client-side.
@@ -60,10 +75,13 @@ export function getVideos() {
 }
 
 /**
- * The newest curation run's ranked stories per country per category, from
- * `stories`. Both countries are fetched eagerly (not on toggle) so switching
- * the News tab's country is a client-side re-slice, same as switching a
- * category tab — no loading flicker.
+ * Last STORY_ARCHIVE_WINDOW_DAYS days of curated stories per country per
+ * category, from `stories`, newest first. One read backs both the Stories
+ * "Latest" (newest run_date) and "Archive" (the whole window, grouped by day)
+ * views — same one-query-backs-both-views shape as getNews()/getVideos();
+ * StoriesFeed.svelte slices/groups client-side. Both countries are fetched
+ * eagerly (not on toggle) so switching the News tab's country, category, or
+ * Latest/Archive tab is a client-side re-slice — no loading flicker.
  * -> { stories: { IN: { politics: Story[], ... }, US: { politics: Story[], ... } } }
  */
 export function getStories() {
@@ -141,6 +159,27 @@ async function firestoreNews() {
   return { articles: withPinnedLinks(snap.docs.map((d) => d.data())) };
 }
 
+async function firestoreKnowledgeBytes() {
+  const { collection, query, where, orderBy, limit, getDocs } =
+    await import("firebase/firestore");
+  // Same shape as firestoreNews: the feed_category filter keeps this query
+  // scoped to services/ingest/knowledge_bytes.yaml's two categories, so
+  // News's/Stories' own writes into this same collection can never leak in.
+  // Needs the same composite index as News (feed_category, processed_at) —
+  // Firestore indexes match on field names/order, not on the `in`-list
+  // values, so nothing new to declare in firestore.indexes.json.
+  const cutoff = knowledgeCutoffIso();
+  const q = query(
+    collection(await db(), "processed_articles"),
+    where("feed_category", "in", KNOWLEDGE_CATEGORY_CODES),
+    where("processed_at", ">=", cutoff),
+    orderBy("processed_at", "desc"),
+    limit(KNOWLEDGE_MAX_ARTICLES),
+  );
+  const snap = await getDocs(q);
+  return { articles: snap.docs.map((d) => normalizeArticle(d.data())) };
+}
+
 async function firestoreVideos() {
   const { collection, query, where, orderBy, limit, getDocs } =
     await import("firebase/firestore");
@@ -166,32 +205,36 @@ async function firestoreStories() {
   await Promise.all(NEWS_COUNTRY_CODES.map(async (country) => {
     out[country] = {};
     await Promise.all(STORY_CATEGORY_CODES.map(async (code) => {
-      out[country][code] = await latestStoriesForCategory(country, code);
+      out[country][code] = await storiesForCategory(country, code);
     }));
   }));
   return { stories: out };
 }
 
 // One query per (country, category) pair, same shape as firestoreLatest's
-// per-lens reads. `rank` resets to 1 on every run, so ordering by rank alone
-// across the whole collection would interleave today's stories with every
-// previous day's — the composite index is on
-// (country, coarse_category, run_date desc, rank asc) precisely so a day's
-// ranking is a contiguous prefix of the results. See
-// ../../infra/firebase/firestore.indexes.json and latestRunOnly below.
-async function latestStoriesForCategory(country, code) {
+// per-lens reads, windowed on run_date so one read backs both the Stories
+// "Latest" (newest run_date, client-sliced in StoriesFeed.svelte) and
+// "Archive" (the whole window, grouped by day) views — same one-query-backs-
+// both-views shape as firestoreNews/firestoreVideos. `rank` resets to 1 on
+// every run, so ordering by rank alone across the whole collection would
+// interleave one day's stories with another's; the composite index is on
+// (country, coarse_category, run_date desc, rank asc) precisely so each day's
+// ranking sorts as its own contiguous block. See
+// ../../infra/firebase/firestore.indexes.json.
+async function storiesForCategory(country, code) {
   const { collection, query, where, orderBy, limit, getDocs } =
     await import("firebase/firestore");
   const q = query(
     collection(await db(), "stories"),
     where("country", "==", country),
     where("coarse_category", "==", code),
+    where("run_date", ">=", storiesCutoffDate()),
     orderBy("run_date", "desc"),
     orderBy("rank", "asc"),
     limit(STORY_MAX_PER_CATEGORY),
   );
   const snap = await getDocs(q);
-  return latestRunOnly(snap.docs.map((d) => normalizeStory(d.data())));
+  return snap.docs.map((d) => normalizeStory(d.data()));
 }
 
 // --- Mock source (bundled fixtures) ---------------------------------------
@@ -256,6 +299,25 @@ async function mockNews() {
   return { articles: withPinnedLinks(docs.slice(0, NEWS_MAX_ARTICLES)) };
 }
 
+async function mockKnowledgeBytes() {
+  // fixtures/knowledge.json holds raw article docs (same shape as Firestore),
+  // already only a couple of items — like mockNews, we do NOT apply the window
+  // cutoff to the static fixture, so it doesn't age out and render empty.
+  let docs;
+  try {
+    docs = await fixture("knowledge.json");
+  } catch {
+    return { articles: [] };
+  }
+  return {
+    articles: docs
+      .slice()
+      .sort((a, b) => (b.processed_at ?? "").localeCompare(a.processed_at ?? ""))
+      .slice(0, KNOWLEDGE_MAX_ARTICLES)
+      .map(normalizeArticle),
+  };
+}
+
 async function mockVideos() {
   // fixtures/videos.json holds raw video docs (same shape as Firestore). Like
   // mockNews, we do NOT apply the window cutoff to the static fixture — we only
@@ -272,6 +334,10 @@ async function mockVideos() {
 }
 
 async function mockStories() {
+  // fixtures/stories.json holds raw story docs (same shape as Firestore),
+  // already only a few days deep. Unlike the Firestore path we do NOT apply
+  // the window cutoff here — same reasoning as mockNews/mockVideos: a cutoff
+  // against real "now" would age the static fixture out to empty.
   let docs;
   try {
     docs = await fixture("stories.json");
@@ -285,7 +351,7 @@ async function mockStories() {
       const inCat = docs
         .filter((s) => s.country === country && s.coarse_category === code)
         .map(normalizeStory);
-      out[country][code] = latestRunOnly(sortByRunThenRank(inCat));
+      out[country][code] = sortByRunThenRank(inCat);
     }
   }
   return { stories: out };
@@ -293,24 +359,22 @@ async function mockStories() {
 
 // --- helpers ---------------------------------------------------------------
 
-// run_date desc, then rank asc — matches the Firestore query's ordering so
-// both sources feed latestRunOnly identically. Copies rather than sorting in
-// place.
+// run_date desc, then rank asc — matches the Firestore query's ordering
+// (storiesForCategory), so StoriesFeed.svelte can group both sources into day
+// buckets identically, newest day first. Copies rather than sorting in place.
 function sortByRunThenRank(stories) {
   return [...stories].sort(
     (a, b) => (b.run_date ?? "").localeCompare(a.run_date ?? "") || a.rank - b.rank,
   );
 }
 
-// `stories` must already be sorted by sortByRunThenRank. The newest run_date's
-// entries are a contiguous prefix (see latestStoriesForCategory) — take it and
-// stop. This is the same "the field that means latest can't be filtered on
-// server-side" shape as feedmind_audio.py::collect_articles' processed_date
-// match, just solved client-side here because the browser owns this query.
-function latestRunOnly(stories) {
-  if (!stories.length) return [];
-  const newest = stories[0].run_date;
-  return stories.filter((s) => s.run_date === newest);
+// run_date is a plain "YYYY-MM-DD" string (see the root CLAUDE.md), so a
+// lexicographic >= range is chronological — same trick as newsCutoffIso/
+// videoCutoffIso, just date-only rather than a full timestamp.
+function storiesCutoffDate() {
+  return new Date(Date.now() - (STORY_ARCHIVE_WINDOW_DAYS - 1) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 // rank drives display order; ai_summary/audio_url are only ever populated for
@@ -341,6 +405,10 @@ function newsCutoffIso() {
 
 function videoCutoffIso() {
   return new Date(Date.now() - VIDEO_WINDOW_DAYS * 86_400_000).toISOString();
+}
+
+function knowledgeCutoffIso() {
+  return new Date(Date.now() - KNOWLEDGE_WINDOW_DAYS * 86_400_000).toISOString();
 }
 
 // Merge the reader-pinned static links (e.g. GitHub Trending) into the fetched

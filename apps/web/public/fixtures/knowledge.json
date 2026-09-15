@@ -1,0 +1,41 @@
+[
+  {
+    "article_id": "k-aiml-01",
+    "url": "https://florilex.web.app/aiml/phases/01-math-foundations/01-linear-algebra-intuition/",
+    "title": "Linear Algebra Intuition",
+    "feed_source": "AI Engineering from Scratch",
+    "feed_category": "aiml",
+    "summary": "This lesson builds geometric intuition for the core objects of linear algebra used throughout AI: vectors as arrows with magnitude and direction, and matrices as transformations rather than static grids of numbers. It covers vector addition, the dot product's two equivalent definitions, and how dividing out lengths yields cosine similarity — the same operation that powers transformer attention scores. From there it introduces linear independence, span, and basis, then shows how row reduction reveals a matrix's rank, the count of genuinely independent directions it contains. The lesson closes by connecting rank directly to LoRA, showing how fine-tuning large models can exploit the fact that a weight update rarely needs full rank.",
+    "published_at": "2026-09-14T00:00:00+00:00",
+    "processed_at": "2026-09-14T08:00:00+00:00",
+    "status": "stored",
+    "ai_summary": "A geometric tour of linear algebra's core objects — vectors, dot products, cosine similarity — building up to rank, basis, and why LoRA fine-tuning works: most weight updates don't need full rank.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio/2026-09-14/k-aiml-01.mp3"
+  },
+  {
+    "article_id": "k-aiml-02",
+    "url": "https://florilex.web.app/aiml/phases/01-math-foundations/02-vectors-matrices-operations/",
+    "title": "Vectors, Matrices & Operations",
+    "feed_source": "AI Engineering from Scratch",
+    "feed_category": "aiml",
+    "summary": "This lesson turns the vector intuition from Lesson 01 into the concrete matrix operations that make up a neural network layer. It distinguishes element-wise (Hadamard) multiplication from matrix multiplication — the single most common source of shape bugs in ML code — and covers transpose, the determinant, and when a matrix's inverse exists. Broadcasting is introduced as the rule that lets a single bias vector add cleanly across an entire batch of examples. Everything comes together in a dense layer forward pass, relu(W @ x + b).",
+    "published_at": "2026-09-14T00:00:00+00:00",
+    "processed_at": "2026-09-14T08:00:00+00:00",
+    "status": "stored",
+    "ai_summary": "",
+    "audio_url": ""
+  },
+  {
+    "article_id": "k-dsa-01",
+    "url": "https://florilex.web.app/dsa/phases/00-foundations/01-big-o-notation/",
+    "title": "Big-O Notation: Reading the Growth Curve",
+    "feed_source": "DSA from Scratch",
+    "feed_category": "dsa",
+    "summary": "This lesson introduces Big-O as a tool for predicting whether an algorithm will finish in time, before any code exists to measure. It covers the formal meaning of O, Ω, and Θ, the three rules that simplify almost any bound (drop constants, drop lower-order terms, assume worst case), and why the constant a bound hides can still decide the winner for small inputs. It closes with amortized analysis, using a dynamic array's doubling strategy to show how an occasionally-expensive operation can still average out to O(1).",
+    "published_at": "2026-09-14T00:00:00+00:00",
+    "processed_at": "2026-09-14T08:00:00+00:00",
+    "status": "stored",
+    "ai_summary": "",
+    "audio_url": ""
+  }
+]

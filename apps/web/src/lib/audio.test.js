@@ -14,6 +14,8 @@ import {
   currentTrack,
   claimPlayback,
   clearProblem,
+  pauseQueue,
+  resumeQueue,
 } from "./audio.svelte.js";
 
 const track = (n) => ({ url: `https://storage.googleapis.com/b/${n}.mp3`, title: n, context: "Academic" });
@@ -228,6 +230,75 @@ describe("failure handling", () => {
     await settle();
 
     expect(queue.problem).toBe("");
+  });
+});
+
+describe("pause and resume", () => {
+  it("pauses without losing queue position", async () => {
+    playQueue([track("a"), track("b")], "news");
+    await settle();
+
+    pauseQueue();
+
+    expect(queue.state).toBe("paused");
+    expect(queue.index).toBe(0);
+    expect(el.paused).toBe(true);
+  });
+
+  it("resumes the same track from a pause", async () => {
+    playQueue([track("a"), track("b")], "news");
+    await settle();
+    pauseQueue();
+
+    resumeQueue();
+    await settle();
+
+    expect(queue.state).toBe("playing");
+    expect(queue.index).toBe(0);
+    expect(currentTrack().title).toBe("a");
+  });
+
+  it("ignores a pause request unless the queue is playing", () => {
+    // Idle: nothing to pause.
+    pauseQueue();
+    expect(queue.state).toBe("idle");
+  });
+
+  it("ignores a resume request unless the queue is paused", async () => {
+    playQueue([track("a")], "news");
+    await settle();
+    expect(queue.state).toBe("playing");
+
+    resumeQueue();
+    await settle();
+
+    // Still just playing — resume on an already-playing queue is a no-op,
+    // not a restart from the top.
+    expect(queue.state).toBe("playing");
+  });
+
+  it("is not fooled by advance()'s own internal pause() between tracks", async () => {
+    // advance() calls el.pause() while swapping src before the next track —
+    // that must never be mistaken for a user-requested pause.
+    playQueue([track("a"), track("b")], "news");
+    await settle();
+
+    el.fireEnded();
+    await settle();
+
+    expect(queue.state).toBe("playing");
+    expect(currentTrack().title).toBe("b");
+  });
+
+  it("still stops a paused queue entirely", async () => {
+    playQueue([track("a"), track("b")], "news");
+    await settle();
+    pauseQueue();
+
+    stopQueue();
+
+    expect(queue.state).toBe("idle");
+    expect(queue.tracks).toEqual([]);
   });
 });
 

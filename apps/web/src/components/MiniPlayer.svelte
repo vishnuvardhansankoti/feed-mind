@@ -3,7 +3,7 @@
   // button that started the queue has scrolled away — or after the user has
   // moved to another section entirely, since playback deliberately survives
   // navigation.
-  import { queue, skipTrack, stopQueue, clearProblem } from "../lib/audio.svelte.js";
+  import { queue, skipTrack, stopQueue, pauseQueue, resumeQueue, clearProblem } from "../lib/audio.svelte.js";
 
   let track = $derived(queue.tracks[queue.index] ?? null);
   let position = $derived(`${queue.index + 1} of ${queue.tracks.length}`);
@@ -22,7 +22,12 @@
 
 {#if queue.state !== "idle" && track}
   <div class="mini" role="region" aria-label="Audio queue">
-    <span class="pulse" class:loading={queue.state === "loading"} aria-hidden="true"></span>
+    <span
+      class="pulse"
+      class:loading={queue.state === "loading"}
+      class:paused={queue.state === "paused"}
+      aria-hidden="true"
+    ></span>
 
     <div class="now" aria-live="polite">
       <span class="title">{track.title || "Untitled"}</span>
@@ -30,10 +35,25 @@
         {#if track.context}<span class="ctx">{track.context}</span>{/if}
         <span class="pos">{position}</span>
         {#if queue.state === "loading"}<span class="pos">loading…</span>{/if}
+        {#if queue.state === "paused"}<span class="pos">paused</span>{/if}
       </span>
     </div>
 
     <div class="controls">
+      {#if queue.state === "paused"}
+        <button type="button" onclick={resumeQueue} aria-label="Resume playing">
+          Resume
+        </button>
+      {:else}
+        <button
+          type="button"
+          onclick={pauseQueue}
+          disabled={queue.state === "loading"}
+          aria-label="Pause playing"
+        >
+          Pause
+        </button>
+      {/if}
       <button type="button" onclick={skipTrack} disabled={last} aria-label="Skip to next summary">
         Skip
       </button>
@@ -70,7 +90,7 @@
     border-radius: 50%;
     background: var(--accent);
   }
-  .pulse.loading { opacity: 0.4; }
+  .pulse.loading, .pulse.paused { opacity: 0.4; }
 
   .warn { flex: none; font-size: 0.8rem; }
   .problem .title { color: var(--muted); }

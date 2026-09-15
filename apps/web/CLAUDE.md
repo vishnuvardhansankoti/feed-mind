@@ -17,7 +17,8 @@ of FeedMind's services:
 | Videos | `#/videos` | `youtube_videos` | `services/ingest` (youtube group) |
 | Papers | `#/` | `runs`, `run_status` | `services/paper-prism` |
 | Stories | `#/stories` | `stories` | `services/news-curator` |
-| (all four) | — | `ai_summary`, `audio_url` fields | `services/summarizer` |
+| Knowledge Bytes | `#/knowledge` | `processed_articles` | `services/ingest` (knowledge_bytes group) |
+| (all five) | — | `ai_summary`, `audio_url` fields | `services/summarizer` |
 | Saved / prefs | `#/saved` | `users/{uid}` | this app — the only write path |
 
 ## Web architecture
@@ -61,11 +62,11 @@ Videos with no parseable `processed_at` can't be placed in a batch, so Latest om
 
 **Categories are a second, independent taxonomy.** `constants.js::STORY_CATEGORIES` (politics/global/business/sports/culture) has nothing to do with `NEWS_CATEGORIES` — different collection, different pipeline, and `constants.test.js` asserts the two code sets don't overlap so a stray `===` filter can't silently cross them. Codes must match `services/news-curator/src/news_curator/anchors.py::COARSE_ANCHORS` byte-for-byte, same contract shape as `NEWS_CATEGORIES` ↔ ingest `feeds.yaml`. `BUSINESS_STORY_CATEGORIES` is a pure label lookup for the badge on a business story that has one; eligibility is decided entirely server-side.
 
-**One query per category, not one query for everything.** `firestoreStories` mirrors `firestoreLatest`'s per-lens shape (`Promise.all` over `STORY_CATEGORY_CODES`), each `where(coarse_category==code).orderBy(run_date desc).orderBy(rank asc).limit(STORY_MAX_PER_CATEGORY)` — needs the composite index in `../../infra/firebase/firestore.indexes.json` on exactly those three fields, in that order.
+**One query per category, not one query for everything.** `firestoreStories` mirrors `firestoreLatest`'s per-lens shape (`Promise.all` over `STORY_CATEGORY_CODES`), each `where(coarse_category==code).where(run_date>=cutoff).orderBy(run_date desc).orderBy(rank asc).limit(STORY_MAX_PER_CATEGORY)` — needs the composite index in `../../infra/firebase/firestore.indexes.json` on exactly those three fields (country, coarse_category, run_date, rank), in that order. The `run_date >=` range filter is compatible with that same index without changes, because Firestore only requires the ranged field to be the first `orderBy` after the equality filters, which it already is.
 
-**`rank` resets to 1 every run, so it cannot be ordered on alone.** `services/news-curator` writes a `Story` for *every* cluster in a category, not just the ones selected for summarization, so a busy category can carry 10-20+ ranked docs a day and the same rank number recurs across days. `latestRunOnly` in `data.js` takes the contiguous prefix of the (run_date desc, rank asc)-ordered results that shares the newest `run_date` — the same "the field that means latest can't be filtered on server-side, so take the newest and stop" shape as `services/summarizer/feedmind_audio.py::collect_articles`' `processed_date` match, just solved client-side here because the browser owns the query.
+**`rank` resets to 1 every run, so it cannot be ordered on alone.** `services/news-curator` writes a `Story` for *every* cluster in a category, not just the ones selected for summarization, so a busy category can carry 10-20+ ranked docs a day and the same rank number recurs across days. `StoriesFeed.svelte` groups the (run_date desc, rank asc)-ordered results into day buckets client-side (`days`/`shownDays`, same shape as `NewsFeed`/`VideoFeed`) — the same "the field that means latest can't be filtered on server-side" shape as `services/summarizer/feedmind_audio.py::collect_articles`' `processed_date` match, just solved client-side here because the browser owns the query.
 
-**No Latest/Archive split, unlike News and Videos.** `getStories()` already resolves to "the newest run's ranked cards" — there is no rolling window to slice further. A history view is a natural follow-up (query without the `run_date` filter, group by day) but is not built here.
+**Latest/Archive split, same one-query-backs-both-views shape as News and Videos.** `getStories()` now returns the whole `STORY_ARCHIVE_WINDOW_DAYS` (3) window per (country, category), newest run_date first, instead of pre-slicing to the newest run — `constants.js::STORY_MAX_PER_CATEGORY` is `STORY_MAX_PER_DAY * STORY_ARCHIVE_WINDOW_DAYS`, sized per day and multiplied by the window rather than picked independently. `StoriesFeed.svelte`'s Latest tab takes just the newest day bucket; Archive shows every bucket in the window, with a day-date heading per group like `NewsFeed`'s Archive. The mock fixture is *not* cutoff-filtered against real "now", same reasoning as `mockNews`/`mockVideos` — a static fixture would age out to empty.
 
 **`title` is flattened up from `canonical.title`.** `normalizeStory` copies it to the top level so `lib/playlists.js::tracksFrom` — which reads a flat `title` + `audio_url`, same as an article or paper — works on a story with no changes to that shared code.
 
@@ -73,7 +74,21 @@ Videos with no parseable `processed_at` can't be placed in a batch, so Latest om
 
 **Rules:** `../../infra/firebase/firestore.rules` adds `stories` as public-read / `write: if false`, same shape as `processed_articles`.
 
-**Mock parity:** `public/fixtures/stories.json` backs `VITE_DATA_SOURCE=mock` — a flat array like `news.json`/`videos.json`, not manifest-driven. `mockStories` applies the same category-split + `latestRunOnly` slicing as the Firestore path so both sources produce identical shapes.
+**Mock parity:** `public/fixtures/stories.json` backs `VITE_DATA_SOURCE=mock` — a flat array like `news.json`/`videos.json`, not manifest-driven. `mockStories` applies the same category-split + `sortByRunThenRank` ordering as the Firestore path (both leave Latest/Archive slicing to `StoriesFeed.svelte`) so both sources produce identical shapes.
+
+### Knowledge Bytes (fifth section, from `services/ingest`'s `knowledge_bytes.yaml`)
+
+`#/knowledge` reads the **same** `processed_articles` collection as News, filtered to `constants.js::KNOWLEDGE_CATEGORY_CODES` (`aiml`, `dsa`) instead of `NEWS_CATEGORY_RSS_CODES` — same one-query-backs-both-views shape as `firestoreNews`, same composite index (`feed_category`, `processed_at`), and `KnowledgeFeed.svelte` is structurally a copy of `NewsFeed.svelte`'s Latest/Archive + category-tab pattern (this repo's established convention for these near-identical feed sections, see `NewsFeed`/`StoriesFeed`/`VideoFeed`). No follow/unfollow — there are only two sources total (one per series), so per-source muting would just be a second way to hide a whole tab — and no masthead "Listen Top" shortcut, unlike News.
+
+**The source is a sibling repo, not another FeedMind service.** `services/ingest/knowledge_bytes.yaml` fetches `https://florilex.web.app/<series>/rss.xml` — a fully static Astro site (`../florilex`) with no relationship to this repo's GCP project. Each florilex series feed exposes only its **2 most-recently-published lessons ever**, not a rolling time window, so most 08:00 runs find nothing new — that is the source's normal cadence, not a misconfiguration to chase.
+
+**`summarize: none` here means "use the feed's own description," not "no summary."** Every RSS `<description>` in florilex is already the lesson's own hand-written summary (`apps/aiml/src/content/config.ts`'s `summary` field), so re-summarizing it would be redundant work for a worse result. `packages/feedmind-core/feedmind_core/runner.py::_summarize`'s `SUMMARIZE_NONE` branch returns `article.snippet` (the fetched RSS text) rather than `""`, which is what `store.py::save_article` writes to the `summary` field the web app actually renders — the previously-existing behavior of returning `""` left the description stranded in `snippet`, a field `ArticleCard.svelte` never reads. This is a shared `feedmind-core` behavior change, not a Knowledge-Bytes-only branch: safe for `youtube.yaml` (never calls `_summarize`) and for `services/india-news-ingest` (its `summary` field is never read downstream — its articles are excluded from this web app's News tab via `curation_status` and rendered instead through `services/news-curator`'s own `ai_summary`).
+
+**No `curation_status`, so no summarizer changes.** Knowledge Bytes articles flow through `services/summarizer`'s default `RSS_FEED` pipeline exactly like News's tech-blog articles, getting a real LLM-generated `ai_summary` and audio in the same 08:00 batch — see the root `CLAUDE.md`'s ingest section.
+
+**Bookmarking reuses `ArticleCard`'s hardcoded `type="news"`.** A saved Knowledge Bytes lesson works (saves, restores, counts against `BOOKMARK_LIMIT`) but is grouped under the "AI Cloud Blogs" heading in `SavedView`, not its own — introducing a real `"knowledge"` bookmark type would touch `BOOKMARK_TYPES`, `SavedView.svelte`'s label map, and `prefs.js`, which wasn't asked for and isn't done here.
+
+**Mock parity:** `public/fixtures/knowledge.json` backs `VITE_DATA_SOURCE=mock`, same flat-array shape as `news.json`. `mockKnowledgeBytes` does **not** apply the window cutoff to the static fixture, same reasoning as `mockNews`/`mockStories` — a cutoff against real "now" would age it out to empty.
 
 ### Sign-in and per-user data (the one write path)
 

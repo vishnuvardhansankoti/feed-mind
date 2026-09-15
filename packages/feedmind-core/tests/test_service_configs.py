@@ -15,12 +15,16 @@ import yaml
 from feedmind_core import serviceconfig
 from feedmind_core.telegram import _CATEGORY_META
 
-# Feed categories the reader knows how to render. Duplicated by
-# apps/web/src/lib/constants.js::NEWS_CATEGORIES, which keys its tabs off the
-# same strings — including the inconsistent separators (open-source hyphenates,
-# top_stories underscores), which must be preserved exactly on both sides. The
-# reader matches with ===, so a "tidied" separator empties a tab silently.
-KNOWN_CATEGORIES = {"academic", "industry", "cloud", "open-source", "top_stories"}
+# Feed categories the web app knows how to render. Duplicated across two
+# independent tab lists — apps/web/src/lib/constants.js::NEWS_CATEGORIES
+# (academic/industry/cloud/open-source/top_stories) and ::KNOWLEDGE_CATEGORIES
+# (aiml/dsa) — which key their tabs off these same strings, including the
+# inconsistent separators (open-source hyphenates, top_stories underscores),
+# preserved exactly on both sides. The reader matches with ===, so a "tidied"
+# separator empties a tab silently.
+KNOWN_CATEGORIES = {
+    "academic", "industry", "cloud", "open-source", "top_stories", "aiml", "dsa",
+}
 
 SERVICES_DIR = Path(__file__).resolve().parents[3] / "services"
 FEED_CONFIGS = sorted(SERVICES_DIR.glob("ingest/*.yaml"))
@@ -61,9 +65,14 @@ def test_every_category_has_telegram_header_metadata(path):
     """Without an entry the digest header falls back to a generic badge.
 
     Legible, but not the wording anyone intended — and easy to miss, since it
-    renders fine.
+    renders fine. Scoped to groups that actually reach Telegram
+    (`deliver_telegram: true`) — a category from a web-app-only group (e.g.
+    knowledge_bytes.yaml's aiml/dsa) never renders into a digest header at
+    all, so requiring metadata for it here would just be dead configuration.
     """
     cfg = serviceconfig.load(path)
+    if not cfg.deliver_telegram:
+        pytest.skip(f"{cfg.service} never delivers to Telegram")
     missing = set(cfg.categories) - set(_CATEGORY_META)
     assert not missing, f"{cfg.service}: no header metadata for {missing}"
 

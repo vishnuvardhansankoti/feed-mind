@@ -26,7 +26,7 @@ export const queue = $state({
   /** [{ url, title, context }] */
   tracks: [],
   index: -1,
-  /** idle | loading | playing */
+  /** idle | loading | playing | paused */
   state: "idle",
   source: null,
   /**
@@ -105,6 +105,30 @@ async function advance() {
   } catch {
     // Autoplay refusal or an unreachable object — same dead end either way, and
     // the same handling as a track that finished.
+    if (queue.state !== "idle") advance();
+  }
+}
+
+/**
+ * Pause the running queue without losing its position. A no-op outside
+ * "playing" — in particular while "loading" (mid-track-swap in `advance()`,
+ * which also calls `el.pause()` internally), so that transient pause is never
+ * mistaken for a user-requested one.
+ */
+export function pauseQueue() {
+  if (queue.state !== "playing") return;
+  el?.pause();
+  queue.state = "paused";
+}
+
+/** Resume a paused queue from where it left off. A no-op unless paused. */
+export async function resumeQueue() {
+  if (queue.state !== "paused") return;
+  queue.state = "loading";
+  try {
+    await el.play();
+  } catch {
+    // Same dead end as any other unplayable track — skip to the next one.
     if (queue.state !== "idle") advance();
   }
 }

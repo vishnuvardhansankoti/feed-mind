@@ -16,6 +16,10 @@ import {
   BUSINESS_STORY_CATEGORIES,
   NEWS_COUNTRIES,
   NEWS_COUNTRY_CODES,
+  KNOWLEDGE_CATEGORIES,
+  KNOWLEDGE_CATEGORY_CODES,
+  KNOWLEDGE_WINDOW_DAYS,
+  KNOWLEDGE_MAX_ARTICLES,
 } from "./constants.js";
 
 describe("lens metadata", () => {
@@ -119,6 +123,48 @@ describe("story categories", () => {
     for (const code of STORY_CATEGORY_CODES) {
       expect(NEWS_CATEGORY_CODES).not.toContain(code);
     }
+  });
+});
+
+describe("knowledge categories", () => {
+  it("matches services/ingest/knowledge_bytes.yaml's category values", () => {
+    expect(KNOWLEDGE_CATEGORY_CODES).toEqual(["aiml", "dsa"]);
+  });
+
+  it("opens on AI/ML, so a new category cannot hijack the landing tab", () => {
+    // KnowledgeFeed seeds its selected tab from KNOWLEDGE_CATEGORIES[0].
+    expect(KNOWLEDGE_CATEGORIES[0].code).toBe("aiml");
+  });
+
+  it("gives every category a distinct code and label", () => {
+    const codes = KNOWLEDGE_CATEGORIES.map((c) => c.code);
+    const labels = KNOWLEDGE_CATEGORIES.map((c) => c.label);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("KNOWLEDGE_CATEGORY_CODES is derived from KNOWLEDGE_CATEGORIES", () => {
+    expect(KNOWLEDGE_CATEGORY_CODES).toEqual(KNOWLEDGE_CATEGORIES.map((c) => c.code));
+  });
+
+  it("shares processed_articles but has no overlap with NEWS_CATEGORY_CODES", () => {
+    // Same collection as News (unlike Stories, which is a separate collection
+    // entirely), so an overlapping code here really would cross-contaminate
+    // both tabs' Firestore queries — not just a future-proofing exercise.
+    for (const code of KNOWLEDGE_CATEGORY_CODES) {
+      expect(NEWS_CATEGORY_CODES).not.toContain(code);
+    }
+  });
+
+  it("has no overlap with STORY_CATEGORY_CODES", () => {
+    for (const code of KNOWLEDGE_CATEGORY_CODES) {
+      expect(STORY_CATEGORY_CODES).not.toContain(code);
+    }
+  });
+
+  it("defines a window and a read cap", () => {
+    expect(KNOWLEDGE_WINDOW_DAYS).toBeGreaterThan(0);
+    expect(KNOWLEDGE_MAX_ARTICLES).toBeGreaterThan(0);
   });
 });
 

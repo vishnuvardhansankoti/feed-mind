@@ -32,7 +32,7 @@ whole point of the monorepo is that each one is now a single diff.
 ```
 apps/web/                    Svelte 5 + Vite PWA -> Firebase Hosting
 packages/feedmind-core/      shared: feed URLs -> Firestore (not deployed alone)
-services/ingest/             CF gen2, 08:00 — news + YouTube
+services/ingest/             CF gen2, 08:00 — news + YouTube + Knowledge Bytes
 services/telegram-notifier/  CF gen2, Pub/Sub — sends the digest
 services/archive/            CF gen2, 1st & 16th — Firestore -> BigQuery
 services/india-news-ingest/  CF gen2, 17:30 CT — five Indian publications
@@ -48,24 +48,35 @@ scripts/                     test-all, lock-all, stage-service, deploy-feedmind,
                              setup-feedmind-infra, setup-wif
 ```
 
-`services/ingest` runs both feed groups on one 08:00 schedule. The groups are
+`services/ingest` runs three feed groups on one 08:00 schedule. The groups are
 separate YAML files rather than one list because they behave differently: only
-`news` goes to Telegram, and both are summarized and wake the AI-summary
-service. It used to carry a third group, `topstories.yaml` (one Times of India
-feed, unranked); that moved to `services/india-news-ingest` +
-`services/news-curator`, see `docs/feed-mind/news-curator-design.md`. Articles
-already stored with `feed_category=top_stories` keep their 90-day TTL and their
-web app tab — this was a live retirement, not a cutover, so old and new content
-coexist until the old rows expire.
+`news` goes to Telegram, `news` and `knowledge_bytes` are both summarized and
+wake the AI-summary service, `youtube` is neither. `knowledge_bytes.yaml`
+fetches the tutorial-series RSS feeds published by the sibling `florilex` repo
+(`https://florilex.web.app/<series>/rss.xml`) — each item's `<description>` is
+already the lesson's own hand-written summary, so `summarize: none` here means
+"skip Sumy/Gemini, use the feed's own text as `summary` directly," not "no
+summary" — see `packages/feedmind-core/feedmind_core/runner.py::_summarize`.
+Its articles carry no `curation_status`, so they flow through
+`services/summarizer`'s default `RSS_FEED` pipeline exactly like `news.yaml`'s
+articles, with no summarizer-side changes. It used to carry a different third
+group, `topstories.yaml` (one Times of India feed, unranked); that moved to
+`services/india-news-ingest` + `services/news-curator`, see
+`docs/feed-mind/news-curator-design.md`. Articles already stored with
+`feed_category=top_stories` keep their 90-day TTL and their web app tab — this
+was a live retirement, not a cutover, so old and new content coexist until the
+old rows expire.
 
 ## How the components fit together
 
 ```
-                    ┌── news.yaml       -> telegram_status=pending
+                    ┌── news.yaml            -> telegram_status=pending
+                    ├── youtube.yaml         -> youtube_videos
 Scheduler ─08:00─▶ ingest
-                    └── youtube.yaml    -> youtube_videos
+                    └── knowledge_bytes.yaml -> processed_articles (aiml/dsa,
+                                                 from the florilex repo's RSS)
                           │
-                          │ once, after both groups
+                          │ once, after every group
                           ├──▶ feedmind-telegram-ready ──▶ telegram-notifier
                           │                                      │
                           ▼                          queries telegram_status
@@ -134,8 +145,9 @@ two places the implementation deviates from the original doc (canonical
 selection has no scraped body to rank by; `rss_rank` is derived from
 `published_at` order, not the literal feed position), and
 `apps/web/CLAUDE.md`'s Stories section for what the reader does and does not
-do yet (no bookmarking, no follow/unfollow, no Latest/Archive split — those
-are natural follow-ups, not omissions to fix reflexively).
+do yet (no bookmarking, no follow/unfollow — those are natural follow-ups,
+not omissions to fix reflexively; a Latest/Archive split now exists, same
+one-query-backs-both-views shape as News and Videos).
 
 ## Contracts that span components
 
@@ -150,7 +162,7 @@ both sides are in the same commit.
 | `telegram_status` on an article | `services/ingest` (via `save_article`) | `services/telegram-notifier` | see below — this one is load-bearing |
 | `runs` / `run_status` doc shape | `services/paper-prism/src/paper_prism/models.py` | `apps/web/src/lib/data.js::normalizeRun` | both files |
 | `ai_summary`, `audio_url`, `audio_generated_at` | `services/summarizer` | `apps/web` cards | all three writers' docs are affected |
-| Category codes | `services/ingest/*.yaml` | `apps/web/src/lib/constants.js::NEWS_CATEGORIES` | both — matched with `===` |
+| Category codes | `services/ingest/*.yaml` | `apps/web/src/lib/constants.js::NEWS_CATEGORIES` (news.yaml) / `::KNOWLEDGE_CATEGORIES` (knowledge_bytes.yaml) | both — matched with `===`, and the two web constants must never share a code since both query the same `processed_articles` collection |
 | Pub/Sub message shape | both producers' `events.py` | `services/summarizer/main.py` | producer + consumer |
 | Firestore database id | `FIRESTORE_DATABASE` (job + function env) | `VITE_FIRESTORE_DATABASE` (web, build-time) | **three** places, plus `firebase.json` |
 | `curation_status` on an article | `services/india-news-ingest`, `services/us-news-ingest` (via `save_article`'s `extra` param) | `services/news-curator` | see `services/news-curator/CLAUDE.md` — `news-curator` re-declares the two string values by hand, since it does not depend on `feedmind-core` |

@@ -1,13 +1,14 @@
 <script>
   import { onMount } from "svelte";
   import { LENSES } from "./lib/constants.js";
-  import { getLatest, getArchive, getStatus, getNews, getVideos, getStories } from "./lib/data.js";
+  import { getLatest, getArchive, getStatus, getNews, getVideos, getStories, getKnowledgeBytes } from "./lib/data.js";
   import LensColumn from "./components/LensColumn.svelte";
   import PaperCard from "./components/PaperCard.svelte";
   import FreshnessBadge from "./components/FreshnessBadge.svelte";
   import NewsFeed from "./components/NewsFeed.svelte";
   import VideoFeed from "./components/VideoFeed.svelte";
   import StoriesFeed from "./components/StoriesFeed.svelte";
+  import KnowledgeFeed from "./components/KnowledgeFeed.svelte";
   import SearchBar from "./components/SearchBar.svelte";
   import ConsentBanner from "./components/ConsentBanner.svelte";
   import AccountMenu from "./components/AccountMenu.svelte";
@@ -25,19 +26,22 @@
   import { bookmarks } from "./lib/bookmarks.svelte.js";
 
   // Top-level section from the URL hash: "#/papers" -> papers, "#/videos" ->
-  // videos, "#/stories" -> stories, "#/saved" -> saved, anything else (incl.
-  // the default "#/") -> news, the landing section.
+  // videos, "#/stories" -> stories, "#/knowledge" -> knowledge, "#/saved" ->
+  // saved, anything else (incl. the default "#/") -> news, the landing
+  // section.
   const pageFromHash = () => {
     if (typeof location === "undefined") return "news";
     if (location.hash === "#/papers") return "papers";
     if (location.hash === "#/videos") return "videos";
     if (location.hash === "#/stories") return "stories";
+    if (location.hash === "#/knowledge") return "knowledge";
     if (location.hash === "#/saved") return "saved";
     return "news";
   };
   let page = $state(pageFromHash());
   const HASH = {
-    papers: "#/papers", videos: "#/videos", stories: "#/stories", saved: "#/saved", news: "#/",
+    papers: "#/papers", videos: "#/videos", stories: "#/stories",
+    knowledge: "#/knowledge", saved: "#/saved", news: "#/",
   };
   const goto = (p) => { location.hash = HASH[p] ?? "#/"; };
 
@@ -52,6 +56,7 @@
     { id: "papers", label: "Papers" },
     { id: "videos", label: "Videos" },
     { id: "stories", label: "News" },
+    { id: "knowledge", label: "Knowledge Bytes" },
   ];
   // Only for signed-in users: there is nothing to show otherwise, and the tab
   // would advertise a section that immediately turns them away.
@@ -138,6 +143,23 @@
     }
   }
 
+  // Knowledge Bytes are loaded lazily the first time that section is opened.
+  let knowledge = $state(null);       // { articles } once loaded
+  let knowledgeLoading = $state(false);
+  let knowledgeError = $state(null);
+
+  async function loadKnowledge() {
+    if (knowledge || knowledgeLoading) return;
+    knowledgeLoading = true;
+    try {
+      knowledge = await getKnowledgeBytes();
+    } catch (e) {
+      knowledgeError = e?.message ?? String(e);
+    } finally {
+      knowledgeLoading = false;
+    }
+  }
+
   // Papers: Listen All follows the visible tab, same rule as News.
   let paperQueue = $derived(
     tab === "latest" ? paperTracks(latest) : paperTracks(archive, { many: true }),
@@ -212,6 +234,7 @@
   $effect(() => { if (page === "news") loadNews(); });
   $effect(() => { if (page === "videos") loadVideos(); });
   $effect(() => { if (page === "stories") loadStories(); });
+  $effect(() => { if (page === "knowledge") loadKnowledge(); });
 
   // The settings sheet lists sources derived from the loaded documents, so both
   // lazy sections have to be fetched before it can show a complete list —
@@ -225,9 +248,10 @@
   let contentEl;
   const getContentEl = () => contentEl;
   let searchRevision = $derived(
-    `${page}|${tab}|${loading}|${newsLoading}|${videosLoading}|${storiesLoading}|` +
+    `${page}|${tab}|${loading}|${newsLoading}|${videosLoading}|${storiesLoading}|${knowledgeLoading}|` +
       `${news ? news.articles?.length : 0}|${videos ? videos.videos?.length : 0}|` +
       `${stories ? Object.values(stories.stories ?? {}).flat().length : 0}|` +
+      `${knowledge ? knowledge.articles?.length : 0}|` +
       `${Object.keys(latest).length}|${Object.keys(archive).length}|` +
       // Saved items are searchable content too, and starring one re-renders
       // the list without changing anything else in this key.
@@ -331,6 +355,14 @@
       {:else}
         <StoriesFeed stories={stories?.stories ?? {}} />
       {/if}
+    {:else if page === "knowledge"}
+      {#if knowledgeLoading}
+        <div class="state"><span class="spinner"></span> Loading Knowledge Bytes…</div>
+      {:else if knowledgeError}
+        <div class="state err">Couldn’t load Knowledge Bytes: {knowledgeError}</div>
+      {:else}
+        <KnowledgeFeed articles={knowledge?.articles ?? []} />
+      {/if}
     {:else}
 
     <div class="tabrow">
@@ -430,7 +462,10 @@
     border-right: 1px solid var(--border);
   }
   .sidebar .brand { margin-bottom: 2rem; }
-  .brand { display: flex; align-items: center; gap: 0.9rem; }
+  /* Stacked, not side-by-side: at the sidebar's 220px width a row layout left
+     so little room for the text that the icon's flex-shrink kicked in and
+     squashed it out of square. Stacking removes that competition entirely. */
+  .brand { display: flex; flex-direction: column; align-items: flex-start; gap: 0.7rem; }
   .sidebar-nav { display: flex; flex-direction: column; gap: 0.15rem; }
   .sidebar-nav button {
     font: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer;
@@ -441,7 +476,8 @@
   .sidebar-nav button.active { background: var(--surface-2); color: var(--text); }
 
   .prism {
-    width: 34px; height: 34px; border-radius: 9px;
+    width: 42px; height: 42px; border-radius: 11px;
+    flex-shrink: 0;
     background: conic-gradient(from 210deg, #ff6b6b, #ffd166, #4ade80, #38bdf8, #a78bfa, #ff6b6b);
   }
   h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; }

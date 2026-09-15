@@ -67,3 +67,41 @@ describe("StoriesFeed — country toggle", () => {
     expect(screen.getByText(/No US sports stories yet\./)).toBeVisible();
   });
 });
+
+describe("StoriesFeed — Latest/Archive window", () => {
+  // data.js now hands over the whole STORY_ARCHIVE_WINDOW_DAYS window,
+  // newest run_date first — same shape NewsFeed/VideoFeed group client-side.
+  const multiDay = {
+    IN: {
+      politics: [], global: [], sports: [], culture: [],
+      business: [
+        story("in-b-new", { run_date: "2026-09-10" }),
+        story("in-b-old", { run_date: "2026-09-09" }),
+      ],
+    },
+    US: { politics: [], global: [], business: [], sports: [], culture: [] },
+  };
+
+  it("Latest shows only the newest run_date's stories", async () => {
+    render(StoriesFeed, { stories: multiDay });
+    await clickTab("Business");
+    expect(screen.getByRole("link", { name: "Title in-b-new" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Title in-b-old" })).toBeNull();
+  });
+
+  it("Archive shows every run_date in the window", async () => {
+    render(StoriesFeed, { stories: multiDay });
+    await clickTab("Business");
+    await clickTab("Archive · 3 days");
+    expect(screen.getByRole("link", { name: "Title in-b-new" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Title in-b-old" })).toBeInTheDocument();
+  });
+
+  it("switching back to Latest drops the older day again", async () => {
+    render(StoriesFeed, { stories: multiDay });
+    await clickTab("Business");
+    await clickTab("Archive · 3 days");
+    await clickTab("Latest");
+    expect(screen.queryByRole("link", { name: "Title in-b-old" })).toBeNull();
+  });
+});

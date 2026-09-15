@@ -2,10 +2,11 @@
 main.py — feedmind-ingest: fetch every feed group into Firestore, then ring the
 Telegram notifier's doorbell.
 
-One function, two feed groups, one schedule (08:00 daily):
+One function, three feed groups, one schedule (08:00 daily):
 
-    news.yaml        the digest feeds  -> stored telegram_status=pending
-    youtube.yaml     channel uploads   -> youtube_videos, no summarization
+    news.yaml            the digest feeds     -> stored telegram_status=pending
+    youtube.yaml         channel uploads      -> youtube_videos, no summarization
+    knowledge_bytes.yaml florilex tutorial RSS -> stored, web-app only, no summarization
 
 Indian top-stories coverage moved out of this service to
 `services/india-news-ingest` + `services/news-curator` — see
@@ -54,12 +55,17 @@ logger = logging.getLogger("feedmind-ingest")
 # Order is deliberate: YouTube first because it is the cheapest group (7 fetches,
 # no summarization) and the one whose web-reader tab degrades most visibly if a
 # day is missed — its "Latest" is an ingest batch, so a skipped run is a visible
-# gap rather than staleness. News runs last because it is the group that absorbs
-# a partial run harmlessly: anything not stored is simply not deduplicated, and
-# tomorrow's run picks it up. The soft-timeout guard in the runner is what makes
-# this ordering matter at all; on a normal day every group completes.
+# gap rather than staleness. Knowledge Bytes runs second for the same "cheap,
+# no summarization" reason (2 fetches; florilex's own feeds expose only their 2
+# most-recent lessons, so most days there is nothing new to store at all — a
+# missed run here is the least urgent of the three). News runs last because it
+# is the group that absorbs a partial run harmlessly: anything not stored is
+# simply not deduplicated, and tomorrow's run picks it up. The soft-timeout
+# guard in the runner is what makes this ordering matter at all; on a normal
+# day every group completes.
 GROUPS = [
     serviceconfig.load_beside(__file__, "youtube.yaml"),
+    serviceconfig.load_beside(__file__, "knowledge_bytes.yaml"),
     serviceconfig.load_beside(__file__, "news.yaml"),
 ]
 

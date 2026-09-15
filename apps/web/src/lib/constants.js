@@ -63,6 +63,28 @@ export const NEWS_CATEGORY_RSS_CODES = NEWS_CATEGORY_CODES.filter(
 export const NEWS_WINDOW_DAYS = 7;
 export const NEWS_MAX_ARTICLES = 200;
 
+// Knowledge Bytes: tutorial-lesson RSS feeds from the sibling `florilex` repo
+// (services/ingest/knowledge_bytes.yaml), one series per code. A separate
+// top-level section from AI Cloud Blogs — these are evergreen lessons, not a
+// news digest — so they get their own category list rather than joining
+// NEWS_CATEGORIES; each `code` must match that YAML's `category:` field
+// byte-for-byte, same contract shape as NEWS_CATEGORIES <-> news.yaml.
+//
+// Order is tab order; the first entry is the default tab.
+export const KNOWLEDGE_CATEGORIES = [
+  { code: "aiml", label: "AI/ML" },
+  { code: "dsa", label: "DSA" },
+];
+
+export const KNOWLEDGE_CATEGORY_CODES = KNOWLEDGE_CATEGORIES.map((c) => c.code);
+
+// Same window/cap shape as NEWS_WINDOW_DAYS/NEWS_MAX_ARTICLES. Florilex's own
+// feeds only ever expose each series' 2 most-recently-published lessons (not a
+// rolling time window), so most days there's nothing new inside this window —
+// that's the source's normal cadence, not a bug in this constant.
+export const KNOWLEDGE_WINDOW_DAYS = 7;
+export const KNOWLEDGE_MAX_ARTICLES = 200;
+
 // Stories tab: curated Indian news, keyed by the `coarse_category` values
 // services/news-curator writes to the `stories` collection
 // (docs/feed-mind/news-curator-design.md §4.2). Deliberately no `tech` or
@@ -107,11 +129,16 @@ export const BUSINESS_STORY_CATEGORIES = {
   personal_finance: "Personal Finance",
 };
 
-// Rows fetched per category before slicing to the newest run_date client-side
-// (data.js::latestRunOnly) — generous enough to cover a busy day's full
-// cluster count for one category, not just its top-ranked canonical picks.
-// See data.js for why "the newest run" can't be a server-side equality filter.
-export const STORY_MAX_PER_CATEGORY = 50;
+// Rolling window (days) and hard read cap for the Stories tab, same shape as
+// NEWS_WINDOW_DAYS/NEWS_MAX_ARTICLES: one query per (country, category) backs
+// both the "Latest" (newest run_date, client-sliced — data.js::latestRunOnly)
+// and "Archive" (the whole window, grouped by day) views. 50/day is generous
+// enough to cover a busy category's full cluster count, not just its
+// top-ranked canonical picks, so the cap is sized per day and multiplied by
+// the window rather than picked independently.
+export const STORY_ARCHIVE_WINDOW_DAYS = 3;
+export const STORY_MAX_PER_DAY = 50;
+export const STORY_MAX_PER_CATEGORY = STORY_MAX_PER_DAY * STORY_ARCHIVE_WINDOW_DAYS;
 
 // Videos page: YouTube subscriptions written to `youtube_videos` by feed-mind.
 // One read backs both tabs — Latest (the most recent ingest batch) and Archive

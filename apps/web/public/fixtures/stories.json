@@ -7,7 +7,11 @@
     "rank": 1,
     "score": 0.842,
     "cluster_size": 3,
-    "sources": ["Economic Times", "Business Standard", "Times of India"],
+    "sources": [
+      "Economic Times",
+      "Business Standard",
+      "Times of India"
+    ],
     "canonical_article_id": "s-biz-01",
     "canonical": {
       "title": "RBI holds repo rate at 6.5% for the fifth straight review",
@@ -16,8 +20,16 @@
       "published_at": "2026-09-10T04:15:00Z"
     },
     "related_articles": [
-      { "source": "Business Standard", "url": "https://example.com/rbi-repo-bs", "title": "RBI MPC keeps rates unchanged" },
-      { "source": "Times of India", "url": "https://example.com/rbi-repo-toi", "title": "No change in repo rate, says RBI" }
+      {
+        "source": "Business Standard",
+        "url": "https://example.com/rbi-repo-bs",
+        "title": "RBI MPC keeps rates unchanged"
+      },
+      {
+        "source": "Times of India",
+        "url": "https://example.com/rbi-repo-toi",
+        "title": "No change in repo rate, says RBI"
+      }
     ],
     "ai_summary": "The RBI's Monetary Policy Committee held the repo rate steady at 6.5% for a fifth consecutive review, citing balanced inflation and growth risks.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-10/s-biz-01.mp3",
@@ -33,7 +45,9 @@
     "rank": 2,
     "score": 0.61,
     "cluster_size": 1,
-    "sources": ["Hindu BusinessLine"],
+    "sources": [
+      "Hindu BusinessLine"
+    ],
     "canonical_article_id": "s-biz-02",
     "canonical": {
       "title": "Fintech startup raises $50M Series B",
@@ -56,7 +70,10 @@
     "rank": 1,
     "score": 0.55,
     "cluster_size": 2,
-    "sources": ["Times of India", "The Hindu"],
+    "sources": [
+      "Times of India",
+      "The Hindu"
+    ],
     "canonical_article_id": "s-sports-01",
     "canonical": {
       "title": "India wins the T20 series decider",
@@ -65,7 +82,11 @@
       "published_at": "2026-09-10T18:30:00Z"
     },
     "related_articles": [
-      { "source": "The Hindu", "url": "https://example.com/india-t20-hindu", "title": "India clinches series in final over" }
+      {
+        "source": "The Hindu",
+        "url": "https://example.com/india-t20-hindu",
+        "title": "India clinches series in final over"
+      }
     ],
     "ai_summary": "India won the deciding T20 international in a last-over finish to take the series 2-1.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-10/s-sports-01.mp3",
@@ -81,7 +102,9 @@
     "rank": 1,
     "score": 0.63,
     "cluster_size": 1,
-    "sources": ["The Hindu"],
+    "sources": [
+      "The Hindu"
+    ],
     "canonical_article_id": "s-pol-01",
     "canonical": {
       "title": "Parliament passes the new data protection bill",
@@ -104,7 +127,10 @@
     "rank": 1,
     "score": 0.58,
     "cluster_size": 2,
-    "sources": ["The Hindu", "Times of India"],
+    "sources": [
+      "The Hindu",
+      "Times of India"
+    ],
     "canonical_article_id": "s-global-01",
     "canonical": {
       "title": "India and EU conclude a new trade agreement",
@@ -113,7 +139,11 @@
       "published_at": "2026-09-10T09:00:00Z"
     },
     "related_articles": [
-      { "source": "Times of India", "url": "https://example.com/india-eu-trade-toi", "title": "India, EU sign long-negotiated trade pact" }
+      {
+        "source": "Times of India",
+        "url": "https://example.com/india-eu-trade-toi",
+        "title": "India, EU sign long-negotiated trade pact"
+      }
     ],
     "ai_summary": "India and the European Union concluded a trade agreement after years of negotiation, cutting tariffs across several sectors.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-10/s-global-01.mp3",
@@ -129,7 +159,9 @@
     "rank": 1,
     "score": 0.52,
     "cluster_size": 1,
-    "sources": ["Times of India"],
+    "sources": [
+      "Times of India"
+    ],
     "canonical_article_id": "s-culture-01",
     "canonical": {
       "title": "Bollywood's biggest release of the year tops opening weekend",
@@ -152,7 +184,10 @@
     "rank": 1,
     "score": 0.79,
     "cluster_size": 2,
-    "sources": ["CNBC", "MarketWatch"],
+    "sources": [
+      "CNBC",
+      "MarketWatch"
+    ],
     "canonical_article_id": "s-us-biz-01",
     "canonical": {
       "title": "Fed holds rates steady, signals caution on inflation",
@@ -161,7 +196,11 @@
       "published_at": "2026-09-10T18:00:00Z"
     },
     "related_articles": [
-      { "source": "MarketWatch", "url": "https://example.com/fed-holds-rates-mw", "title": "Fed keeps rates unchanged, cites inflation risk" }
+      {
+        "source": "MarketWatch",
+        "url": "https://example.com/fed-holds-rates-mw",
+        "title": "Fed keeps rates unchanged, cites inflation risk"
+      }
     ],
     "ai_summary": "The Federal Reserve held interest rates steady, citing continued caution over inflation and mixed signals from the labor market.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-10/s-us-biz-01.mp3",
@@ -177,7 +216,9 @@
     "rank": 1,
     "score": 0.51,
     "cluster_size": 1,
-    "sources": ["CBS News"],
+    "sources": [
+      "CBS News"
+    ],
     "canonical_article_id": "s-us-sports-01",
     "canonical": {
       "title": "49ers edge Rams in season opener",
@@ -200,7 +241,10 @@
     "rank": 1,
     "score": 0.6,
     "cluster_size": 2,
-    "sources": ["NPR News", "CBS News"],
+    "sources": [
+      "NPR News",
+      "CBS News"
+    ],
     "canonical_article_id": "s-us-pol-01",
     "canonical": {
       "title": "Senate advances bipartisan spending bill",
@@ -209,7 +253,11 @@
       "published_at": "2026-09-10T16:00:00Z"
     },
     "related_articles": [
-      { "source": "CBS News", "url": "https://example.com/senate-spending-bill-cbs", "title": "Senate moves spending bill forward in bipartisan vote" }
+      {
+        "source": "CBS News",
+        "url": "https://example.com/senate-spending-bill-cbs",
+        "title": "Senate moves spending bill forward in bipartisan vote"
+      }
     ],
     "ai_summary": "The Senate advanced a bipartisan spending bill after weeks of negotiation, setting up a final vote before the funding deadline.",
     "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-10/s-us-pol-01.mp3",
@@ -225,7 +273,9 @@
     "rank": 1,
     "score": 0.54,
     "cluster_size": 1,
-    "sources": ["NPR News"],
+    "sources": [
+      "NPR News"
+    ],
     "canonical_article_id": "s-us-global-01",
     "canonical": {
       "title": "US and EU reach new trade framework",
@@ -248,7 +298,9 @@
     "rank": 1,
     "score": 0.48,
     "cluster_size": 1,
-    "sources": ["Fortune"],
+    "sources": [
+      "Fortune"
+    ],
     "canonical_article_id": "s-us-culture-01",
     "canonical": {
       "title": "Streaming service's new series breaks viewership records",
@@ -262,5 +314,637 @@
     "run_date": "2026-09-10",
     "created_at": "2026-09-10T00:05:32Z",
     "expires_at": "2026-12-09T00:05:32Z"
+  },
+  {
+    "story_id": "in_business_2026-09-09_01",
+    "country": "IN",
+    "coarse_category": "business",
+    "business_category": "markets",
+    "rank": 1,
+    "score": 0.842,
+    "cluster_size": 3,
+    "sources": [
+      "Economic Times",
+      "Business Standard",
+      "Times of India"
+    ],
+    "canonical_article_id": "s-biz-01",
+    "canonical": {
+      "title": "RBI holds repo rate at 6.5% for the fifth straight review",
+      "url": "https://example.com/rbi-repo-rate",
+      "source": "Economic Times",
+      "published_at": "2026-09-09T04:15:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "Business Standard",
+        "url": "https://example.com/rbi-repo-bs",
+        "title": "RBI MPC keeps rates unchanged"
+      },
+      {
+        "source": "Times of India",
+        "url": "https://example.com/rbi-repo-toi",
+        "title": "No change in repo rate, says RBI"
+      }
+    ],
+    "ai_summary": "The RBI's Monetary Policy Committee held the repo rate steady at 6.5% for a fifth consecutive review, citing balanced inflation and growth risks.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-biz-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "in_business_2026-09-09_02",
+    "country": "IN",
+    "coarse_category": "business",
+    "business_category": "companies",
+    "rank": 2,
+    "score": 0.61,
+    "cluster_size": 1,
+    "sources": [
+      "Hindu BusinessLine"
+    ],
+    "canonical_article_id": "s-biz-02",
+    "canonical": {
+      "title": "Fintech startup raises $50M Series B",
+      "url": "https://example.com/fintech-series-b",
+      "source": "Hindu BusinessLine",
+      "published_at": "2026-09-09T05:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": null,
+    "audio_url": null,
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "in_sports_2026-09-09_01",
+    "country": "IN",
+    "coarse_category": "sports",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.55,
+    "cluster_size": 2,
+    "sources": [
+      "Times of India",
+      "The Hindu"
+    ],
+    "canonical_article_id": "s-sports-01",
+    "canonical": {
+      "title": "India wins the T20 series decider",
+      "url": "https://example.com/india-t20-win",
+      "source": "Times of India",
+      "published_at": "2026-09-09T18:30:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "The Hindu",
+        "url": "https://example.com/india-t20-hindu",
+        "title": "India clinches series in final over"
+      }
+    ],
+    "ai_summary": "India won the deciding T20 international in a last-over finish to take the series 2-1.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-sports-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "in_politics_2026-09-09_01",
+    "country": "IN",
+    "coarse_category": "politics",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.63,
+    "cluster_size": 1,
+    "sources": [
+      "The Hindu"
+    ],
+    "canonical_article_id": "s-pol-01",
+    "canonical": {
+      "title": "Parliament passes the new data protection bill",
+      "url": "https://example.com/data-protection-bill",
+      "source": "The Hindu",
+      "published_at": "2026-09-09T12:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": "Parliament passed the new data protection bill, tightening consent requirements for cross-border data transfers.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-pol-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "in_global_2026-09-09_01",
+    "country": "IN",
+    "coarse_category": "global",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.58,
+    "cluster_size": 2,
+    "sources": [
+      "The Hindu",
+      "Times of India"
+    ],
+    "canonical_article_id": "s-global-01",
+    "canonical": {
+      "title": "India and EU conclude a new trade agreement",
+      "url": "https://example.com/india-eu-trade",
+      "source": "The Hindu",
+      "published_at": "2026-09-09T09:00:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "Times of India",
+        "url": "https://example.com/india-eu-trade-toi",
+        "title": "India, EU sign long-negotiated trade pact"
+      }
+    ],
+    "ai_summary": "India and the European Union concluded a trade agreement after years of negotiation, cutting tariffs across several sectors.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-global-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "in_culture_2026-09-09_01",
+    "country": "IN",
+    "coarse_category": "culture",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.52,
+    "cluster_size": 1,
+    "sources": [
+      "Times of India"
+    ],
+    "canonical_article_id": "s-culture-01",
+    "canonical": {
+      "title": "Bollywood's biggest release of the year tops opening weekend",
+      "url": "https://example.com/bollywood-opening-weekend",
+      "source": "Times of India",
+      "published_at": "2026-09-09T20:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": "The year's most anticipated Bollywood release posted the highest opening-weekend numbers of 2026 so far.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-culture-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "us_business_2026-09-09_01",
+    "country": "US",
+    "coarse_category": "business",
+    "business_category": "economy",
+    "rank": 1,
+    "score": 0.79,
+    "cluster_size": 2,
+    "sources": [
+      "CNBC",
+      "MarketWatch"
+    ],
+    "canonical_article_id": "s-us-biz-01",
+    "canonical": {
+      "title": "Fed holds rates steady, signals caution on inflation",
+      "url": "https://example.com/fed-holds-rates",
+      "source": "CNBC",
+      "published_at": "2026-09-09T18:00:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "MarketWatch",
+        "url": "https://example.com/fed-holds-rates-mw",
+        "title": "Fed keeps rates unchanged, cites inflation risk"
+      }
+    ],
+    "ai_summary": "The Federal Reserve held interest rates steady, citing continued caution over inflation and mixed signals from the labor market.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-us-biz-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "us_sports_2026-09-09_01",
+    "country": "US",
+    "coarse_category": "sports",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.51,
+    "cluster_size": 1,
+    "sources": [
+      "CBS News"
+    ],
+    "canonical_article_id": "s-us-sports-01",
+    "canonical": {
+      "title": "49ers edge Rams in season opener",
+      "url": "https://example.com/49ers-rams-opener",
+      "source": "CBS News",
+      "published_at": "2026-09-09T23:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": null,
+    "audio_url": null,
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "us_politics_2026-09-09_01",
+    "country": "US",
+    "coarse_category": "politics",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.6,
+    "cluster_size": 2,
+    "sources": [
+      "NPR News",
+      "CBS News"
+    ],
+    "canonical_article_id": "s-us-pol-01",
+    "canonical": {
+      "title": "Senate advances bipartisan spending bill",
+      "url": "https://example.com/senate-spending-bill",
+      "source": "NPR News",
+      "published_at": "2026-09-09T16:00:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "CBS News",
+        "url": "https://example.com/senate-spending-bill-cbs",
+        "title": "Senate moves spending bill forward in bipartisan vote"
+      }
+    ],
+    "ai_summary": "The Senate advanced a bipartisan spending bill after weeks of negotiation, setting up a final vote before the funding deadline.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-us-pol-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "us_global_2026-09-09_01",
+    "country": "US",
+    "coarse_category": "global",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.54,
+    "cluster_size": 1,
+    "sources": [
+      "NPR News"
+    ],
+    "canonical_article_id": "s-us-global-01",
+    "canonical": {
+      "title": "US and EU reach new trade framework",
+      "url": "https://example.com/us-eu-trade-framework",
+      "source": "NPR News",
+      "published_at": "2026-09-09T14:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": "The US and the European Union agreed on a new trade framework, easing tariffs on select goods after months of talks.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-09/s-us-global-01.mp3",
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "us_culture_2026-09-09_01",
+    "country": "US",
+    "coarse_category": "culture",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.48,
+    "cluster_size": 1,
+    "sources": [
+      "Fortune"
+    ],
+    "canonical_article_id": "s-us-culture-01",
+    "canonical": {
+      "title": "Streaming service's new series breaks viewership records",
+      "url": "https://example.com/streaming-series-record",
+      "source": "Fortune",
+      "published_at": "2026-09-09T13:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": null,
+    "audio_url": null,
+    "run_date": "2026-09-09",
+    "created_at": "2026-09-09T00:05:32Z",
+    "expires_at": "2026-12-08T00:05:32Z"
+  },
+  {
+    "story_id": "in_business_2026-09-08_01",
+    "country": "IN",
+    "coarse_category": "business",
+    "business_category": "markets",
+    "rank": 1,
+    "score": 0.842,
+    "cluster_size": 3,
+    "sources": [
+      "Economic Times",
+      "Business Standard",
+      "Times of India"
+    ],
+    "canonical_article_id": "s-biz-01",
+    "canonical": {
+      "title": "RBI holds repo rate at 6.5% for the fifth straight review",
+      "url": "https://example.com/rbi-repo-rate",
+      "source": "Economic Times",
+      "published_at": "2026-09-08T04:15:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "Business Standard",
+        "url": "https://example.com/rbi-repo-bs",
+        "title": "RBI MPC keeps rates unchanged"
+      },
+      {
+        "source": "Times of India",
+        "url": "https://example.com/rbi-repo-toi",
+        "title": "No change in repo rate, says RBI"
+      }
+    ],
+    "ai_summary": "The RBI's Monetary Policy Committee held the repo rate steady at 6.5% for a fifth consecutive review, citing balanced inflation and growth risks.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-biz-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "in_business_2026-09-08_02",
+    "country": "IN",
+    "coarse_category": "business",
+    "business_category": "companies",
+    "rank": 2,
+    "score": 0.61,
+    "cluster_size": 1,
+    "sources": [
+      "Hindu BusinessLine"
+    ],
+    "canonical_article_id": "s-biz-02",
+    "canonical": {
+      "title": "Fintech startup raises $50M Series B",
+      "url": "https://example.com/fintech-series-b",
+      "source": "Hindu BusinessLine",
+      "published_at": "2026-09-08T05:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": null,
+    "audio_url": null,
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "in_sports_2026-09-08_01",
+    "country": "IN",
+    "coarse_category": "sports",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.55,
+    "cluster_size": 2,
+    "sources": [
+      "Times of India",
+      "The Hindu"
+    ],
+    "canonical_article_id": "s-sports-01",
+    "canonical": {
+      "title": "India wins the T20 series decider",
+      "url": "https://example.com/india-t20-win",
+      "source": "Times of India",
+      "published_at": "2026-09-08T18:30:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "The Hindu",
+        "url": "https://example.com/india-t20-hindu",
+        "title": "India clinches series in final over"
+      }
+    ],
+    "ai_summary": "India won the deciding T20 international in a last-over finish to take the series 2-1.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-sports-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "in_politics_2026-09-08_01",
+    "country": "IN",
+    "coarse_category": "politics",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.63,
+    "cluster_size": 1,
+    "sources": [
+      "The Hindu"
+    ],
+    "canonical_article_id": "s-pol-01",
+    "canonical": {
+      "title": "Parliament passes the new data protection bill",
+      "url": "https://example.com/data-protection-bill",
+      "source": "The Hindu",
+      "published_at": "2026-09-08T12:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": "Parliament passed the new data protection bill, tightening consent requirements for cross-border data transfers.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-pol-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "in_global_2026-09-08_01",
+    "country": "IN",
+    "coarse_category": "global",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.58,
+    "cluster_size": 2,
+    "sources": [
+      "The Hindu",
+      "Times of India"
+    ],
+    "canonical_article_id": "s-global-01",
+    "canonical": {
+      "title": "India and EU conclude a new trade agreement",
+      "url": "https://example.com/india-eu-trade",
+      "source": "The Hindu",
+      "published_at": "2026-09-08T09:00:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "Times of India",
+        "url": "https://example.com/india-eu-trade-toi",
+        "title": "India, EU sign long-negotiated trade pact"
+      }
+    ],
+    "ai_summary": "India and the European Union concluded a trade agreement after years of negotiation, cutting tariffs across several sectors.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-global-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "in_culture_2026-09-08_01",
+    "country": "IN",
+    "coarse_category": "culture",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.52,
+    "cluster_size": 1,
+    "sources": [
+      "Times of India"
+    ],
+    "canonical_article_id": "s-culture-01",
+    "canonical": {
+      "title": "Bollywood's biggest release of the year tops opening weekend",
+      "url": "https://example.com/bollywood-opening-weekend",
+      "source": "Times of India",
+      "published_at": "2026-09-08T20:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": "The year's most anticipated Bollywood release posted the highest opening-weekend numbers of 2026 so far.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-culture-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "us_business_2026-09-08_01",
+    "country": "US",
+    "coarse_category": "business",
+    "business_category": "economy",
+    "rank": 1,
+    "score": 0.79,
+    "cluster_size": 2,
+    "sources": [
+      "CNBC",
+      "MarketWatch"
+    ],
+    "canonical_article_id": "s-us-biz-01",
+    "canonical": {
+      "title": "Fed holds rates steady, signals caution on inflation",
+      "url": "https://example.com/fed-holds-rates",
+      "source": "CNBC",
+      "published_at": "2026-09-08T18:00:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "MarketWatch",
+        "url": "https://example.com/fed-holds-rates-mw",
+        "title": "Fed keeps rates unchanged, cites inflation risk"
+      }
+    ],
+    "ai_summary": "The Federal Reserve held interest rates steady, citing continued caution over inflation and mixed signals from the labor market.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-us-biz-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "us_sports_2026-09-08_01",
+    "country": "US",
+    "coarse_category": "sports",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.51,
+    "cluster_size": 1,
+    "sources": [
+      "CBS News"
+    ],
+    "canonical_article_id": "s-us-sports-01",
+    "canonical": {
+      "title": "49ers edge Rams in season opener",
+      "url": "https://example.com/49ers-rams-opener",
+      "source": "CBS News",
+      "published_at": "2026-09-08T23:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": null,
+    "audio_url": null,
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "us_politics_2026-09-08_01",
+    "country": "US",
+    "coarse_category": "politics",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.6,
+    "cluster_size": 2,
+    "sources": [
+      "NPR News",
+      "CBS News"
+    ],
+    "canonical_article_id": "s-us-pol-01",
+    "canonical": {
+      "title": "Senate advances bipartisan spending bill",
+      "url": "https://example.com/senate-spending-bill",
+      "source": "NPR News",
+      "published_at": "2026-09-08T16:00:00Z"
+    },
+    "related_articles": [
+      {
+        "source": "CBS News",
+        "url": "https://example.com/senate-spending-bill-cbs",
+        "title": "Senate moves spending bill forward in bipartisan vote"
+      }
+    ],
+    "ai_summary": "The Senate advanced a bipartisan spending bill after weeks of negotiation, setting up a final vote before the funding deadline.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-us-pol-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "us_global_2026-09-08_01",
+    "country": "US",
+    "coarse_category": "global",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.54,
+    "cluster_size": 1,
+    "sources": [
+      "NPR News"
+    ],
+    "canonical_article_id": "s-us-global-01",
+    "canonical": {
+      "title": "US and EU reach new trade framework",
+      "url": "https://example.com/us-eu-trade-framework",
+      "source": "NPR News",
+      "published_at": "2026-09-08T14:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": "The US and the European Union agreed on a new trade framework, easing tariffs on select goods after months of talks.",
+    "audio_url": "https://storage.googleapis.com/feed-mind-audio-summaries/news-stories/2026-09-08/s-us-global-01.mp3",
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
+  },
+  {
+    "story_id": "us_culture_2026-09-08_01",
+    "country": "US",
+    "coarse_category": "culture",
+    "business_category": null,
+    "rank": 1,
+    "score": 0.48,
+    "cluster_size": 1,
+    "sources": [
+      "Fortune"
+    ],
+    "canonical_article_id": "s-us-culture-01",
+    "canonical": {
+      "title": "Streaming service's new series breaks viewership records",
+      "url": "https://example.com/streaming-series-record",
+      "source": "Fortune",
+      "published_at": "2026-09-08T13:00:00Z"
+    },
+    "related_articles": [],
+    "ai_summary": null,
+    "audio_url": null,
+    "run_date": "2026-09-08",
+    "created_at": "2026-09-08T00:05:32Z",
+    "expires_at": "2026-12-07T00:05:32Z"
   }
 ]
