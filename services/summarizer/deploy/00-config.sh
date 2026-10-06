@@ -68,7 +68,7 @@ export FEEDMIND_TTS_DEFAULT="${FEEDMIND_TTS_DEFAULT:-local}"
 # defaults (webscraper/speech.py::PIPER_DEFAULT_MODEL for Piper). Found by
 # testing the real deployed service against real production data before
 # wiring the real subscription.
-export TTS_RATE="${TTS_RATE:-200}"
+export TTS_RATE="${TTS_RATE:-175}"
 
 export LLM_API="${LLM_API:-openai}"
 export LLM_BASE_URL="${LLM_BASE_URL:-https://ollama.com/v1}"

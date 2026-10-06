@@ -271,7 +271,7 @@ All in [`00-config.sh`](00-config.sh), all env-overridable.
 | `LLM_MODEL` | `gpt-oss:120b` | |
 | `LLM_MAX_TOKENS` | `1200` | Headroom for `gpt-oss`'s reasoning, not longer output |
 | `LLM_API_KEY_SECRET` | `feedmind-llm-api-key` | Mounted as `LLM_API_KEY` |
-| `TTS_RATE` | `200` | Words per minute — shared by both backends, since both take a raw WPM value |
+| `TTS_RATE` | `175` | Words per minute — shared by both backends, since both take a raw WPM value |
 
 Deliberately **not** a `TTS_VOICE`/`FEEDMIND_VOICE` variable: `en-US-Neural2-F` is a Cloud-TTS-specific voice name with no equivalent on `espeak-ng`, so forcing one value onto both backends breaks whichever one it doesn't belong to (found the hard way — see Troubleshooting). `cloud_speech.py`'s own default already is that voice; `espeak-ng` uses its own default when none is given.
 
