@@ -30,10 +30,16 @@ SHAPE_DETAIL_CHARS = 300
 
 def post_json(url, payload, headers, timeout):
     """POST JSON, return the parsed JSON reply, raise LLMError on any failure."""
+    # Some providers' WAFs (e.g. Groq's Cloudflare, HTTP 403 "error code: 1010")
+    # block urllib's default "Python-urllib/3.x" User-Agent outright.
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", **headers},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "feedmind-audio/1.0",
+            **headers,
+        },
         method="POST",
     )
     try:

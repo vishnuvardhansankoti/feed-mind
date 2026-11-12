@@ -70,9 +70,18 @@ export FEEDMIND_TTS_DEFAULT="${FEEDMIND_TTS_DEFAULT:-local}"
 # wiring the real subscription.
 export TTS_RATE="${TTS_RATE:-175}"
 
+# Groq (2026-11): switched from ollama-cloud after hitting its free-tier
+# monthly limit, same gpt-oss-120b model (Groq's id: openai/gpt-oss-120b).
+# Groq speaks the same OpenAI wire format, so this is a base_url/model swap,
+# not a code change. max_tokens stays at 1200 — gpt-oss is a reasoning model
+# and spends part of the budget thinking before it answers, same as it did
+# on ollama-cloud; see webscraper/llm.py's ENV_OVERRIDES comment.
 export LLM_API="${LLM_API:-openai}"
-export LLM_BASE_URL="${LLM_BASE_URL:-https://ollama.com/v1}"
-export LLM_MODEL="${LLM_MODEL:-gpt-oss:120b}"
+export LLM_BASE_URL="${LLM_BASE_URL:-https://api.groq.com/openai/v1}"
+export LLM_MODEL="${LLM_MODEL:-openai/gpt-oss-120b}"
+
+#export LLM_BASE_URL="${LLM_BASE_URL:-https://ollama.com/v1}"
+#export LLM_MODEL="${LLM_MODEL:-gpt-oss:120b}"
 export LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-1200}"
 export VAPID_SUBJECT="${VAPID_SUBJECT:-mailto:shankotai@gmail.com}"
 
