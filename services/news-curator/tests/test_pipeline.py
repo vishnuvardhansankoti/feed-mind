@@ -94,12 +94,20 @@ class FakeSink:
     def __init__(self) -> None:
         self.stories = []
         self.clustered = []
+        self.uncategorized = []
+        self.pruned = []
 
     def write_story(self, story) -> None:
         self.stories.append(story)
 
     def mark_clustered(self, article_id, story_id, is_canonical, audio_eligible) -> None:
         self.clustered.append((article_id, story_id, is_canonical, audio_eligible))
+
+    def mark_uncategorized(self, article_id) -> None:
+        self.uncategorized.append(article_id)
+
+    def prune_category(self, country, coarse_category, keep) -> None:
+        self.pruned.append((country, coarse_category, keep))
 
 
 @pytest.fixture
@@ -112,6 +120,7 @@ def config() -> Config:
         coarse_threshold=0.28,
         cluster_distance_threshold=0.22,
         top_k_per_category=1,
+        story_limit_per_category=20,
     )
 
 

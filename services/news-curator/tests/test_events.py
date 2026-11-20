@@ -22,6 +22,7 @@ def _config(sink="firestore", project="feed-mind", topic="feedmind-content-ready
         coarse_threshold=0.28,
         cluster_distance_threshold=0.22,
         top_k_per_category=5,
+        story_limit_per_category=20,
         content_ready_topic=topic,
     )
 

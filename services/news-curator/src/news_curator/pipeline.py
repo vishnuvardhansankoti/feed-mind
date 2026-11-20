@@ -78,6 +78,16 @@ def run(config: Config, embedder: Embedder, articles: list[CuratedArticle], sink
     coarse_vecs, coarse_codes = classify.coarse_anchor_matrix(embedder.encode)
     coarse_labels = classify.classify_coarse(embeddings, coarse_vecs, coarse_codes, config.coarse_threshold)
 
+    # Drain uncategorized articles out of the pending backlog immediately,
+    # rather than leaving them for the cluster loop below to just skip. The
+    # cluster loop only ever advances articles whose label matched an anchor;
+    # anything UNCATEGORIZED was otherwise never written back to Firestore,
+    # so it stayed "pending" forever and was re-embedded and re-classified on
+    # every single future run — see store.py's CURATION_UNCATEGORIZED.
+    for article, label in zip(articles, coarse_labels, strict=True):
+        if label == UNCATEGORIZED:
+            sink.mark_uncategorized(article.article_id)
+
     business_vecs, business_codes = classify.business_anchor_matrix(embedder.encode)
 
     created_at = datetime.now(UTC)
@@ -174,6 +184,13 @@ def run(config: Config, embedder: Embedder, articles: list[CuratedArticle], sink
                         is_canonical=article.article_id == canonical.article_id,
                         audio_eligible=audio_eligible,
                     )
+
+            # Cap the standing set for this (country, coarse_category) once
+            # per run, after today's stories are written — not per-story,
+            # same reasoning as events.py publishing once per run rather
+            # than once per cluster. See store.py's prune_category docstring
+            # for why this evicts by run_date rather than by score.
+            sink.prune_category(country, coarse_category, config.story_limit_per_category)
 
     summary.articles_uncategorized = sum(1 for label in coarse_labels if label == UNCATEGORIZED)
     log.info(

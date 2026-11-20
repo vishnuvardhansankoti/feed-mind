@@ -184,7 +184,19 @@ similarity is a dot product.
 ### 4.2 Zero-shot classification
 
 Each article's vector is matched to the anchor with maximum cosine similarity.
-Below **0.28**, the article is `uncategorized`.
+Below **0.15** (`COARSE_THRESHOLD`), the article is `uncategorized`. This doc
+originally specified 0.28, but that was never exercised against real data
+end to end before shipping — the push subscription silently 403'd for
+months (see `services/news-curator/CLAUDE.md`), so the first real run was
+2026-11-09, and at 0.28 the best-anchor score across a 300-article real
+sample topped out at 0.2782: zero articles ever classified. Recalibrated to
+0.15 (see `config.py`'s `COARSE_THRESHOLD` comment for the sampling detail).
+An uncategorized article is now marked terminal (`store.py`'s
+`CURATION_UNCATEGORIZED`) rather than left `pending` forever — before that
+fix, a miscalibrated threshold meant the backlog never drained and every
+run re-embedded and re-classified the same growing set of articles, which is
+what turned into a runaway Cloud Run billing loop once the subscription
+started actually delivering.
 
 prd-new's anchor sentences are US-written — "parliament", "United Nations",
 "olympic". These are rewritten for Indian coverage, because the anchor text is the
@@ -223,9 +235,21 @@ the source does not have.
 ### 4.4 Event clustering
 
 Agglomerative hierarchical clustering, complete linkage, cosine distance
-`d = 1 − cos`, cutoff **τ = 0.22**, run independently within each coarse category.
-Singletons form clusters of size 1. τ is the number most likely to need tuning
-against real output; prd-new §7 suggests the 0.20–0.25 range.
+`d = 1 − cos`, cutoff **τ = 0.4** (`CLUSTER_DISTANCE_THRESHOLD`), run
+independently within each coarse category. Singletons form clusters of size 1.
+
+τ started at 0.22 (prd-new §7 suggested 0.20–0.25) but was never validated
+against real cross-outlet duplicates before shipping. Checked against a real
+case once the pipeline was actually running end to end (2026-11): three
+articles from two outlets all covering one Trump-Xi-Putin trilateral sat at
+cosine distance 0.35–0.58 from each other — all above 0.22, so none merged.
+Across two months of production, 1,327 of 1,339 `IN`/`politics` stories were
+single-article "clusters." Recalibrated to 0.4 by sweeping thresholds against
+a real day of 109 India-general articles: it merges genuine duplicates
+without yet merging distinct stories, which starts happening at 0.55 (e.g. a
+cricket final and a football final merged as "the same story" because both
+mention India beating Pakistan). See `config.py`'s comment for the full
+sweep.
 
 ### 4.5 Ranking
 
@@ -387,10 +411,15 @@ target with human labels. There are no human labels, and none are planned. The
 anchor sentences in §4.2 are the only lever, and the honest position is that the
 first weeks of output are the evaluation.
 
-**Clustering precision is likewise unmeasured**, and τ = 0.22 is inherited from
-prd-new rather than tuned on Indian copy. A too-low τ shows duplicates; a too-high
-τ merges unrelated stories within a category, which is the worse failure because
-it silently drops an event.
+**Clustering precision is measured once now, not continuously.** τ moved from
+0.22 (inherited from prd-new, never tuned on real copy) to 0.4, calibrated
+against one real day's worth of articles (§4.4) — but that is a single
+snapshot, not an ongoing evaluation. A too-low τ shows duplicates; a too-high
+τ merges unrelated stories within a category, which is the worse failure
+because it silently drops an event. 0.4 sits just below where that second
+failure mode started appearing in the sweep, but a different day's news mix
+could land differently — there are still no human labels and none are
+planned.
 
 **prd-new's 4-minute runtime KPI is not a target here.** §6 of that document
 mandates a 1s per-domain scrape delay, which alone puts 223 sequential fetches

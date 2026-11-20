@@ -1,9 +1,12 @@
 """Event clustering (design doc §4.4).
 
 Agglomerative hierarchical clustering, complete linkage, cosine distance
-d = 1 - cos, cutoff tau = 0.22, run independently within each coarse category
-(never across categories — a politics article and a business article never
-compete for the same cluster regardless of how similar their embeddings are).
+d = 1 - cos, cutoff tau = config.py's CLUSTER_DISTANCE_THRESHOLD (0.4 — see
+that file's comment for how this was calibrated against real duplicate
+coverage, not the design doc's original 0.22), run independently within each
+coarse category (never across categories — a politics article and a business
+article never compete for the same cluster regardless of how similar their
+embeddings are).
 """
 
 from __future__ import annotations

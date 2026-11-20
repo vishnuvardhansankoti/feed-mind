@@ -32,6 +32,18 @@ STORIES_COLLECTION = "stories"
 CURATION_PENDING = "pending"
 CURATION_CLUSTERED = "clustered"
 
+# A terminal status for articles that classify.classify_coarse could not match
+# to any anchor above COARSE_THRESHOLD. Not part of the cross-service
+# contract above — india/us-news-ingest never write or read this value, it
+# only exists so fetch_pending_articles stops returning the same article
+# forever. Before this existed, an uncategorized article stayed "pending"
+# permanently and was re-embedded and re-classified on every single curation
+# run, since nothing ever flipped its status — this is what let the backlog
+# grow unbounded and turned a miscalibrated COARSE_THRESHOLD into a runaway
+# Cloud Run billing loop (see docs/feed-mind/news-curator-design.md's
+# threshold note and config.py's COARSE_THRESHOLD comment).
+CURATION_UNCATEGORIZED = "uncategorized"
+
 
 def fetch_pending_articles(db) -> list[CuratedArticle]:
     """Every article india-news-ingest or us-news-ingest has stored but this
@@ -82,6 +94,8 @@ class Sink(Protocol):
     def mark_clustered(
         self, article_id: str, story_id: str, is_canonical: bool, audio_eligible: bool
     ) -> None: ...
+    def mark_uncategorized(self, article_id: str) -> None: ...
+    def prune_category(self, country: str, coarse_category: str, keep: int) -> None: ...
 
 
 class LocalJsonSink:
@@ -110,6 +124,15 @@ class LocalJsonSink:
             article_id, story_id, is_canonical, audio_eligible,
         )
 
+    def mark_uncategorized(self, article_id: str) -> None:
+        log.info("(local) would mark %s: curation_status=%s", article_id, CURATION_UNCATEGORIZED)
+
+    def prune_category(self, country: str, coarse_category: str, keep: int) -> None:
+        log.info(
+            "(local) would prune country=%s coarse_category=%s to the %d most recent",
+            country, coarse_category, keep,
+        )
+
 
 class FirestoreSink:
     def __init__(self, db) -> None:
@@ -129,6 +152,44 @@ class FirestoreSink:
                 "audio_eligible": audio_eligible,
                 "curation_status": CURATION_CLUSTERED,
             }
+        )
+
+    def mark_uncategorized(self, article_id: str) -> None:
+        self.db.collection(PROCESSED_ARTICLES_COLLECTION).document(article_id).update(
+            {"curation_status": CURATION_UNCATEGORIZED}
+        )
+
+    def prune_category(self, country: str, coarse_category: str, keep: int) -> None:
+        """Cap the standing count of stories/(country, coarse_category) at `keep`.
+
+        Evicts by `run_date` (most recent survives), `score` only breaking
+        ties within the same day — rank.py's score has no recency term, so
+        pruning by score alone would let one big story from weeks ago block
+        every new one in that category forever. Two equality filters, no
+        order_by, so this needs no composite index (same reasoning as
+        fetch_pending_articles above) — just a full fetch + client-side sort,
+        which is fine at the scale one category's standing set actually
+        reaches.
+        """
+        from google.cloud.firestore_v1.base_query import FieldFilter
+
+        docs = list(
+            self.db.collection(STORIES_COLLECTION)
+            .where(filter=FieldFilter("country", "==", country))
+            .where(filter=FieldFilter("coarse_category", "==", coarse_category))
+            .stream()
+        )
+        if len(docs) <= keep:
+            return
+
+        rows = [(doc, doc.to_dict() or {}) for doc in docs]
+        rows.sort(key=lambda row: (row[1].get("run_date", ""), row[1].get("score", 0.0)), reverse=True)
+
+        for stale_doc, _ in rows[keep:]:
+            stale_doc.reference.delete()
+        log.info(
+            "Pruned %d stale stories: country=%s coarse_category=%s kept=%d",
+            len(rows) - keep, country, coarse_category, keep,
         )
 
 
